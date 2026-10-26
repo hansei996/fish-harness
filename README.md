@@ -17,14 +17,14 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | 路径 | 是什么 |
 | --- | --- |
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
-| [`verify/`](verify/) | 42 项存储/策略不变量 + 17 项真实 dsh 端到端 + 一条 opt-in 的真实唤醒检查 |
+| [`verify/`](verify/) | 61 项存储/策略/soak 不变量 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.4（当前）· `v0.1` / `v0.2` / `v0.3` 保留在旁，可对照错在哪 |
 | [`docs/dsh-schedule-api.md`](docs/dsh-schedule-api.md) | dsh `schedule` 的可落地 API 结论（带 `包名/文件:行号` 证据） |
 | [`docs/wake-verification.md`](docs/wake-verification.md) | 自主唤醒验了什么、**没验什么** |
 | [`docs/wake-e2e.md`](docs/wake-e2e.md) | 真实 web profile 下一次真实唤醒的实测记录 |
 | [`docs/ci.md`](docs/ci.md) | CI 的固定项与理由 |
-| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍两套 verify |
+| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍三套 verify（smoke / e2e / pack） |
 
 ---
 
@@ -90,13 +90,25 @@ ffmpeg -framerate 30 -i frames/f%04d.png -c:v libx264 \
 
 ## 装法
 
+> **还没发布到 npm。** 现在 `dsh plugin add dsh-life` 会以 `ERR_PNPM_FETCH_404` 失败（`dsh-life` 在 registry 上还是 404）。下面的 `link:` 方式是当前唯一能装上的路。发布之后这两行会换过来 —— 我不想在 README 里写一句你自己一跑就红的命令。
+
 ```sh
-dsh plugin --profile <你的 profile> add dsh-life
-# 或从本地检出安装：
-dsh plugin --profile <你的 profile> add link:/绝对路径/packages/dsh-life
+git clone https://github.com/hansei996/fish-harness
+cd fish-harness
+dsh plugin --profile <你的 profile> add link:$(pwd)/packages/dsh-life
+```
+
+Windows PowerShell 里把 `$(pwd)` 换成绝对路径，例如：
+
+```powershell
+dsh plugin --profile <你的 profile> add link:C:\Users\you\fish-harness\packages\dsh-life
 ```
 
 插件自带 `cordis.patch.yml`，**不需要手改 profile 配置**。装完重启 profile。
+
+装完怎么确认它真的挂上了：`dsh --profile <profile> --dump-config | findstr dsh-life`，或者在会话里问它 `life_whoami`。状态落在 `$DSH_HOME/life/<lifeId>/`，装坏了删掉那个目录就能从零开始。
+
+> 装不上的两种常见原因：① dsh 用的是打包版（`dsh.cmd` 走 asar），`plugin add` 内部调不到 pnpm —— 换 `pnpm add @deepseek-ai/dsh` 装出来的那个；② PATH 里没有 `pnpm`（见 `verify/README.md` 的 shim 写法）。
 
 配置项（经 Standard Schema 校验，非法值会拒绝而不是静默忽略）：
 
@@ -134,9 +146,9 @@ dsh plugin --profile <你的 profile> add link:/绝对路径/packages/dsh-life
 
 安全策略与预算独立于这三档，**不随「成长」自动解除**。
 
-### 12 个模型可见工具
+### 13 个模型可见工具
 
-`life_whoami` · `life_start_activity` · `life_finish_activity` · `life_note_interest` · `life_note_skill` · `life_promise` · `life_settle_commitment` · `life_remember_person` · `life_ledger` · `life_identity_update` · `life_snapshot_for_keeper` · `life_wake`
+`life_whoami` · `life_start_activity` · `life_finish_activity` · `life_note_interest` · `life_note_skill` · `life_promise` · `life_settle_commitment` · `life_remember_person` · `life_ledger` · `life_identity_update` · `life_snapshot_for_keeper` · `life_wake` · `life_candidates`
 
 ### 它到点会自己醒
 
@@ -149,8 +161,25 @@ dsh plugin --profile <你的 profile> add link:/绝对路径/packages/dsh-life
 - **每日预算**：每次投递按 `messageId` 幂等记账（dsh 不保证 exactly-once）；当天用满就只布「明天最早那一次」，不是永久停摆，也不是 15 分钟重试。
 - **醒来后知道要干什么**：那一轮的系统提示词开头多一句「这一轮是你自己醒来的，没有人跟你说话」，结尾要求先读状态、再决定继续或明确休息，**不许为了显得活着而编造经历**。
 - **模型自己定时间**：`life_wake` 接受 `afterMinutes` 或 `at`，替换当前闹钟而不是叠加；静默与预算同样生效，用完就如实拒绝。
+- **不整天消失**：如果下一次唤醒会被静默段推到「后天」，就夹到被跳过那天的最后一个允许时刻（默认 22:59），而不是让整整一天没有任何一次醒来。这条是 soak 抓出来的（`every=24h±4h` 时出现过 34 小时的静默空窗）。
 
-已知边界见 [`docs/wake-verification.md`](docs/wake-verification.md)：标准 preset / 桌面 GUI 下的一次真实唤醒尚未被观察到（dsh `0.2.1-rc.2` 的 preset audit 有问题，实测只能在 preset-free overlay 下建会话）。
+已知边界见 [`docs/wake-verification.md`](docs/wake-verification.md)。真实唤醒已在 shipped `standard` preset 下观察到（`verify/live/`，3/3）；早前那次「只能在 preset-free overlay 里醒」是**本机一个装坏了的 dsh**，不是 dsh 的 bug —— 复盘见 [`docs/dsh-preset-audit.md`](docs/dsh-preset-audit.md)。
+
+### 醒来之后做什么
+
+醒着不等于在活。唤醒轮会附一份**有界**（≤600 字符）的候选短名单，按 `docs/PLAN.md` §6.2 的公式算出来：
+
+```
+优先级 = 承诺紧迫度 + 兴趣匹配 + 未完成事项价值 + 适度探索 - 成本 - 风险 - 切换损耗
+```
+
+每条候选都带**理由**和七项分数明细（`lib/choose.js`，纯函数、时钟可注入）：
+
+- 「昨天在这一关失败了」→ 未完成事项分高；「答应过今天写完」→ 承诺紧迫度高；「只观察过两次的兴趣」→ 探索加成；
+- **「休息，什么都不做」永远是候选之一**，固定 0.35，不会被高分候选挤掉 —— 允许不行动，才不会有「为了活跃而制造事件」；
+- 当天唤醒额度快用完时，「开新坑」的成本上调，休息和继续手上的事自然上浮。
+
+它**不是命令**：模型可以选，也可以不选。非唤醒轮一个字符都不加（那是每轮成本）；`life_candidates` 可以让它随时追问「为什么这条排第一」。
 
 ### 一条证据规则
 
@@ -168,17 +197,18 @@ dsh plugin --profile <你的 profile> add link:/绝对路径/packages/dsh-life
 
 | 文件 | 行数 | 做什么 |
 | --- | --- | --- |
-| `lib/index.js` | 798 | 插件入口：注册工具、注入上下文、监听会话事件、向 `schedule` 布防 |
+| `lib/index.js` | 877 | 插件入口：注册工具、注入上下文、监听会话事件、向 `schedule` 布防 |
 | `lib/store.js` | 519 | 生命状态机：三档变量、承诺、关系、账本、唤醒绑定；原子落盘 |
-| `lib/wake.js` | 159 | 唤醒策略纯函数：静默区间、`every ± jitter`、明日兜底；随机量可注入 |
-| `lib/config.js` | 170 | 零依赖 Standard Schema 校验器（含唤醒字段） |
+| `lib/wake.js` | 238 | 唤醒策略纯函数：静默区间、`every ± jitter`、不跳日夹取、明日兜底；随机量可注入 |
+| `lib/choose.js` | 629 | 活动选择器：七项加权、理由与明细、休息恒存；时钟可注入、无随机 |
+| `lib/config.js` | 175 | 零依赖 Standard Schema 校验器（含唤醒与选择器字段） |
 
 **为什么零自有依赖**：插件会被装进 npm CLI 或内置 Electron 运行时，两者依赖解析根不同。只用 Node 内置模块，才能保证在两种环境下都加载得起来。
 
 **五个挂载点**（全部是公开扩展点）：
 
 ```
-inject(['tools'])            → ctx.tools.register()      注册 12 个工具
+inject(['tools'])            → ctx.tools.register()      注册 13 个工具
 inject(['systemPrompt'])     → ctx.systemPrompt.section() 注入每轮上下文
 inject(['schedule'])         → ctx.schedule.create()      布防一次性唤醒
 on('agent/inbox/claimed')    → 在 prompt 组装前知道「这一轮是唤醒」
@@ -208,12 +238,13 @@ wake.json          唤醒绑定 · 下一个闹钟 · 当天预算 · 已投递 
 
 ## 验证
 
-两套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。
+三套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。
 
 ```sh
-node verify/smoke.mjs       # 42 项：存储不变量 + 唤醒策略（确定性，不 spawn dsh，约 5s）
+node verify/smoke.mjs       # 61 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性，不 spawn dsh，约 5s）
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs   # 17 项：真实 dsh 端到端
-node verify/live/wake-live.mjs                # 可选：真实 web profile 的一次真实唤醒（约 1–2 min）
+DSH_BIN=<dsh bin> node verify/pack-install.mjs # 9 项：打出来的包能不能装进 profile 并激活（约 20s）
+node verify/live/wake-live.mjs                # 可选：真实 web profile 的一次真实唤醒（约 1–2 min；会先验安装是否健康）
 ```
 
 `e2e` 那套**不是 mock**：它用 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装进去，真启动，然后断言运行系统的实际产出 —— 磁盘上的身份、账本里的真实 `turn/end`、**装配后**的系统提示词里的生命层 section、以及 12 个工具 schema 全部对模型可见。
@@ -260,9 +291,8 @@ node verify/live/wake-live.mjs                # 可选：真实 web profile 的�
 
 ## 已知限制
 
-- **唤醒后的活动选择仍是手动的。** 醒是醒了，读状态、挑活动、收尾都靠模型自己；还没有候选排序，也没有「醒来后不知道要干什么」的兜底流程。
-- **标准 preset / 桌面 GUI 下的一次真实唤醒还没被观察到。** dsh `0.2.1-rc.2` 目前 `session/create` 会返回 `agent-preset/invalid`；能醒的那条路是 preset-free overlay（见 `verify/live/`）。这条最该先修。
-- **连续多日唤醒可靠性未实测。** 规划 §10.2 的决策门是无人干预 7 天；接口跑通只证明能接上，不证明长跑不漂移。会话归档会掐断唤醒（dsh `schedule` 语义），归档策略还没定。
+- **活动选择是排序器给的候选，不是命令。** `lib/choose.js` 把承诺紧迫度、兴趣、未完成事项、技能、探索加成和切换成本算成一份**带理由**的短名单（`休息` 永远在名单里、分数固定 0.35），只在唤醒轮注入（≤600 字符）。它还不会自己「学会」该偏好什么——权重是手写的，没有从经历里回归出参数。
+- **真实 7 天无人干预仍未跑过。** 策略层用确定性模拟覆盖了「不跳日、不落静默、不超预算、跨天重置」这些不变量；真实长跑、真实凭据下的行为没测。会话归档会掐断唤醒（dsh `schedule` 的语义），归档策略还没定。
 - **`wakeEnabled: false` / `paused: true` 不撤销已排的闹钟**，只停止继续布防。
 - **账本只记了回合边界，还没记结果。** 监听工具结果能让账本证明更多，尚未接。
 - **没有 UI 实体。** 界面目前是原型，生命只能通过工具看到。

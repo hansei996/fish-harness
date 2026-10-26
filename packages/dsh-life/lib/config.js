@@ -30,6 +30,10 @@ const DEFAULTS = {
   wakeQuietEnd: '08:00',
   wakeMaxPerDay: 6,
   wakePrompt: '（自主唤醒）现在没有人跟你说话，是你自己醒的。先 life_whoami 看看自己的状态，再决定继续昨天没做完的事，或者明确休息。真实经历才算经历，没有证据就如实说没做成。',
+  // Activity chooser (docs/PLAN.md §6.2). Optional: disabling it leaves the
+  // life to decide without a ranked shortlist, which is honest degradation.
+  chooserEnabled: true,
+  chooserTopN: 3,
 }
 
 const CLOCK_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
@@ -89,7 +93,7 @@ function validate (input) {
     }
   }
 
-  for (const key of ['injectContext', 'autoCreate', 'wakeEnabled']) {
+  for (const key of ['injectContext', 'autoCreate', 'wakeEnabled', 'chooserEnabled']) {
     if (!(key in raw)) continue
     if (typeof raw[key] !== 'boolean') {
       issues.push(issue(key, `${key} must be a boolean`))
@@ -114,6 +118,7 @@ function validate (input) {
     ['wakeEveryMinutes', 15, 1440],
     ['wakeJitterMinutes', 0, 240],
     ['wakeMaxPerDay', 1, 48],
+    ['chooserTopN', 1, 5],
   ]) {
     if (!(key in raw)) continue
     const value = raw[key]

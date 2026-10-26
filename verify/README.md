@@ -4,8 +4,8 @@
 
 | 套件 | 查什么 | 本机实测 |
 |---|---|---|
-| `verify/smoke.mjs` | 26 项存储不变量/装载 + 16 项自主唤醒（固定时钟与随机数，不需要真 dsh） | 42/42 通过 |
-| `verify/e2e-tools.mjs` | 17 项端到端：真 dsh 装载插件、12 个工具可见、身份/账本落盘、无 schedule 时降级、web 模板确实带 schedule | 17/17 通过 |
+| `verify/smoke.mjs` | 26 项存储不变量/装载 + 16 项自主唤醒 + 10 项 7 天模拟 soak + 9 项活动选择器（固定时钟与随机数，不需要真 dsh） | 61/61 通过 |
+| `verify/e2e-tools.mjs` | 17 项端到端：真 dsh 装载插件、13 个工具可见、身份/账本落盘、无 schedule 时降级、web 模板确实带 schedule | 17/17 通过 |
 
 唤醒部分的验证结论与**没验到什么**见 [`docs/wake-verification.md`](../docs/wake-verification.md)。
 更慢、需要真实 web profile 的「真的醒一次」检查在 [`verify/live/`](live/README.md)（opt-in，不在 CI 里）。
@@ -41,7 +41,7 @@ export DSH_BIN=$(pwd)/node_modules/@deepseek-ai/dsh/lib/bin.js
 
 ```sh
 npm run verify            # 两套一起
-node verify/smoke.mjs     # 42 项
+node verify/smoke.mjs     # 61 项
 node verify/e2e-tools.mjs # 17 项
 ```
 
@@ -63,3 +63,14 @@ node verify/e2e-tools.mjs # 17 项
 
 顺带修了一个**假绿**：`dsh plugin manager installs dsh-life` 原来只 grep 输出里有没有 `dsh-life`，
 命令失败也会 PASS。现在要求 `exit code === 0` 且输出里没有 `failed`。
+
+## 第三套：打包产物能不能装（`verify/pack-install.mjs`）
+
+```sh
+node verify/pack-install.mjs   # 需要 pnpm 在 PATH；约 20-40s
+```
+
+它做三件 `link:` 覆盖不到的事：`pnpm pack` 出 tarball、断言 `files`/`exports`/`dsh.bundle` 承诺的文件
+一个不少、把 tarball 装进全新 profile 再 boot 一次（无凭据只要求 `identity.json` 落盘，90s 超时算失败）。
+`PACK_DSH_HOME` 可覆盖临时 HOME；失败会保留 tarball 与 HOME 并打印路径。
+它**不在** `npm run verify` 里：根 `package.json` 不在本轮写范围，而且它比前两套慢（要真装 + 真 boot）。

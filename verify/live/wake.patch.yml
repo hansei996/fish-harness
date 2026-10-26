@@ -1,41 +1,31 @@
-# verify/live overlay — NOT a normal way to run dsh. Read the warning first.
+# verify/live overlay — one plugin, nothing else. Shipped presets are untouched.
 #
-# WHY THIS FILE DISABLES THINGS
-# -----------------------------
-# On dsh 0.2.1-rc.2, creating a Session in the shipped `web` profile fails for
-# every shipped preset with:
+# The `web` profile serves HTTP and has no command that runs a turn, so an
+# overlay plugin is the only unattended entry point for this check. That is the
+# ONLY reason this file exists: it inserts the driver and changes no preset,
+# no registry, no service.
+#
+# HISTORY — read this before re-adding a `disabled` row
+# ---------------------------------------------------
+# An earlier revision of this file also disabled `preset-standard/ptc/minimal/
+# cordis` and `agent-preset-registry`, because every `session/create` in the
+# shipped `web` profile failed with:
 #
 #   agent-preset/invalid
 #   persona: prompt section "deployment:persona-prefix" is already registered
 #   tool-subagent: standing `modelSelectionSettings` requires a scoped preset Context
 #
-# The cause is dsh's shipped preset *audit*: each preset tree re-mounts plugins
-# that the deployment layer already mounted (persona prompt section, the
-# persistent pwsh tool, the compact command), so the audit reports the preset as
-# unusable and no Session can be created through any entry point — direct
-# service call, Peer RPC, or HTTP. It is a dsh bug, not a property of this repo.
+# That failure was NOT dsh's. It came from one broken local `_dshrt` install
+# (a pnpm tree left behind by an `ERR_PNPM_IGNORED_BUILDS` exit-1 install); a
+# clean install of the same 0.2.1-rc.2 creates a Session with `agentPreset:
+# "standard"` every time. See `docs/dsh-preset-audit.md` for the experiment, the
+# line numbers of the audit path, and how to tell a bad install from a real bug.
 #
-# Turning presets off is the smallest way to get a Session at all, and it is a
-# DELIBERATE SABOTAGE of the profile for the duration of this check:
-#
-#   * `agentPreset` is empty: the persona, the preset tool set and the subagent
-#     tooling are all absent. What is proved below is the wake path only.
-#   * This is not how the desktop GUI composes its profile, so a PASS here says
-#     nothing about the GUI.
-#
-# Remove these six `disabled` rows once the upstream preset audit is fixed; the
-# check should then create a Session with the default preset and keep its three
-# assertions unchanged.
-- id: preset-standard
-  disabled: true
-- id: preset-ptc
-  disabled: true
-- id: preset-minimal
-  disabled: true
-- id: preset-cordis
-  disabled: true
-- id: agent-preset-registry
-  disabled: true
+# The disabling was a lie about the product — it implied a companion can only
+# wake by giving up the persona, the preset tool set and subagent tooling. It is
+# gone. `wake-live.mjs` now refuses to run (exit 2, clearly labelled as an
+# environment problem) when the install under test cannot create a Session with
+# the shipped `standard` preset.
 
 # The driver: a relative name is anchored beside this file, so nothing has to be
 # published or installed into the profile.

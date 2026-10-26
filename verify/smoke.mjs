@@ -6,6 +6,7 @@
  * the store and plugin are exercised as shipped.
  */
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -91,7 +92,7 @@ mod.apply(fakeCtx, { lifeId: 'registration' })
 const warns = events.filter((e) => e.kind === 'warn')
 const toolNames = events.filter((e) => e.kind === 'tool').map((e) => e.name)
 check('plugin applies with no warnings', warns.length === 0, warns.map((w) => w.m).join('; '))
-check('registers the full life tool surface', toolNames.length === 12, `${toolNames.length} tools`)
+check('registers the full life tool surface', toolNames.length === 13, `${toolNames.length} tools`)
 check('registers the plan-critical tools',
   ['life_whoami', 'life_start_activity', 'life_finish_activity', 'life_promise',
     'life_settle_commitment', 'life_identity_update', 'life_ledger', 'life_wake'].every((n) => toolNames.includes(n)))
@@ -513,7 +514,7 @@ setClock(10, 0)
 const degradedState = wakeCtx({ withSchedule: false })
 mod.apply(degradedState.root, { lifeId: 'wake-degraded' })
 const degradedShapeOk = degradedState.warnings.length === 0 &&
-  degradedState.tools.length === 12 &&
+  degradedState.tools.length === 13 &&
   degradedState.sections.length === 1
 degradedState.emit('session/event', sessionOf('degraded-session'), { type: 'turn/end', time: clockNow, data: { turn: 1 } })
 degradedState.emit('session/event', sessionOf('degraded-session'), { type: 'turn/end', time: clockNow, data: { turn: 2 } })
@@ -599,6 +600,616 @@ check('life_wake degrades with an explicit error when the service is absent or t
   spentBudgetError.includes('life/wake-budget-exhausted') &&
   spentBudgetState.calls.create.length === 0,
   `no-service=${unavailableError || 'no error'}; budget=${spentBudgetError || 'no error'}; budget creates=${spentBudgetState.calls.create.length}`)
+
+// ---------------------------------------------------------------------------
+// 9f. Multi-day soak: deterministic simulation of the 7-day decision gate
+//
+// docs/PLAN.md §10.2 asks for seven unattended days. Waiting seven days is not
+// possible, but the schedule policy is a pure function of the clock and one
+// random source, so a pinned clock plus a seeded PRNG reproduces it exactly.
+// Every simulated delivery drives the REAL plugin wiring: the recording fake
+// Host arms a one-shot, the clock jumps to its due time, the wake arrives as a
+// `source.kind === 'schedule'` message, and `turn/end` lets the plugin re-arm.
+// The fake Host also models what docs/wake-e2e.md measured: a delivered
+// one-shot becomes inactive, so `list()` no longer returns it.
+// ---------------------------------------------------------------------------
+function mulberry32 (seed) {
+  let state = seed >>> 0
+  return function random () {
+    state = (state + 0x6D2B79F5) >>> 0
+    let t = state
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+const SOAK_ORIGIN = new FixedDate(2026, 9, 26, 0, 0, 0, 0).getTime()
+const SOAK_DAY_MS = 24 * 60 * MINUTE
+const soakDayIndex = (value) => Math.floor((value - SOAK_ORIGIN) / SOAK_DAY_MS)
+const minutesOfDay = (value) => {
+  const date = new FixedDate(value)
+  return date.getHours() * 60 + date.getMinutes()
+}
+const clockOfMinutes = (minutes) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+
+async function runSoak ({ lifeId, seed, config = {}, days, startHour = 8 }) {
+  const effective = { ...ConfigDefaults, ...config }
+  clockNow = new FixedDate(2026, 9, 26, startHour, 0, 0, 0).getTime()
+  Math.random = mulberry32(seed)
+  const state = wakeCtx()
+  mod.apply(state.root, { lifeId, ...config })
+  const store = new LifeStore({ lifeId })
+  const session = sessionOf(`soak-${lifeId}`)
+  const deliveries = []
+  const armed = []
+  const consumed = new Set()
+  const dayCounts = new Map()
+  const violations = { quiet: [], interval: [], dayKey: [], count: [], rearm: [] }
+  const quietWindowNow = {
+    quietStart: effective.wakeQuietStart,
+    quietEnd: effective.wakeQuietEnd,
+  }
+
+  const turnEnd = (turn) => state.emit('session/event', session, {
+    type: 'turn/end',
+    time: clockNow,
+    data: { turn, reason: { kind: 'completed' } },
+  })
+
+  turnEnd(0)
+  if (!await waitFor(() => state.calls.create.length > 0)) {
+    violations.rearm.push('no first alarm after the keeper turn')
+  }
+
+  let guard = 0
+  while (guard++ < 500) {
+    const call = state.calls.create[state.calls.create.length - 1]
+    if (!call) break
+    const target = clockNow + call.after_seconds * 1000
+    const dayIndex = soakDayIndex(target)
+    if (dayIndex > days) break
+    const fromDayIndex = soakDayIndex(clockNow)
+    armed.push({ id: call.id, afterSeconds: call.after_seconds, now: clockNow, target, dayIndex })
+    consumed.add(call.id)
+    if (wake.isQuietAt(new FixedDate(target), quietWindowNow)) {
+      violations.quiet.push(`day${dayIndex} ${clockText(target)}`)
+    }
+    const previous = deliveries[deliveries.length - 1]
+    if (previous) {
+      const gap = target - previous.at
+      if (!(gap >= wake.MIN_WAKE_DELAY_MS)) {
+        violations.interval.push(`day${dayIndex} ${clockText(previous.at)} -> ${clockText(target)} = ${(gap / 1000).toFixed(3)}s`)
+      }
+    }
+    clockNow = target
+    // Real dsh makes a delivered one-shot inactive; see docs/wake-e2e.md.
+    state.tasks = state.tasks.filter((task) => task.id !== call.id)
+    state.emit('session/event', session, {
+      type: 'user/message',
+      time: clockNow,
+      data: { id: `${lifeId}-${deliveries.length}`, source: { kind: 'schedule' } },
+    })
+    const wakeAfter = store.readWake()
+    const dayKey = wake.dayKeyOf(new FixedDate(target))
+    const countSoFar = (dayCounts.get(dayIndex) || 0) + 1
+    dayCounts.set(dayIndex, countSoFar)
+    if (wakeAfter.dayKey !== dayKey) {
+      violations.dayKey.push(`day${dayIndex}: dayKey=${wakeAfter.dayKey}, expected ${dayKey}`)
+    }
+    if (wakeAfter.countToday !== countSoFar) {
+      violations.count.push(`day${dayIndex} wake#${countSoFar}: countToday=${wakeAfter.countToday}`)
+    }
+    deliveries.push({
+      at: target,
+      dayIndex,
+      fromDayIndex,
+      dayKey,
+      afterSeconds: call.after_seconds,
+      countToday: wakeAfter.countToday,
+    })
+    if (dayIndex === days) break
+    turnEnd(deliveries.length)
+    const beforeCreates = state.calls.create.length
+    if (!await waitFor(() => state.calls.create.length > beforeCreates)) {
+      violations.rearm.push(`no re-arm after day${dayIndex} ${clockText(target)}`)
+      break
+    }
+  }
+
+  for (const call of state.calls.create) {
+    if (consumed.has(call.id)) continue
+    const target = clockNow + call.after_seconds * 1000
+    armed.push({ id: call.id, afterSeconds: call.after_seconds, now: clockNow, target, dayIndex: soakDayIndex(target) })
+  }
+
+  return {
+    lifeId,
+    seed,
+    config: effective,
+    quietWindow: quietWindowNow,
+    quietStartMinute: wake.parseClock(effective.wakeQuietStart),
+    deliveries,
+    armed,
+    dayCounts,
+    violations,
+  }
+}
+
+const soakDayText = (run, dayList) => dayList.map((day) => {
+  const rows = run.deliveries.filter((row) => row.dayIndex === day)
+  if (!rows.length) return `day${day}=0`
+  return `day${day}=${rows.length} (${clockText(rows[0].at)}-${clockText(rows[rows.length - 1].at)})`
+}).join(' | ')
+
+/** First value that makes an armed delay untrustworthy, or null. */
+function soakArmedProblem (run) {
+  const every = run.config.wakeEveryMinutes
+  const jitter = run.config.wakeJitterMinutes
+  const earliestDirect = Math.max(60, (every - jitter) * 60)
+  const latestDirect = (every + jitter) * 60
+  const quietEnd = wake.parseClock(run.config.wakeQuietEnd)
+  for (const row of run.armed) {
+    if (!Number.isFinite(row.afterSeconds) || !Number.isInteger(row.afterSeconds) || row.afterSeconds < 60) {
+      return `${run.lifeId} ${clockText(row.now)}: after_seconds=${row.afterSeconds}`
+    }
+    if (!(row.target > row.now)) {
+      return `${run.lifeId} ${clockText(row.now)}: target ${clockText(row.target)} is not in the future`
+    }
+    const sameDay = row.dayIndex === soakDayIndex(row.now)
+    if (sameDay) {
+      if (row.afterSeconds < earliestDirect || row.afterSeconds > latestDirect) {
+        return `${run.lifeId} ${clockText(row.now)}: same-day after_seconds=${row.afterSeconds}s ` +
+          `(${(row.afterSeconds / 60).toFixed(1)}m), expected ${(earliestDirect / 60).toFixed(0)}..${(latestDirect / 60).toFixed(0)}m`
+      }
+      continue
+    }
+    const targetMinute = minutesOfDay(row.target)
+    const direct = row.afterSeconds >= earliestDirect && row.afterSeconds <= latestDirect
+    const quietPushed = targetMinute >= quietEnd && targetMinute < quietEnd + jitter
+    // Post-fix behaviour: a quiet push that would skip a whole calendar day is
+    // clamped to quietStart-1min of the first skipped day (e.g. 22:59).
+    const clamped = run.quietStartMinute > 0 &&
+      targetMinute === run.quietStartMinute - 1 &&
+      row.dayIndex === soakDayIndex(row.now) + 1
+    if (!direct && !quietPushed && !clamped) {
+      return `${run.lifeId} ${clockText(row.now)}: rollover after_seconds=${row.afterSeconds}s ` +
+        `target=${clockText(row.target)} (neither every±jitter, quiet-end+jitter, nor the clamped 22:59)`
+    }
+    if (!(row.afterSeconds > 3600)) {
+      return `${run.lifeId} ${clockText(row.now)}: rollover after_seconds=${row.afterSeconds}s <= 1h`
+    }
+  }
+  return null
+}
+
+const defaultSoak = await runSoak({ lifeId: 'soak-default', seed: 20261026, days: 7 })
+const crowdedSoak = await runSoak({ lifeId: 'soak-crowded', seed: 7, config: { wakeMaxPerDay: 14 }, days: 7 })
+// Same two profiles under the seeds the keeper named for the "next-day shift"
+// regression. Their pre-fix wake sequences are pinned as digests below.
+const defaultSoak60 = await runSoak({ lifeId: 'soak-default-60', seed: 60, days: 7 })
+const defaultSoak42 = await runSoak({ lifeId: 'soak-default-42', seed: 42, days: 7 })
+const crowdedSoak60 = await runSoak({ lifeId: 'soak-crowded-60', seed: 60, config: { wakeMaxPerDay: 14 }, days: 7 })
+const crowdedSoak42 = await runSoak({ lifeId: 'soak-crowded-42', seed: 42, config: { wakeMaxPerDay: 14 }, days: 7 })
+// The extreme profile the keeper asked for: "wake about once a day", with the
+// widest jitter. Nine days are simulated, but only days 1..7 are asserted here;
+// the day-8 boundary is reported separately (see docs/wake-verification.md).
+const extremeSoak = await runSoak({
+  lifeId: 'soak-extreme',
+  seed: 60,
+  config: { wakeEveryMinutes: 1440, wakeJitterMinutes: 240 },
+  days: 9,
+})
+const extremeSoak42 = await runSoak({
+  lifeId: 'soak-extreme-42',
+  seed: 42,
+  config: { wakeEveryMinutes: 1440, wakeJitterMinutes: 240 },
+  days: 9,
+})
+const soakRuns = [
+  defaultSoak, crowdedSoak, defaultSoak60, defaultSoak42,
+  crowdedSoak60, crowdedSoak42, extremeSoak, extremeSoak42,
+]
+const soakCounts = (run, dayList) => dayList.map((day) => run.dayCounts.get(day) || 0)
+
+const defaultDays = soakCounts(defaultSoak, [0, 1, 2, 3, 4, 5, 6])
+const defaultNextDay = defaultSoak.dayCounts.get(7) || 0
+const defaultRollovers = defaultSoak.deliveries.filter((row) => row.dayIndex > row.fromDayIndex)
+check('7-day soak (defaults 90m±20m, 6/day): every day wakes, stays within budget, and reconnects to the next morning',
+  defaultDays.every((count) => count >= 1 && count <= defaultSoak.config.wakeMaxPerDay) &&
+  defaultNextDay >= 1 &&
+  defaultRollovers.length === 7 &&
+  defaultRollovers.every((row) => defaultDays[row.fromDayIndex] === defaultSoak.config.wakeMaxPerDay),
+  `${soakDayText(defaultSoak, [0, 1, 2, 3, 4, 5, 6])} | first-of-day7=${defaultNextDay}; ` +
+  `rollovers=${defaultRollovers.length}/7, all from a spent day`)
+
+const soakQuietViolations = soakRuns.flatMap((run) => run.violations.quiet)
+const soakIntervalViolations = soakRuns.flatMap((run) => run.violations.interval)
+const soakGaps = soakRuns.flatMap((run) => run.deliveries.slice(1).map((row, index) => row.at - run.deliveries[index].at))
+const soakMinGap = soakGaps.length ? Math.min(...soakGaps) : 0
+const soakDeliveryCount = soakRuns.reduce((sum, run) => sum + run.deliveries.length, 0)
+const soakRearmViolations = soakRuns.flatMap((run) => run.violations.rearm)
+check('soak (8 runs): no wake lands in the quiet window, no two wakes are under 60s apart, and every turn re-arms',
+  soakQuietViolations.length === 0 && soakIntervalViolations.length === 0 && soakRearmViolations.length === 0,
+  `${soakDeliveryCount} wakes checked; quiet=${soakQuietViolations.length}` +
+  `${soakQuietViolations.length ? ` [${soakQuietViolations.slice(0, 2).join('; ')}]` : ''}; ` +
+  `interval=${soakIntervalViolations.length}${soakIntervalViolations.length ? ` [${soakIntervalViolations.slice(0, 2).join('; ')}]` : ''}; ` +
+  `re-arm=${soakRearmViolations.length}${soakRearmViolations.length ? ` [${soakRearmViolations.slice(0, 2).join('; ')}]` : ''}; ` +
+  `min gap=${(soakMinGap / 1000).toFixed(1)}s`)
+
+const soakDayKeyViolations = soakRuns.flatMap((run) => run.violations.dayKey)
+const soakCountViolations = soakRuns.flatMap((run) => run.violations.count)
+check('soak (8 runs): dayKey resets at midnight and countToday never accumulates across days',
+  soakDayKeyViolations.length === 0 && soakCountViolations.length === 0,
+  `${soakDeliveryCount} deliveries checked; dayKey=${soakDayKeyViolations.length}` +
+  `${soakDayKeyViolations.length ? ` [${soakDayKeyViolations.slice(0, 2).join('; ')}]` : ''}; ` +
+  `countToday=${soakCountViolations.length}${soakCountViolations.length ? ` [${soakCountViolations.slice(0, 2).join('; ')}]` : ''}`)
+
+const soakArmedProblems = soakRuns
+  .map((run) => ({ lifeId: run.lifeId, problem: soakArmedProblem(run) }))
+  .filter((row) => row.problem)
+const soakArmedValues = soakRuns.flatMap((run) => run.armed.map((row) => row.afterSeconds))
+check('soak (8 runs): every armed delay is a finite integer ≥60s, same-day targets are every±jitter, rollovers are quiet-end or the same interval',
+  soakArmedProblems.length === 0,
+  `${soakArmedValues.length} alarms checked; after_seconds ${Math.min(...soakArmedValues)}..${Math.max(...soakArmedValues)}s` +
+  `${soakArmedProblems.length ? `; ${soakArmedProblems.map((row) => row.problem).slice(0, 2).join(' | ')}` : ''}`)
+
+check('soak: spending the daily budget books tomorrow just after quiet-end — never a 15-minute retry and never a lost day',
+  defaultRollovers.length === 7 &&
+  defaultRollovers.every((row) =>
+    row.afterSeconds > 3600 &&
+    minutesOfDay(row.at) >= 8 * 60 &&
+    minutesOfDay(row.at) < 8 * 60 + defaultSoak.config.wakeJitterMinutes),
+  defaultRollovers.map((row) =>
+    `day${row.fromDayIndex}->${row.dayIndex}: ${(row.afterSeconds / 3600).toFixed(2)}h -> ${clockText(row.at)} ` +
+    `(count=${defaultDays[row.fromDayIndex]}/${defaultSoak.config.wakeMaxPerDay})`).join('; '))
+
+const crowdedDays = soakCounts(crowdedSoak, [0, 1, 2, 3, 4, 5, 6])
+const crowdedNextDay = crowdedSoak.dayCounts.get(7) || 0
+const crowdedRollovers = crowdedSoak.deliveries.filter((row) => row.dayIndex > row.fromDayIndex)
+check('soak (crowded 14/day, budget never spent): the quiet push still carries the life into the next morning, every day',
+  crowdedDays.every((count) => count >= 1 && count <= crowdedSoak.config.wakeMaxPerDay) &&
+  crowdedNextDay >= 1 &&
+  crowdedRollovers.length === 7 &&
+  crowdedRollovers.every((row) => crowdedDays[row.fromDayIndex] < crowdedSoak.config.wakeMaxPerDay),
+  `${soakDayText(crowdedSoak, [0, 1, 2, 3, 4, 5, 6])} | first-of-day7=${crowdedNextDay}; ` +
+  `rollovers=${crowdedRollovers.length}/7, all quiet-pushed (previous day below budget)`)
+
+const extremeDays = soakCounts(extremeSoak, [1, 2, 3, 4, 5, 6, 7])
+const extremeDay0 = extremeSoak.dayCounts.get(0) || 0
+const extremeDay8 = extremeSoak.dayCounts.get(8) || 0
+const extreme42Days = soakCounts(extremeSoak42, [1, 2, 3, 4, 5, 6, 7])
+const extreme42Day8 = extremeSoak42.dayCounts.get(8) || 0
+check('soak (extreme 1440m±240m, seeds 60 and 42): the setup day is empty by construction, but each of the following seven days gets its wake',
+  extremeDay0 === 0 &&
+  extremeSoak.deliveries[0]?.dayIndex === 1 &&
+  extremeDays.every((count) => count >= 1 && count <= extremeSoak.config.wakeMaxPerDay) &&
+  extremeDay8 >= 1 &&
+  extremeSoak42.deliveries[0]?.dayIndex === 1 &&
+  extreme42Days.every((count) => count >= 1 && count <= extremeSoak42.config.wakeMaxPerDay) &&
+  extreme42Day8 >= 1,
+  `seed60 day0=${extremeDay0} (first interval 20–28h) | ${soakDayText(extremeSoak, [1, 2, 3, 4, 5, 6, 7, 8])}; ` +
+  `seed42 | ${soakDayText(extremeSoak42, [1, 2, 3, 4, 5, 6, 7, 8])}`)
+
+const soakNoSkipFailures = soakRuns.flatMap((run) =>
+  run.deliveries.slice(1)
+    .map((row, index) => ({ run, row, previous: run.deliveries[index] }))
+    .filter(({ row, previous }) => row.dayIndex - previous.dayIndex > 1)
+    .map(({ run, row, previous }) =>
+      `${run.lifeId}: day${previous.dayIndex} ${clockText(previous.at)} -> day${row.dayIndex} ${clockText(row.at)} ` +
+      `(skipped ${row.dayIndex - previous.dayIndex - 1} day(s))`))
+const soakMaxDayGap = Math.max(...soakRuns.flatMap((run) =>
+  run.deliveries.slice(1).map((row, index) => row.dayIndex - run.deliveries[index].dayIndex)))
+check('soak: no quiet push ever skips a whole local calendar day (adjacent wake day index differs by at most 1)',
+  soakNoSkipFailures.length === 0,
+  soakNoSkipFailures.length
+    ? soakNoSkipFailures.slice(0, 3).join(' | ')
+    : `max adjacent day-index gap=${soakMaxDayGap} over ${soakRuns.length} runs; extreme seed60 day8 is the clamped 22:59 wake`)
+
+// Pre-fix golden sequences: the day-skip fix must not change any sequence whose
+// quiet push already lands on the very next calendar day (the keeper's red
+// line). Digests are over `d<dayIndex>@HH:MM` joined with commas, captured from
+// the implementation BEFORE the clamp existed.
+const soakSequence = (run) => run.deliveries.map((row) => `d${row.dayIndex}@${clockText(row.at)}`).join(',')
+const soakDigest = (run) => createHash('sha256').update(soakSequence(run)).digest('hex').slice(0, 16)
+const soakGoldens = [
+  { name: 'default/20261026', run: defaultSoak, digest: '0ac8e508f4046d11', count: 43 },
+  { name: 'default/60', run: defaultSoak60, digest: '430e83ff82a1c958', count: 43 },
+  { name: 'default/42', run: defaultSoak42, digest: 'a0e9271f01ea1d35', count: 43 },
+  { name: 'crowded/7', run: crowdedSoak, digest: '296d69cd6d8cbe0d', count: 74 },
+  { name: 'crowded/60', run: crowdedSoak60, digest: 'fe8d32971632d8b3', count: 72 },
+  { name: 'crowded/42', run: crowdedSoak42, digest: 'baefbbe9cd8f3dc1', count: 74 },
+  { name: 'extreme/42 (pre-fix had no skip)', run: extremeSoak42, digest: '331d09ceddf3fc76', count: 9 },
+]
+const soakGoldenFailure = soakGoldens.find((row) =>
+  soakDigest(row.run) !== row.digest || row.run.deliveries.length !== row.count)
+check('soak regression: default, crowded, and non-skipping extreme sequences are byte-identical to their pre-fix golden',
+  !soakGoldenFailure,
+  soakGoldenFailure
+    ? `${soakGoldenFailure.name}: digest=${soakDigest(soakGoldenFailure.run)} expected=${soakGoldenFailure.digest}, ` +
+      `count=${soakGoldenFailure.run.deliveries.length}/${soakGoldenFailure.count}; ` +
+      `first 120 chars=${soakSequence(soakGoldenFailure.run).slice(0, 120)}`
+    : soakGoldens.map((row) => `${row.name}=${row.digest}(${row.count})`).join(', '))
+
+const unitWake = ({ year, month, day, hour, minute }, every, jitter, quietStart, quietEnd, randoms) => {
+  let draw = 0
+  const now = new FixedDate(year, month - 1, day, hour, minute, 0, 0)
+  const delay = wake.nextWakeDelayMs({
+    now,
+    everyMinutes: every,
+    jitterMinutes: jitter,
+    quietStart,
+    quietEnd,
+    random: () => randoms[draw++],
+  })
+  return { delay, target: new FixedDate(now.getTime() + delay) }
+}
+const nextDayShift = unitWake({ year: 2026, month: 10, day: 26, hour: 22, minute: 30 }, 90, 20, '23:00', '08:00', [0.1, 0.1])
+const skipClamp = unitWake({ year: 2026, month: 11, day: 2, hour: 22, minute: 19 }, 1440, 240, '23:00', '08:00', [1, 0.5])
+const midnightStart = unitWake({ year: 2026, month: 11, day: 2, hour: 22, minute: 19 }, 1440, 240, '00:00', '08:00', [1, 0.5])
+const malformedQuiet = unitWake({ year: 2026, month: 11, day: 2, hour: 22, minute: 19 }, 1440, 240, 'oops', '08:00', [1, 0.5])
+const clampNow = new FixedDate(2026, 10, 2, 22, 19, 0, 0)
+const clampDirect = wake.clampToLastAllowedMoment({
+  now: clampNow,
+  targetMs: new FixedDate(2026, 10, 4, 10, 0, 0, 0).getTime(),
+  quietStart: '23:00',
+  quietEnd: '08:00',
+})
+const clampNextDay = wake.clampToLastAllowedMoment({
+  now: clampNow,
+  targetMs: new FixedDate(2026, 10, 3, 8, 0, 0, 0).getTime(),
+  quietStart: '23:00',
+  quietEnd: '08:00',
+})
+const clampMidnightStart = wake.clampToLastAllowedMoment({
+  now: clampNow,
+  targetMs: new FixedDate(2026, 10, 4, 10, 0, 0, 0).getTime(),
+  quietStart: '00:00',
+  quietEnd: '08:00',
+})
+const clampMalformed = wake.clampToLastAllowedMoment({
+  now: clampNow,
+  targetMs: new FixedDate(2026, 10, 4, 10, 0, 0, 0).getTime(),
+  quietStart: 'oops',
+  quietEnd: '08:00',
+})
+const expectedClamp = new FixedDate(2026, 10, 3, 22, 59, 0, 0).getTime()
+check('soak regression: a next-day-only quiet shift keeps its exact pre-fix delay; a skipped day is clamped to 22:59; 00:00/malformed skip the clamp',
+  nextDayShift.delay === 34320000 && clockText(nextDayShift.target.getTime()) === '08:02' &&
+  skipClamp.delay === 88800000 && clockText(skipClamp.target.getTime()) === '22:59' &&
+  clampDirect === expectedClamp &&
+  clampNextDay === new FixedDate(2026, 10, 3, 8, 0, 0, 0).getTime() &&
+  clampMidnightStart === new FixedDate(2026, 10, 4, 10, 0, 0, 0).getTime() &&
+  clampMalformed === new FixedDate(2026, 10, 4, 10, 0, 0, 0).getTime() &&
+  midnightStart.delay === 128460000 && clockText(midnightStart.target.getTime()) === '10:00' &&
+  malformedQuiet.delay === 100799971 && clockText(malformedQuiet.target.getTime()) === '02:18',
+  `next-day shift=${nextDayShift.delay}ms target=${clockText(nextDayShift.target.getTime())}; ` +
+  `skip clamp=${skipClamp.delay}ms target=${clockText(skipClamp.target.getTime())} (direct=${clockText(clampDirect)}); ` +
+  `+1 target untouched=${clockText(clampNextDay)}; quietStart 00:00=${clockText(clampMidnightStart)}/` +
+  `${midnightStart.delay}ms; malformed=${clockText(clampMalformed)}/${malformedQuiet.delay}ms`)
+
+// ---------------------------------------------------------------------------
+// 10. Activity chooser: ranking math and its wiring (docs/PLAN.md §6.2)
+//
+// The ranking is pure and `now` is injectable, so every value below is exact.
+// The wiring checks then prove the same ranking reaches the wake-turn prompt
+// and the life_candidates tool, and costs exactly zero characters on a keeper
+// turn (that prompt is paid for on every turn).
+// ---------------------------------------------------------------------------
+const choose = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'choose.js')).href)
+
+clockNow = new FixedDate(2026, 9, 27, 12, 0, 0, 0).getTime()
+const chooserNow = new FixedDate(2026, 9, 27, 12, 0, 0, 0)
+const chooserIso = (hours) => new FixedDate(2026, 9, 27, hours, 0, 0, 0).toISOString()
+
+// ---- 10a. Individual terms -------------------------------------------------
+const urgency = (dueAt) => choose.urgencyOf({ what: '某件事', dueAt }, chooserNow)
+const urgencyOverdue = urgency('2026-10-25')
+const urgencyToday = urgency('2026-10-27')
+const urgencyIn3Days = urgency('2026-10-30')
+const urgencyNoDate = urgency(undefined)
+check('chooser urgency: overdue > due today > 3 days out > no dueAt (which still scores above zero)',
+  urgencyOverdue === 1 && urgencyOverdue > urgencyToday && urgencyToday > urgencyIn3Days &&
+  urgencyIn3Days > urgencyNoDate && urgencyNoDate > 0,
+  `overdue=${urgencyOverdue}, today=${urgencyToday.toFixed(3)}, +3d=${urgencyIn3Days.toFixed(3)}, noDate=${urgencyNoDate}`)
+
+const freshIso = chooserIso(11)
+const interestScore = (spec) => choose.interestScore(spec, chooserNow)
+const freshHigh = interestScore({ topic: 't', confidence: 0.9, observations: 5, updatedAt: freshIso })
+const freshLow = interestScore({ topic: 't', confidence: 0.2, observations: 5, updatedAt: freshIso })
+const staleHigh = interestScore({ topic: 't', confidence: 0.9, observations: 5, updatedAt: new FixedDate(2026, 5, 1).toISOString() })
+const ancientHigh = interestScore({ topic: 't', confidence: 0.9, observations: 5, updatedAt: new FixedDate(2018, 0, 1).toISOString() })
+const exploreBonus2 = choose.explorationBonusOf({ observations: 2 })
+const exploreBonus3 = choose.explorationBonusOf({ observations: 3 })
+const oneObservation = interestScore({ topic: 't', confidence: 0.5, observations: 1, updatedAt: freshIso })
+const manyObservations = interestScore({ topic: 't', confidence: 0.5, observations: 9, updatedAt: freshIso })
+check('chooser interest: confident+fresh beats low/stale; 1-2 observations get a bonus; very old records keep a floor',
+  freshHigh > freshLow && freshHigh > staleHigh && staleHigh > 0.4 &&
+  ancientHigh > 0.4 && ancientHigh > 0 &&
+  exploreBonus2 === 0.15 && exploreBonus3 === 0 &&
+  oneObservation > manyObservations,
+  `fresh-high=${freshHigh.toFixed(3)}, fresh-low=${freshLow.toFixed(3)}, stale-high=${staleHigh.toFixed(3)}, ` +
+  `ancient=${ancientHigh.toFixed(3)}, bonus(obs2)=+${exploreBonus2}/bonus(obs3)=+${exploreBonus3}, ` +
+  `1-obs=${oneObservation.toFixed(3)} vs 9-obs=${manyObservations.toFixed(3)}`)
+
+const unfinished = choose.unfinishedScore
+const unfinishedFailed = unfinished({ lastFinished: { what: 'x', outcome: 'failed' } })
+const unfinishedNext = unfinished({ next: { what: 'y' } })
+const unfinishedDone = unfinished({ lastFinished: { what: 'x', outcome: 'done' } })
+const unfinishedNone = unfinished(null)
+check('chooser unfinished: failed-and-unresolved > recorded next step > last done > nothing',
+  unfinishedFailed === 0.9 && unfinishedNext === 0.75 && unfinishedDone === 0.15 && unfinishedNone === 0,
+  `failed=${unfinishedFailed}, next=${unfinishedNext}, done=${unfinishedDone}, none=${unfinishedNone}`)
+
+const runningActivity = { what: '练第 38 层' }
+const switchAway = choose.switchCost(runningActivity, { what: '看挖矿类小品', kind: 'interest' })
+const continueSame = choose.switchCost(runningActivity, { what: '练第 38 层', kind: 'continue' })
+const sameWhatNoKind = choose.switchCost(runningActivity, { what: '练第 38 层' })
+const switchToRest = choose.switchCost(runningActivity, { what: '休息，什么都不做', kind: 'rest' })
+const switchIdle = choose.switchCost(null, { what: '任何事', kind: 'interest' })
+check('chooser switch cost: leaving a running activity costs, continuing it or resting does not',
+  switchAway === 1 && continueSame === 0 && sameWhatNoKind === 0 && switchToRest === 0 && switchIdle === 0,
+  `away=${switchAway}, continue=${continueSame}, sameWhat=${sameWhatNoKind}, rest=${switchToRest}, idle=${switchIdle}`)
+
+// ---- 10b. Ranking: order, parts/score agreement, rest, budget --------------
+const chooserState = {
+  now: chooserNow,
+  commitments: [{ id: 'c1', what: '把打法写进技能经验', dueAt: '2026-10-25', status: 'open' }],
+  interests: [{ topic: '挖矿类小品', confidence: 0.8, observations: 2, updatedAt: freshIso }],
+  skills: [{ name: '矿工与矮人 38 层', stage: 'practicing' }],
+  activity: { current: { what: '练第 38 层' } },
+  wakeBudget: { countToday: 1, maxPerDay: 6 },
+}
+const ranked = choose.rankCandidates(chooserState)
+const rankedAgain = choose.rankCandidates(chooserState)
+const rankedSorted = ranked.candidates.every((candidate, index) =>
+  index === 0 || ranked.candidates[index - 1].score >= candidate.score)
+const restCandidate = ranked.candidates.find((candidate) => candidate.kind === 'rest')
+const partKeys = ['commitment', 'interest', 'unfinished', 'explore', 'cost', 'risk', 'switch']
+const partsPresent = ranked.candidates.every((candidate) =>
+  partKeys.every((key) => typeof candidate.parts[key] === 'number'))
+const clamp01 = (value) => Math.min(1, Math.max(0, value))
+const r3 = (value) => Math.round(clamp01(value) * 1000) / 1000
+const recomputeScore = (candidate) => r3(
+  candidate.parts.commitment + candidate.parts.interest + candidate.parts.unfinished + candidate.parts.explore -
+  candidate.parts.cost - candidate.parts.risk - candidate.parts.switch)
+// Rest is deliberately scored by a fixed constant, not by its (zero) parts; it
+// is checked separately below. Everything else must recompute from `parts`.
+const scoreMatchesParts = ranked.candidates
+  .filter((candidate) => candidate.kind !== 'rest')
+  .every((candidate) => Math.abs(recomputeScore(candidate) - candidate.score) <= 1e-9)
+const restHonest = restCandidate &&
+  restCandidate.score === choose.REST_CANDIDATE_SCORE &&
+  partKeys.every((key) => restCandidate.parts[key] === 0) &&
+  restCandidate.evidence.length > 0
+const deterministicRanking = JSON.stringify(ranked) === JSON.stringify(rankedAgain)
+// Weighted parts must agree with the exported raw functions *and* with
+// CHOOSER_WEIGHTS, so changing a weight never forces this test to hard-code it.
+const commitmentCandidate = ranked.candidates.find((candidate) => candidate.kind === 'commitment')
+const expectedCommitmentPart = r3(
+  choose.urgencyOf(chooserState.commitments[0], chooserNow) * choose.CHOOSER_WEIGHTS.commitment)
+const interestCandidate = ranked.candidates.find((candidate) => candidate.kind === 'interest')
+const interestBase = clamp01(
+  choose.interestScore(chooserState.interests[0], chooserNow) - choose.explorationBonusOf(chooserState.interests[0]))
+const expectedInterestPart = r3(interestBase * choose.CHOOSER_WEIGHTS.interest)
+const expectedExplorePart = r3(
+  choose.explorationBonusOf(chooserState.interests[0]) * choose.CHOOSER_WEIGHTS.explore)
+check('chooser ranking: deterministic and sorted, score recomputes from the weighted parts, rest is always present and honest',
+  rankedSorted && deterministicRanking && partsPresent && scoreMatchesParts && restHonest &&
+  Boolean(commitmentCandidate) && commitmentCandidate.parts.commitment === expectedCommitmentPart &&
+  Boolean(interestCandidate) && interestCandidate.parts.interest === expectedInterestPart &&
+  interestCandidate.parts.explore === expectedExplorePart,
+  `${ranked.candidates.length} candidates: ${ranked.candidates.map((candidate) => `${candidate.kind}:${candidate.score.toFixed(3)}`).join(', ')}; ` +
+  `rest=${restCandidate?.score}/${choose.REST_CANDIDATE_SCORE}; score-from-parts=${scoreMatchesParts}; ` +
+  `commitment part=${commitmentCandidate?.parts.commitment} (recomputed ${expectedCommitmentPart}); ` +
+  `interest/explore part=${interestCandidate?.parts.interest}/${interestCandidate?.parts.explore} ` +
+  `(recomputed ${expectedInterestPart}/${expectedExplorePart}); sorted=${rankedSorted}, deterministic=${deterministicRanking}`)
+
+const chooserBudgetState = {
+  now: chooserNow,
+  commitments: [{ id: 'c1', what: '今天到期的事', dueAt: '2026-10-27', status: 'open' }],
+  interests: [],
+  skills: [],
+  activity: {},
+}
+const richBudget = choose.rankCandidates({ ...chooserBudgetState, wakeBudget: { countToday: 0, maxPerDay: 6 } })
+const tightBudget = choose.rankCandidates({ ...chooserBudgetState, wakeBudget: { countToday: 5, maxPerDay: 6 } })
+const richTop = richBudget.candidates.find((candidate) => candidate.kind === 'commitment')
+const tightTop = tightBudget.candidates.find((candidate) => candidate.kind === 'commitment')
+const restIndexRich = richBudget.candidates.findIndex((candidate) => candidate.kind === 'rest')
+const restIndexTight = tightBudget.candidates.findIndex((candidate) => candidate.kind === 'rest')
+const tightRest = tightBudget.candidates.find((candidate) => candidate.kind === 'rest')
+check('chooser ranking: with one wake left, expensive new activities lose score and rest moves up (its own score stays fixed)',
+  tightTop.score < richTop.score &&
+  restIndexTight < restIndexRich &&
+  tightRest.score === choose.REST_CANDIDATE_SCORE &&
+  tightBudget.notes.some((note) => note.includes('只剩')),
+  `due-today commitment score rich=${richTop.score} tight=${tightTop.score}; ` +
+  `rest index rich=${restIndexRich} tight=${restIndexTight}; notes=${tightBudget.notes.join(' | ')}`)
+
+// ---- 10c. Wiring: wake prompt shortlist, keeper cost, the tool -------------
+function seedChooserLife (lifeId) {
+  const store = new LifeStore({ lifeId })
+  store.ensure({ name: '大肥鱼', species: 'whale', seeds: ['懒'] })
+  store.makeCommitment({ what: '把打法写进技能经验', dueAt: '2026-10-25' })
+  store.recordInterest({ topic: '挖矿类小品', confidence: 0.8, source: 'browsing' })
+  store.recordSkill({ name: '矿工与矮人 38 层', stage: 'practicing', evidence: 'save:38' })
+  store.startActivity({ what: '练第 38 层', why: '昨天连挂两次' })
+  return store
+}
+const chooserOn = wakeCtx()
+mod.apply(chooserOn.root, { lifeId: 'chooser-on' })
+const chooserOff = wakeCtx()
+mod.apply(chooserOff.root, { lifeId: 'chooser-off', chooserEnabled: false })
+seedChooserLife('chooser-on')
+seedChooserLife('chooser-off')
+const chooserWakeSession = sessionOf('chooser-wake-session')
+const chooserKeeperSession = sessionOf('chooser-keeper-session')
+for (const state of [chooserOn, chooserOff]) {
+  state.emit('session/event', chooserWakeSession, {
+    type: 'user/message',
+    time: clockNow,
+    data: { id: `chooser-${state === chooserOn ? 'on' : 'off'}`, source: { kind: 'schedule' } },
+  })
+}
+const sectionText = (state, session) => state.sections[0]?.text?.({ agent: { session } }) || ''
+const wakeTextOn = sectionText(chooserOn, chooserWakeSession)
+const wakeTextOff = sectionText(chooserOff, chooserWakeSession)
+const keeperTextOn = sectionText(chooserOn, chooserKeeperSession)
+const keeperTextOff = sectionText(chooserOff, chooserKeeperSession)
+const shortlistMarker = '你现在可以做的事（按你自己的历史排的，不是命令）：'
+const shortlistBlock = wakeTextOn.slice(wakeTextOff.length)
+const shortlistText = shortlistBlock.startsWith('\n\n') ? shortlistBlock.slice(2) : shortlistBlock
+const wakeLine1 = '（这一轮是你自己醒来的，没有人跟你说话。）'
+const wakeLine2 = '醒来后先读状态再决定：继续没做完的事，或明确休息。不要为了显得活着而编造经历。'
+const preChooserWake = `${wakeLine1}\n${keeperTextOff}\n${wakeLine2}`
+check('chooser wiring: the wake prompt gains a bounded shortlist, the keeper prompt gains exactly zero characters, and chooser-off is the pre-chooser prompt',
+  wakeTextOff === preChooserWake &&
+  wakeTextOn === `${wakeTextOff}\n\n${shortlistText}` &&
+  shortlistText.startsWith(shortlistMarker) &&
+  shortlistText.includes('休息，什么都不做') &&
+  shortlistText.length > 0 && shortlistText.length <= choose.WAKE_SHORTLIST_MAX_CHARS &&
+  keeperTextOn === keeperTextOff &&
+  !keeperTextOn.includes(shortlistMarker),
+  `shortlist=${shortlistText.length} chars (cap ${choose.WAKE_SHORTLIST_MAX_CHARS}); ` +
+  `wake text ${wakeTextOff.length}→${wakeTextOn.length} chars; keeper delta=${keeperTextOn.length - keeperTextOff.length}; ` +
+  `chooser-off wake equals pre-chooser baseline=${wakeTextOff === preChooserWake}`)
+
+const chooserToolState = wakeCtx()
+mod.apply(chooserToolState.root, { lifeId: 'chooser-tool' })
+seedChooserLife('chooser-tool')
+const candidatesTool = toolOf(chooserToolState, 'life_candidates')
+const defaultCandidates = await candidatesTool.execute({}, {})
+const oneCandidate = await candidatesTool.execute({ topN: 1 }, {})
+const fiveCandidates = await candidatesTool.execute({ topN: 5 }, {})
+const clampedCandidates = await candidatesTool.execute({ topN: 9 }, {})
+const fractionalCandidates = await candidatesTool.execute({ topN: 2.5 }, {})
+check('life_candidates: registered, defaults to chooserTopN, honours topN 1..5, exposes CHOOSER_WEIGHTS, and always includes rest',
+  Boolean(candidatesTool) &&
+  defaultCandidates.topN === 3 &&
+  defaultCandidates.candidates.some((candidate) => candidate.kind === 'rest') &&
+  defaultCandidates.weights.commitment === choose.CHOOSER_WEIGHTS.commitment &&
+  oneCandidate.candidates.filter((candidate) => candidate.kind !== 'rest').length <= 1 &&
+  fiveCandidates.candidates.filter((candidate) => candidate.kind !== 'rest').length <= 5 &&
+  clampedCandidates.topN === 5 &&
+  fractionalCandidates.topN === 3,
+  `registered=${Boolean(candidatesTool)}, default topN=${defaultCandidates.topN}, counts topN1/topN5=` +
+  `${oneCandidate.candidates.length}/${fiveCandidates.candidates.length}, topN 9→${clampedCandidates.topN}, ` +
+  `2.5→${fractionalCandidates.topN}, rest always=${defaultCandidates.candidates.some((candidate) => candidate.kind === 'rest')}`)
+
+const disabledToolState = wakeCtx()
+mod.apply(disabledToolState.root, { lifeId: 'chooser-tool-disabled', chooserEnabled: false })
+seedChooserLife('chooser-tool-disabled')
+let chooserDisabledError = ''
+try {
+  await toolOf(disabledToolState, 'life_candidates').execute({}, {})
+} catch (err) {
+  chooserDisabledError = String(err.message)
+}
+check('life_candidates with chooserEnabled:false: explicit error instead of a silent empty list',
+  chooserDisabledError.includes('life/chooser-disabled'),
+  `error=${chooserDisabledError || 'no error (returned a list)'}`)
 
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`)

@@ -15,9 +15,34 @@ $env:DSH_BIN='C:\...\node_modules\@deepseek-ai\dsh'; node verify/live/wake-live.
 realpaths it, which pnpm's junction needs. Needs the **shipped `web` profile**,
 because `headless` and `sdk` compose no `schedule` service.
 
-**Cost:** ~1–2 minutes, three short-lived local processes, one throwaway
-`DSH_HOME` under the temp dir (wiped per run). **No model credential is used**,
-so no spend — the wake turn's model call is expected to fail.
+**Cost:** ~2 minutes, four short-lived local processes (one is the environment
+check below), a throwaway `DSH_HOME` under the temp dir (wiped at start, left on
+disk afterwards so a failure can be read). **No model credential is used**, so no
+spend — the wake turn's model call is expected to fail.
+
+**Presets are not touched.** `wake.patch.yml` inserts exactly one driver plugin
+and changes no preset, no registry and no service. The plugin exists only because
+`dsh web` has no command that runs a turn unattended. The Session under test runs
+the shipped `standard` preset, persona and tool set included.
+
+### Precondition: the installation must be healthy
+
+Before the three phases the runner asks its own question: can this `dsh` create a
+Session in the shipped `web` profile, and does it come back with
+`agentPreset: "standard"`? It boots the profile once with a two-file throwaway
+overlay (`createPeer` + `session/create`, nothing else) and inspects the answer.
+
+- **Healthy** → prints `env ok  session/create → agentPreset="standard"` and runs
+  the phases. The `agentPreset` value is also recorded in the arm timeline, so a
+  PASS always carries the preset it was obtained under.
+- **Damaged install** (`agent-preset/invalid`, or a Session created *without*
+  `standard`) → **exit 2**, labelled `ENV`, with the raw reason lines. This is
+  explicitly *not* a verdict on the wake path: the wake path was never reached.
+  A damaged pnpm tree (one left behind by a failed install) produces exactly this
+  while a clean install of the same version returns `standard` — see
+  `docs/dsh-preset-audit.md` for the reproduction and how to tell them apart.
+- It also refuses a **preset-free** result rather than passing under a profile
+  shape the product does not ship.
 
 ### What it proves
 
@@ -36,7 +61,7 @@ Process A exits before the task is due, so the delivery in step 1 can only come
 from dsh's boot-time catch-up — the "the machine was off" case, which is the one
 that matters for a companion that outlives a session.
 
-It does **not** assert anything about model output, tool use, or the reply.
+All three run with the shipped preset; no part of the profile is disabled.
 
 ### What it does NOT prove
 
@@ -44,40 +69,46 @@ It does **not** assert anything about model output, tool use, or the reply.
   the turn reaches `llm/retry` and ends in an error. Delivery is proved, the
   reply is not.
 - **The desktop GUI.** `~/.dsh/profiles/desktop` is never touched. The GUI is an
-  Electron host with its own composition (including user plugins) and remains
-  unverified for this path — see the preset caveat below, which would bite it too
-  if that composition mounts the same preset trees.
+  Electron host running its own bundled dsh, and this check does not exercise it.
 - **Long-run reliability.** One wake, one restart. Nothing here says a companion
   wakes correctly every day for a week.
-- **That this is how the product should run.** See the warning below.
+- **Anything about preset-free compositions.** The runner refuses them instead of
+  measuring them, precisely because an earlier revision of this file did the
+  opposite.
 
-### The workaround you are looking at
+### History: why this file used to disable every preset
 
-`verify/live/wake.patch.yml` disables **all shipped agent presets** and the
-preset registry. Without that, on dsh `0.2.1-rc.2`, every `session/create` in the
-shipped `web` profile fails with `agent-preset/invalid`: each preset's audit
-re-mounts plugins the deployment layer already mounted (persona prompt section,
-persistent pwsh tool, compact command, subagent model selection) and reports the
-preset unusable. It fails identically through a direct service call, a Peer RPC,
-and HTTP, so it is a dsh bug rather than an entry-point problem.
+Worth keeping, because the mistake is instructive. An earlier revision disabled
+`preset-standard/ptc/minimal/cordis` and `agent-preset-registry`, because every
+`session/create` was failing with:
 
-Consequence: the Session under test is **preset-free** — no persona, no preset
-tool set, no subagent tooling. That is deliberate sabotage for the duration of
-the check, not a supported way to boot dsh. When the upstream audit is fixed,
-delete the `disabled` rows and the three assertions should hold unchanged with
-the default preset.
+```
+agent-preset/invalid
+persona: prompt section "deployment:persona-prefix" is already registered
+tool-subagent: standing `modelSelectionSettings` requires a scoped preset Context
+```
 
-Background, with file/line evidence: `docs/dsh-schedule-api.md` and
-`docs/wake-e2e.md`.
+That was read as a dsh defect, and the check was bent around it — which made the
+script claim "the wake path works, as long as the companion gives up the persona,
+the preset tool set and subagent tooling". Both halves were wrong:
+
+- the failure was **one damaged local install**, not dsh. A clean install of the
+  same `0.2.1-rc.2` returns `agentPreset: "standard"` every time
+  (`docs/dsh-preset-audit.md`);
+- the workaround therefore proved less than it appeared to, and a reader would
+  have concluded the product needs that sacrifice.
+
+The overlay no longer disables anything. The `agentPreset === "standard"` line in
+the output, plus the precondition above, is what stops the same mistake returning.
 
 ### Reading the result
 
 - `PASS`/`FAIL` lines are the three assertions, followed by a timeline of the
   timestamps that matter and the messageId they hang on.
-- exit `0` — all three passed; exit `1` — an assertion failed (real finding);
-  exit `2` — `ENV`, i.e. the check could not run on this machine (no spawnable
-  dsh, no `schedule` service, boot failure). Exit 2 is never a verdict on the
-  wake path.
+- exit `0` — all three passed; exit `1` — an assertion failed (a real finding);
+  exit `2` — `ENV`: the check could not run (no spawnable dsh, no `schedule`
+  service, boot failure, or an install that cannot create a preset Session).
+  Exit 2 is never a verdict on the wake path.
 
 ### Knobs
 

@@ -17,20 +17,23 @@
  * It does NOT look at model output. There is no API key here on purpose: the
  * model call fails, and that is irrelevant — what is under test is delivery.
  *
- * Cost: ~1–2 minutes of wall clock, three local processes, no network model
- * spend. Not part of `npm run verify`; run it by hand before a release if the
- * wake path changed.
+ * Cost: ~2 minutes of wall clock, four local processes (one is the environment
+ * check), no network model spend. Not part of `npm run verify`; run it by hand
+ * before a release if the wake path changed.
  *
- * ── READ THIS BEFORE TRUSTING A PASS ───────────────────────────────────────────
- * The overlay at `verify/live/wake.patch.yml` DISABLES all shipped agent presets
- * and the preset registry. On dsh 0.2.1-rc.2 no Session can be created in the
- * shipped `web` profile otherwise: every preset's audit re-mounts plugins the
- * deployment already mounted and reports `agent-preset/invalid` (persona prompt
- * section, persistent pwsh tool, compact command, subagent model selection).
- * That is a dsh bug. The workaround means the Session here is preset-free, so
- * the persona, the preset tool set and subagent tooling are absent, and this
- * check says nothing about the desktop GUI's composition. See the overlay and
- * verify/live/README.md; the assertions stay valid once the bug is fixed.
+ * ── WHAT THIS RUNS ON ──────────────────────────────────────────────────────────
+ * The shipped `standard` preset, unmodified. `wake.patch.yml` inserts exactly one
+ * driver plugin and changes no preset, no registry and no service; the plugin
+ * exists only because `dsh web` has no command that runs a turn unattended.
+ *
+ * Before the three phases it verifies the install itself: if `session/create` in
+ * the shipped `web` profile does not come back with `agentPreset: "standard"`,
+ * the run stops with exit 2 and says so. That is an installation problem, not a
+ * wake-path verdict — an earlier revision of this file worked around exactly
+ * that symptom by disabling every preset, which was a lie about the product (it
+ * implied a companion can only wake by giving up persona/tools/subagents). The
+ * symptom came from one broken local `_dshrt`; see `docs/dsh-preset-audit.md`
+ * for the experiment that separated it from a real dsh defect.
  * ──────────────────────────────────────────────────────────────────────────────
  */
 import { spawn } from 'node:child_process'
@@ -48,6 +51,45 @@ const PROBE_RESULT = 'wake-result.json'
 
 const AFTER_SECONDS = Number(process.env.WAKE_LIVE_AFTER_SECONDS || 25)
 const BOOT_TIMEOUT_MS = Number(process.env.WAKE_LIVE_BOOT_TIMEOUT_MS || 150_000)
+
+// The environment check is two throwaway files written into the HOME below. It is
+// not a test asset: it exists so a damaged install can never be mistaken for a
+// wake-path failure (or for a pass, which would be worse).
+const CHECK_PROBE = `import fs from 'node:fs'
+
+export const name = 'wake-live-env-check'
+export const inject = []
+
+export function apply (root) {
+  root.inject(['sessionController', 'connection', 'typertGateway'], async (ctx) => {
+    const answer = { at: new Date().toISOString(), services: {
+      sessionController: Boolean(ctx.sessionController),
+      connection: Boolean(ctx.connection),
+      typertGateway: Boolean(ctx.typertGateway),
+    } }
+    await new Promise((r) => setTimeout(r, 2000))
+    try {
+      const peer = ctx.connection.createPeer({ principal: { kind: 'owner' } })
+      answer.result = await ctx.typertGateway.dispatchRpc(
+        'session/create',
+        { args: { request: { cwd: process.env.WAKE_LIVE_CWD } } },
+        new AbortController().signal,
+        peer,
+      )
+    } catch (err) {
+      answer.error = { message: String(err && err.message), code: err && err.code ? String(err.code) : null }
+    }
+    fs.writeFileSync(process.env.WAKE_LIVE_CHECK_OUT, JSON.stringify(answer, null, 2))
+    setTimeout(() => process.exit(0), 200)
+  })
+}
+`
+
+const CHECK_PATCH = `# written by wake-live.mjs: environment self-check only. No preset is disabled.
+- insert:
+    - id: wake-live-env-check
+      name: ./env-check.mjs
+`
 
 banner()
 
@@ -75,11 +117,20 @@ const CHILD_PATH = [path.dirname(process.execPath), process.env.PATH || ''].filt
 console.log(`  dsh       ${DSH}`)
 console.log(`  version   ${await version()}`)
 console.log(`  DSH_HOME  ${HOME}  (throwaway)`)
-console.log(`  overlay   ${relative(PATCH)}  (presets disabled — see the header)`)
+console.log(`  overlay   ${relative(PATCH)}  (one plugin; shipped presets untouched)`)
 console.log(`  one-shot  ${AFTER_SECONDS}s out; the Host is killed before it comes due\n`)
+
+// ── environment check: can this install create a Session with the preset? ─────
+// Written into the throwaway HOME at run time: a self-check of the installation,
+// not a test asset. It uses the same Peer path the phases use, so a green check
+// also proves the creation route. No preset row is disabled anywhere.
+const CHECK_DIR = path.join(HOME, 'env-check')
+const CHECK_OUT = path.join(HOME, 'env-check.json')
+const preset = await checkEnvironment()
 
 const timeline = []
 const results = []
+timeline.push(`env      ${preset.at || 'n/a'}  session/create → agentPreset=${JSON.stringify(preset.agentPreset)}`)
 
 // ── arm: create a Session, arm the wake, leave immediately ────────────────────
 const arm = await boot('arm')
@@ -93,7 +144,7 @@ if (arm.code !== 0 || !state || !state.scheduleId) {
   ])
 }
 const event = lastEvent(arm.out, 'armed')
-timeline.push(`arm      ${event ? event.at : state.armedAt}  session ${state.sessionId}`)
+timeline.push(`arm      ${event ? event.at : state.armedAt}  session ${state.sessionId}  agentPreset=${JSON.stringify(state.agentPreset)}`)
 timeline.push(`         schedule ${state.scheduleId} due ${state.scheduledAt}`)
 
 const due = Date.parse(state.scheduledAt)
@@ -164,20 +215,95 @@ if (failed.length) {
   console.log(`\nFAILED (assertion, not environment): ${failed.map((r) => r.label).join(' | ')}`)
   process.exit(1)
 }
-console.log('\nPASS: the wake path works unattended — but only under the preset-free overlay.')
+console.log('\nPASS: the wake path works unattended on the shipped `standard` preset, unmodified.')
 process.exit(0)
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Pre-flight: can this install create a Session in the shipped `web` profile
+ * with the shipped `standard` preset?
+ *
+ * A damaged install reports `agent-preset/invalid` here and nothing about it is
+ * a verdict on the wake path, so the run stops with the ENVIRONMENT exit code and
+ * says so in words. Refusing a preset-free Session matters too: the earlier
+ * revision of this file disabled every preset, and a PASS under that handicap
+ * claimed less than it looked like it claimed.
+ *
+ * @returns {{ at: string | undefined, agentPreset: string }}
+ */
+async function checkEnvironment () {
+  fs.rmSync(CHECK_DIR, { recursive: true, force: true })
+  fs.mkdirSync(CHECK_DIR, { recursive: true })
+  fs.writeFileSync(path.join(CHECK_DIR, 'env-check.mjs'), CHECK_PROBE, 'utf8')
+  fs.writeFileSync(path.join(CHECK_DIR, 'env-check.patch.yml'), CHECK_PATCH, 'utf8')
+  fs.rmSync(CHECK_OUT, { force: true })
+
+  const run = await new Promise((resolve) => {
+    const child = spawn(
+      process.execPath,
+      [DSH, 'web', '--patch', path.join(CHECK_DIR, 'env-check.patch.yml'), '--no-open', '--port', '0'],
+      {
+        env: { ...process.env, DSH_HOME: HOME, PATH: CHILD_PATH, WAKE_LIVE_CHECK_OUT: CHECK_OUT, WAKE_LIVE_CWD: HOME },
+        cwd: REPO,
+        timeout: BOOT_TIMEOUT_MS,
+      },
+    )
+    let out = ''
+    child.stdout.on('data', (d) => { out += d })
+    child.stderr.on('data', (d) => { out += d })
+    child.on('close', (code) => resolve({ code, out }))
+  })
+
+  const answer = readJson(CHECK_OUT)
+  if (!answer) {
+    environment([
+      'the environment check never answered — the web profile did not reach the probe',
+      `exit=${run.code}`,
+      ...tail(run.out, 6),
+    ])
+  }
+
+  const created = answer.result
+  const agentPreset = created && created.ok === true && created.value ? (created.value.agentPreset ?? null) : null
+
+  if (!created || created.ok !== true) {
+    const error = (created && created.error) || answer.error || {}
+    environment([
+      'this dsh install cannot create a Session in the shipped `web` profile with the shipped preset:',
+      `  code    ${error.code || 'unknown'}`,
+      ...String(error.message || '(no message)').split('\n').filter(Boolean).map((line) => `  reason  ${line}`),
+      '',
+      'That is an INSTALLATION problem, not a verdict on the wake path — the wake path was never reached.',
+      'A clean install of the same version returns agentPreset "standard" for this exact request; a damaged',
+      'pnpm tree reports `agent-preset/invalid` instead. Reinstall and re-run; docs/dsh-preset-audit.md has',
+      'the reproduction and how to tell the two apart.',
+    ])
+  }
+
+  if (agentPreset !== 'standard') {
+    environment([
+      `a Session was created but not with the shipped \`standard\` preset (agentPreset=${JSON.stringify(agentPreset)}).`,
+      'This check assumes the stock web composition. A preset-free or re-branded profile would make the',
+      'result unrepresentative, so it refuses to run instead of passing under a different product shape.',
+    ])
+  }
+
+  console.log(`  env ok    session/create → agentPreset="standard"  (${answer.at || 'n/a'})\n`)
+  return { at: answer.at, agentPreset }
+}
+
 function banner () {
   console.log('\nwake-live — does the real `web` profile wake a Session by itself?\n')
   console.log('  boots the shipped `web` profile 3× against a throwaway DSH_HOME:')
   console.log('    1. create a Session and arm a one-shot wake, then exit (Host down)')
   console.log('    2. boot again after the task is overdue: expect the delivery + ledger row')
   console.log('    3. boot once more: expect the same messageId in the persisted prefix')
-  console.log('  needs: dsh 0.2.1-rc.2 (DSH_BIN), the shipped `web` template, ~1–2 min')
+  console.log('  needs: dsh 0.2.1-rc.2 (DSH_BIN), the shipped `web` template, ~2 min')
   console.log('  spends: nothing — no model credential is used; the model call is expected to fail')
-  console.log('  warns: the overlay disables every shipped preset. That is a workaround for a')
-  console.log('         dsh preset-audit bug, not a normal way to run dsh. See the header.\n')
+  console.log('  checks: first that this install creates a Session with the shipped `standard` preset')
+  console.log('          (otherwise exit 2, an installation problem); then the three wake assertions.')
+  console.log('  runs:   shipped presets, unmodified — one driver plugin, no disabled rows.\n')
 }
 
 function relative (target) {

@@ -1,5 +1,6 @@
 import { LifeStore, resolveDshHome } from './store.js'
 import { ConfigSchema, ConfigDefaults } from './config.js'
+import { CHOOSER_WEIGHTS, rankCandidates, renderWakeCandidates, shortlistCandidates } from './choose.js'
 import {
   dayKeyOf,
   isQuietAt,
@@ -139,9 +140,13 @@ export function apply (root, config = {}) {
           order: SECTION_ORDER,
           text: (context) => {
             try {
-              return renderLifeContext(store.snapshot(), {
-                woke: isWakeTurn(context, wakeRuntime.turns),
-              })
+              const woke = isWakeTurn(context, wakeRuntime.turns)
+              const base = renderLifeContext(store.snapshot(), { woke })
+              // The shortlist is a wake-only cost: a normal keeper turn must not
+              // pay for candidate ranking it will not use.
+              if (!woke || !settings.chooserEnabled) return base
+              const shortlist = renderWakeShortlist(store, settings)
+              return shortlist ? `${base}\n\n${shortlist}` : base
             } catch (err) {
               // A life-context failure must never fail a turn.
               return ''
@@ -420,6 +425,18 @@ function buildTools (store, settings, wakeRuntime) {
       at: { type: 'string', description: 'ISO 8601 instant for the next wake-up, for example 2026-10-27T08:30:00+08:00' },
     },
     execute: async (args, exec) => scheduleSelfWake(store, settings, wakeRuntime, args, exec),
+  }))
+
+  // The thirteenth tool: ask the chooser why one thing outranks another. The
+  // wake turn only shows a bounded shortlist, so this exposes the full parts
+  // and the global notes on demand.
+  tools.push(tool({
+    name: 'life_candidates',
+    description: 'Read your ranked activity candidates: what you could do now, why each one scored the way it did (commitment urgency, interest match, unfinished business, exploration, minus cost, risk and switching cost), and the rest option. Use it when you want to know why something is ranked first, or when you wake up and need a wider list.',
+    parameters: {
+      topN: { type: 'integer', description: 'How many activity candidates to return (1-5); defaults to chooserTopN. The rest candidate is always included.' },
+    },
+    execute: async (args) => readCandidates(store, settings, args),
   }))
 
   return tools
@@ -730,6 +747,68 @@ function isoOf (value) {
   if (typeof value !== 'string' && typeof value !== 'number') return null
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+// ---------------------------------------------------------------------------
+// Activity chooser wiring
+//
+// The ranking itself lives in choose.js (pure, no IO). This layer only feeds it
+// the live state and decides when the result is worth paying for: the shortlist
+// is appended to wake turns only, while the tool is available on demand.
+// ---------------------------------------------------------------------------
+
+/** Read the live state the chooser ranks over, with the day's wake budget. */
+function chooserInputs (store, settings) {
+  const now = new Date()
+  const traits = store.readTraits() || { interests: [], skills: [] }
+  const wake = store.readWake()
+  const today = dayKeyOf(now)
+  const countToday = wake.dayKey === today ? wake.countToday : 0
+  return {
+    now,
+    commitments: store.readCommitments().items,
+    interests: traits.interests,
+    skills: traits.skills,
+    activity: store.readActivity(),
+    wakeBudget: { countToday, maxPerDay: settings.wakeMaxPerDay },
+  }
+}
+
+/** Bounded shortlist appended to a wake-turn prompt only. */
+function renderWakeShortlist (store, settings) {
+  const ranked = rankCandidates(chooserInputs(store, settings))
+  return renderWakeCandidates({ candidates: ranked.candidates, topN: settings.chooserTopN })
+}
+
+/** `life_candidates`: the full ranked detail behind the shortlist. */
+function readCandidates (store, settings, args) {
+  if (!settings.chooserEnabled) {
+    // Explicit error, not a silent empty list: the model must know the chooser
+    // is off so it falls back to its own judgement instead of "nothing to do".
+    throw new Error('life/chooser-disabled: 活动选择器已关闭（chooserEnabled: false），这次只靠你自己判断')
+  }
+  const input = args && typeof args === 'object' ? args : {}
+  const requested = Number(input.topN)
+  const topN = Number.isInteger(requested)
+    ? Math.min(5, Math.max(1, requested))
+    : settings.chooserTopN
+  const state = chooserInputs(store, settings)
+  const ranked = rankCandidates(state)
+  const budget = state.wakeBudget
+  return {
+    now: state.now.toISOString(),
+    topN,
+    wakeBudget: {
+      countToday: budget.countToday,
+      maxPerDay: budget.maxPerDay,
+      remaining: Math.max(0, budget.maxPerDay - budget.countToday),
+    },
+    weights: CHOOSER_WEIGHTS,
+    notes: ranked.notes,
+    total: ranked.candidates.length,
+    candidates: shortlistCandidates(ranked.candidates, topN),
+    rest: ranked.rest,
+  }
 }
 
 // ---------------------------------------------------------------------------

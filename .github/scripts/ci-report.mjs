@@ -1,8 +1,8 @@
 /**
- * Turn the two verify suites into one CI verdict plus a summary for remote triage.
+ * Turn the verify suites into one CI verdict plus a summary for remote triage.
  *
- * Both suites run with `continue-on-error`, so this script sees their real
- * outcomes and can let the second suite run even when the first one failed.
+ * Every suite runs with `continue-on-error`, so this script sees their real
+ * outcomes and can let later suites run even when an earlier one failed.
  * It writes the same markdown to the step summary (if GitHub provides one) and
  * to `verify-report.md`, which the workflow uploads as an artifact.
  *
@@ -35,17 +35,27 @@ function dshVersion () {
   }
 }
 
-const smoke = process.env.SMOKE_OUTCOME || 'unknown'
-const e2e = process.env.E2E_OUTCOME || 'unknown'
+const suites = [
+  ['smoke', process.env.SMOKE_OUTCOME || 'unknown'],
+  ['e2e', process.env.E2E_OUTCOME || 'unknown'],
+  ['pack', process.env.PACK_OUTCOME || 'unknown'],
+]
 const os = process.env.MATRIX_OS || process.env.RUNNER_OS || 'unknown'
 
 const fence = (body) => '```text\n' + tail(body) + '\n```'
+const details = (name, outcome) => [
+  `<details><summary>${name} output (last 30 lines, ${outcome})</summary>`,
+  '',
+  fence(read(`verify-${name}.log`)),
+  '',
+  '</details>',
+].join('\n')
+
 const rows = [
   ['os', os],
   ['node', process.version],
   ['dsh', dshVersion()],
-  ['smoke', smoke],
-  ['e2e', e2e],
+  ...suites.map(([name, outcome]) => [name, outcome]),
 ]
 
 const markdown = [
@@ -55,18 +65,7 @@ const markdown = [
   '| --- | --- |',
   ...rows.map(([key, value]) => `| ${key} | ${value} |`),
   '',
-  `<details><summary>smoke output (last 30 lines, ${smoke})</summary>`,
-  '',
-  fence(read('verify-smoke.log')),
-  '',
-  '</details>',
-  '',
-  `<details><summary>e2e output (last 30 lines, ${e2e})</summary>`,
-  '',
-  fence(read('verify-e2e.log')),
-  '',
-  '</details>',
-  '',
+  ...suites.flatMap(([name, outcome]) => [details(name, outcome), '']),
 ].join('\n')
 
 fs.writeFileSync('verify-report.md', markdown)
@@ -75,7 +74,8 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 }
 console.log(markdown)
 
-if (smoke !== 'success' || e2e !== 'success') {
-  console.error(`verify failed: smoke=${smoke} e2e=${e2e}`)
+const failed = suites.filter(([, outcome]) => outcome !== 'success')
+if (failed.length) {
+  console.error(`verify failed: ${failed.map(([name, outcome]) => `${name}=${outcome}`).join(' ')}`)
   process.exit(1)
 }

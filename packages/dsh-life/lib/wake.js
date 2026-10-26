@@ -58,8 +58,10 @@ export function isQuietAt (value, { quietStart, quietEnd } = {}) {
  * Rule: `now + everyMinutes ± jitterMinutes`. If that target lands inside the
  * quiet window it is pushed to the first quiet-end after it, plus a small
  * `0..jitterMinutes` spread so several lives do not wake on the same second.
- * The result is always strictly positive and at least one minute, since
- * schedule's minimum granularity is 60s.
+ * A long interval can make that push jump over a whole calendar day; see
+ * {@link clampToLastAllowedMoment} for the one exception that keeps the life
+ * from disappearing for 24h. The result is always strictly positive and at
+ * least one minute, since schedule's minimum granularity is 60s.
  *
  * `random` is injectable: a fixed function makes the output deterministic for
  * tests. It is called at most twice (spread, then quiet-window spread).
@@ -89,9 +91,61 @@ export function nextWakeDelayMs ({
     // A quiet window that spans almost the whole day plus a large jitter can
     // land back inside it; settle exactly on the boundary rather than loop.
     if (isQuietAt(target, window)) target = nextClockAfter(target, endMinutes)
+    // The push may now be two or more calendar days away, which would erase an
+    // entire day of the life. Keep one allowed moment on the first skipped day.
+    target = clampToLastAllowedMoment({ now: from, targetMs: target, quietStart, quietEnd })
   }
 
   return Math.max(MIN_WAKE_DELAY_MS, Math.round(target - from.getTime()))
+}
+
+/**
+ * Keep a quiet-pushed target from skipping a whole local calendar day.
+ *
+ * With a 1440-minute interval and wide jitter, the target can land in the quiet
+ * window so late that the quiet-end push lands on the *next* day's morning.
+ * That is legal ("never wake during quiet hours") but it deletes a calendar day
+ * from the life: no wake-up, no activity, nothing to explain to the keeper.
+ *
+ * When the pushed target is two or more local days ahead, the earliest skipped
+ * day gets one allowed instant instead: one minute before quiet starts (22:59
+ * for the default 23:00–08:00 window). A target that is only one day ahead is
+ * returned untouched, so the ordinary "sleep until tomorrow morning" rollover
+ * is byte-for-byte unchanged.
+ *
+ * No clamping when the window cannot supply a safe previous minute:
+ * - `quietStart === '00:00'` would produce "yesterday 23:59", i.e. a past time;
+ * - a malformed or empty window has no meaningful last allowed moment.
+ *
+ * @returns {number} epoch ms of the (possibly clamped) target.
+ */
+export function clampToLastAllowedMoment ({ now, targetMs, quietStart, quietEnd } = {}) {
+  const from = toDate(now)
+  const target = toMillis(targetMs)
+  if (target === null) return from.getTime()
+
+  const start = parseClock(quietStart)
+  const end = parseClock(quietEnd)
+  if (start === null || end === null || start === end) return target
+  if (start === 0) return target
+
+  const fromDay = localDayNumber(from)
+  const targetDay = localDayNumber(new Date(target))
+  if (targetDay - fromDay < 2) return target
+
+  // The earliest day that would otherwise have no wake at all.
+  const skipped = new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    from.getDate() + 1,
+    Math.floor((start - 1) / 60),
+    (start - 1) % 60,
+    0,
+    0,
+  )
+  const clamped = skipped.getTime()
+  if (!Number.isFinite(clamped) || clamped <= from.getTime()) return target
+  return Math.min(clamped, target)
 }
 
 /**
@@ -130,6 +184,31 @@ function toDate (value) {
     if (Number.isFinite(parsed)) return new Date(parsed)
   }
   return new Date()
+}
+
+/** Epoch ms for a Date/number/parseable string, or null when unusable. */
+function toMillis (value) {
+  if (value instanceof Date) {
+    const time = value.getTime()
+    return Number.isFinite(time) ? time : null
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+/**
+ * Local calendar day as an integer day number.
+ *
+ * Built from local year/month/day through UTC so that DST shifts cannot make
+ * two instants of the same local day compare as different days (and so the
+ * difference is a day count, not a string comparison).
+ */
+function localDayNumber (date) {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / (24 * 60 * 60 * 1000))
 }
 
 function nextClockAfter (value, clockMinutes) {

@@ -6,7 +6,7 @@
  * to wake) is a plugin mounted through `dsh web --patch`. This file is that
  * plugin. It is driven by environment variables, one mode per process:
  *
- *   arm     create a preset-free Session, arm a one-shot wake, exit at once.
+ *   arm     create a Session with the shipped preset, arm a one-shot wake, exit.
  *           The schedule service persists the task, so the Host may then die.
  *   watch   a *second* process: report the delivery dsh performs on startup for
  *           a task that came due while the Host was down, plus the ledger row.
@@ -71,8 +71,8 @@ export function apply (root) {
       await sleep(4_000) // let the profile finish composing before the first create
       try {
         // A Session is created through a Peer, not through the bare service: the
-        // preset/binding machinery needs the Peer's scope. Direct service calls
-        // fail with `agent-preset/invalid` for an unrelated reason (see patch).
+        // preset-binding machinery works off the Peer's scope, which is the path
+        // the Web UI itself takes.
         const peer = ctx.connection.createPeer({ principal: { kind: 'owner' } })
         const created = await ctx.typertGateway.dispatchRpc(
           'session/create',
@@ -81,6 +81,9 @@ export function apply (root) {
           peer,
         )
         const sessionId = created && created.ok && created.value ? created.value.sessionId : undefined
+        // The preset this Session actually runs. `standard` is the evidence that
+        // the shipped presets composed and audited clean — we sabotage nothing.
+        const agentPreset = created && created.ok && created.value ? (created.value.agentPreset ?? null) : null
         if (!sessionId) {
           writeJson(RESULT, { ok: false, reason: 'create-failed', services, response: created })
           return finish(7, 'create-failed')
@@ -92,13 +95,14 @@ export function apply (root) {
         })
         writeJson(STATE, {
           sessionId,
+          agentPreset,
           scheduleId: record.id,
           scheduledAt: record.scheduledAt,
           afterSeconds: AFTER,
           armedAt: now(),
           services,
         })
-        say('armed', { sessionId, scheduleId: record.id, scheduledAt: record.scheduledAt })
+        say('armed', { sessionId, agentPreset, scheduleId: record.id, scheduledAt: record.scheduledAt })
         return finish(0, 'armed-and-leaving')
       } catch (err) {
         writeJson(RESULT, { ok: false, reason: 'arm-failed', services, error: errInfo(err) })
