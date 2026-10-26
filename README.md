@@ -46,6 +46,38 @@ dsh 已经开源并且自带：会话持久化与崩溃恢复、持久目标（`
 
 ---
 
+## Showcase
+
+![demo](showcase/demo.gif)
+
+> 15 秒、30fps，**由 PAGX 逐帧烘焙生成**（不是录屏）。三幕连续：它现在在做什么 → 一条动态发到八个平台 → 桌宠形态。
+> 高画质版本：[`showcase/demo.mp4`](showcase/demo.mp4)（365 KB）
+
+| | |
+| --- | --- |
+| ![](showcase/scene-activity.png) | ![](showcase/scene-publish.png) |
+| **它现在在做什么** — 有界的当前活动：为什么是这件事、存档证据、进度与上限、下一步想做什么 | **一条动态发到八个平台** — 逐渠道开关（这里关掉 QQ 与 OnlyFans）、同步发布、逐条回执 |
+| ![](showcase/scene-pet.png) | |
+| **桌宠形态** — 浮在桌面一角，气泡说话；「回它 / 别烦我」 | |
+
+### 动画是怎么做的
+
+用的是腾讯 [libpag](https://github.com/Tencent/libpag) 的 **PAGX** —— 一种 XML 矢量动画格式，官方定位是 *human-readable, diff-friendly, designed for AI-assisted generation*。它正好适合这个场景：动画可以由代码生成、可读、可 diff。
+
+```sh
+cd showcase
+npm install @libpag/pagx
+node bake-showcase.mjs                    # 生成 450 帧到 frames/
+ffmpeg -framerate 30 -i frames/f%04d.png -c:v libx264 \
+  -pix_fmt yuv420p -crf 19 -movflags +faststart demo.mp4
+```
+
+`pagx render` 没有时间参数，所以动画是**逐帧烘焙**的：`bake-showcase.mjs` 自己算插值（缓入缓出、呼吸浮动、进度推进、脉冲圆点、计数器），每一帧生成一份独立 PAGX 文档并渲染。PAGX 负责矢量/文字/图片合成，脚本负责运动。
+
+`frames/` 不入库（见 `.gitignore`），只提交成品视频。
+
+---
+
 ## 装法
 
 ```sh
@@ -155,7 +187,7 @@ DSH_BIN=<dsh bin> node verify/e2e-tools.mjs   # 15 项：真实 dsh 端到端
 
 ---
 
-## 界面原型
+## 界面原型（可交互）
 
 `design/` 下都是单文件 HTML，浏览器直接打开，含交互：
 

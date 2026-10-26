@@ -16,3 +16,6 @@ life/
 # scratch
 tmp/
 *.log
+
+# baked animation frames (regenerate with showcase/bake-showcase.mjs)
+showcase/frames/
