@@ -84,7 +84,8 @@ jobs:
       # bash 的 pipefail + tee：原始输出同时进 step 日志和 artifact。
       # continue-on-error 是为了 smoke 失败时仍然跑 e2e（另一套的原始输出也要能看到），
       # 最终由 Report and gate 统一决定 job 红不红。
-      - name: Verify — smoke (26 checks)
+      # 步骤名不写项数：断言数量会变，名字留着旧数字比没有更误导。
+      - name: Verify — smoke
         id: smoke
         shell: bash
         continue-on-error: true
@@ -92,7 +93,7 @@ jobs:
           set -euo pipefail
           node verify/smoke.mjs 2>&1 | tee verify-smoke.log
 
-      - name: Verify — e2e (15 checks)
+      - name: Verify — e2e
         id: e2e
         shell: bash
         continue-on-error: true
