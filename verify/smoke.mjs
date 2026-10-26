@@ -9,8 +9,11 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const REPO = path.resolve(new URL('.', import.meta.url).pathname, '..')
+// Windows: URL.pathname 会给出 /C:/... 这种带前导斜杠的形式，交给 import()/spawn 会报
+// ERR_UNSUPPORTED_ESM_URL_SCHEME。fileURLToPath 才是跨平台的正确做法。
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PLUGIN = path.join(REPO, 'packages', 'dsh-life')
 const DSH_BIN = process.env.DSH_BIN || '/tmp/dshprobe/node_modules/@deepseek-ai/dsh/lib/bin.js'
 const HOME = process.env.VERIFY_DSH_HOME || path.join(os.tmpdir(), 'dsh-life-verify-home')
@@ -49,7 +52,8 @@ const version = await run(['--version'])
 check('dsh CLI boots and reports a version', /\d+\.\d+\.\d+/.test(version.out), version.out.trim().slice(0, 40))
 
 // ---- 2. The plugin loads with zero dependency resolution -------------------
-const mod = await import(path.join(PLUGIN, 'lib', 'index.js'))
+// Windows: import() 不接受裸的 C:\... 路径，必须转成 file:// URL
+const mod = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'index.js')).href)
 check('plugin module imports with no dependencies', typeof mod.apply === 'function' && mod.name === 'dsh-life')
 
 // ---- 3. Registration against a recording context ---------------------------
@@ -88,7 +92,7 @@ check('per-turn context carries identity, activity and the honesty rule',
   liveText.split('\n')[0].slice(0, 60))
 
 // ---- 4. Durable store invariants, on a real filesystem ---------------------
-const { LifeStore } = await import(path.join(PLUGIN, 'lib', 'store.js'))
+const { LifeStore } = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'store.js')).href)
 const home = path.join(HOME, 'life-invariants')
 const store = new LifeStore({ home, lifeId: 'invariants' })
 store.ensure({ name: '大肥鱼', species: 'whale', seeds: ['懒', '傲娇'] })

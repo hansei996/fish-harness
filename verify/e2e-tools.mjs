@@ -11,8 +11,11 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const REPO = path.resolve(new URL('.', import.meta.url).pathname, '..')
+// Windows: URL.pathname 会给出 /C:/... 这种带前导斜杠的形式，交给 import()/spawn 会报
+// ERR_UNSUPPORTED_ESM_URL_SCHEME。fileURLToPath 才是跨平台的正确做法。
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DSH = process.env.DSH_BIN || '/tmp/dshprobe2/node_modules/@deepseek-ai/dsh/lib/bin.js'
 const HOME = process.env.E2E_DSH_HOME || path.join(os.tmpdir(), 'dsh-life-e2e-home')
 const PLUGIN = path.join(REPO, 'packages', 'dsh-life')
@@ -20,10 +23,15 @@ const PLUGIN = path.join(REPO, 'packages', 'dsh-life')
 fs.rmSync(HOME, { recursive: true, force: true })
 fs.mkdirSync(HOME, { recursive: true })
 
+// Windows: dsh 的 plugin 管理器会去调包管理器，子进程 PATH 里没有 node/pnpm 就会失败。
+// 把当前 node 所在目录并进去，让插件安装在本机可用。
+const NODE_DIR = path.dirname(process.execPath)
+const CHILD_PATH = [NODE_DIR, process.env.PATH || ''].filter(Boolean).join(path.delimiter)
+
 function run (args, { cwd = REPO } = {}) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [DSH, ...args], {
-      env: { ...process.env, DSH_HOME: HOME, CI: 'true' },
+      env: { ...process.env, DSH_HOME: HOME, CI: 'true', PATH: CHILD_PATH },
       cwd,
       timeout: 300000,
     })
@@ -46,7 +54,7 @@ check('dsh composes a new profile from the shipped headless template', init.out.
 
 // 2. Install the plugin through dsh's own plugin manager (not by hand-editing).
 const add = await run(['plugin', '--profile', 'e2e', 'add', `link:${PLUGIN}`])
-check('dsh plugin manager installs dsh-life', /dsh-life/.test(add.out), add.out.trim().split('\n').filter(Boolean).slice(-2).join(' | ').slice(0, 90))
+check('dsh plugin manager installs dsh-life', add.code === 0 && !/failed/i.test(add.out), add.out.trim().split('\n').filter(Boolean).slice(-2).join(' | ').slice(0, 90))
 
 // 3. The composed profile must actually mount it.
 const dump = await run(['--profile', 'e2e', '--dump-config'])
