@@ -1,0 +1,395 @@
+<div id="ar-root">
+  <div class="ar-wrap">
+
+    <!-- ============ 1. 分层与归属 ============ -->
+    <section class="ar-sec" aria-label="技术架构：分层与归属">
+      <div class="ar-frame">
+        <header class="ar-bar">
+          <span class="ar-h1">技术架构</span>
+          <span class="ar-flex"></span>
+          <span class="ar-tag">dsh 0.2.1-rc.2 · MIT</span>
+          <span class="ar-tag ar-tag--us">我们：3 文件 1052 行</span>
+        </header>
+
+        <!-- dsh 底座 -->
+        <div class="ar-shelf ar-shelf--dsh">
+          <div class="ar-shelf-head">
+            <span class="ar-owner ar-owner--dsh">DeepSeek 已开源 · 我们不改</span>
+            <span class="ar-shelf-t">dsh 底座（一切皆插件，没有特权内核可打补丁）</span>
+          </div>
+          <div class="ar-chips ar-chips--dsh">
+            <span class="ar-chip">core/session<em>会话事件日志</em></span>
+            <span class="ar-chip">persistence<em>JSONL 崩溃恢复</em></span>
+            <span class="ar-chip">goal<em>持久目标</em></span>
+            <span class="ar-chip">schedule<em>Host 级定时</em></span>
+            <span class="ar-chip">jobs<em>后台作业</em></span>
+            <span class="ar-chip">approval<em>逐次批准</em></span>
+            <span class="ar-chip">sandbox<em>fail-closed 隔离</em></span>
+            <span class="ar-chip">system-prompt<em>提示词装配</em></span>
+            <span class="ar-chip">tools<em>工具注册表</em></span>
+            <span class="ar-chip">compaction · skills · browser-use · otel</span>
+          </div>
+        </div>
+
+        <!-- 分界线 -->
+        <div class="ar-boundary">
+          <span class="ar-bline"></span>
+          <span class="ar-blabel">扩展点边界 · 我们只挂插件，不 fork 核心</span>
+          <span class="ar-bline"></span>
+        </div>
+
+        <!-- 我们做的那层 -->
+        <div class="ar-us">
+          <div class="ar-us-head">
+            <span class="ar-owner ar-owner--us">要做的产品 · dsh-life</span>
+            <span class="ar-shelf-t">dsh 之上唯一没有的东西：跨会话活着的状态</span>
+          </div>
+
+          <div class="ar-mods">
+            <article class="ar-mod">
+              <div class="ar-mod-h"><code>lib/index.js</code><em>386 行</em></div>
+              <div class="ar-mod-b">插件入口：注册 11 个工具、注入每轮上下文、监听会话事件</div>
+              <div class="ar-hooks">
+                <span><code>inject(['tools'])</code> → <code>register()</code></span>
+                <span><code>inject(['systemPrompt'])</code> → <code>section()</code></span>
+                <span><code>on('session/event')</code> → 记 <code>turn/end</code></span>
+                <span><code>effect()</code> → 卸载时全部反注册</span>
+              </div>
+            </article>
+
+            <article class="ar-mod">
+              <div class="ar-mod-h"><code>lib/store.js</code><em>409 行</em></div>
+              <div class="ar-mod-b">生命状态机：三档速度变量、承诺、关系、账本；每次写原子落盘</div>
+              <div class="ar-mod-k">
+                <b>慢</b> 身份（主人确认才能改）· <b>中</b> 兴趣/技能（带置信度与来源）· <b>快</b> 当前活动（同时只有一个）
+              </div>
+            </article>
+
+            <article class="ar-mod">
+              <div class="ar-mod-h"><code>lib/config.js</code><em>114 行</em></div>
+              <div class="ar-mod-b">零依赖 Standard Schema 校验器；拒绝而非静默忽略非法配置</div>
+              <div class="ar-mod-k">为什么不用 schemastery：桌面端与 npm CLI 的依赖解析根不同，必须只用 Node 内置模块</div>
+            </article>
+          </div>
+        </div>
+
+        <!-- 数据面 -->
+        <div class="ar-data">
+          <div class="ar-data-head">
+            <span class="ar-owner">状态落在哪</span>
+            <span class="ar-shelf-t"><code>$DSH_HOME/life/&lt;lifeId&gt;/</code> · 原子写（tmp + rename）· 损坏降级不死</span>
+          </div>
+          <div class="ar-files">
+            <span class="ar-file"><code>identity.json</code><em>慢变量 · 版本号</em></span>
+            <span class="ar-file"><code>traits.json</code><em>兴趣 · 技能</em></span>
+            <span class="ar-file"><code>relations.json</code><em>主人 / 公开分开存</em></span>
+            <span class="ar-file"><code>commitments.json</code><em>承诺</em></span>
+            <span class="ar-file"><code>activity.json</code><em>当前 + 上一次</em></span>
+            <span class="ar-file ar-file--log"><code>ledger.jsonl</code><em>追加式 · 半行跳过 · 有上限</em></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. 责任划分 ============ -->
+    <section class="ar-sec" aria-label="谁负责什么">
+      <div class="ar-frame">
+        <header class="ar-bar">
+          <span class="ar-h1">谁负责什么</span>
+          <span class="ar-flex"></span>
+          <span class="ar-tag">不重复造轮子，是这张表说了算</span>
+        </header>
+        <div class="ar-split">
+          <div class="ar-col ar-col--dsh">
+            <div class="ar-col-h"><span class="ar-owner ar-owner--dsh">dsh</span></div>
+            <ul>
+              <li>会话不丢 · 崩溃后恢复 · 事件可重放</li>
+              <li>进程隔离 · 工具权限 · 失败关闭</li>
+              <li>用户批准 · 审计事件</li>
+              <li>定时唤醒（<code>schedule</code>）</li>
+              <li>上下文压缩 · 模型切换适配</li>
+              <li>提示词装配 · 工具 schema 下发</li>
+            </ul>
+          </div>
+          <div class="ar-col ar-col--us">
+            <div class="ar-col-h"><span class="ar-owner ar-owner--us">我们</span></div>
+            <ul>
+              <li><b>生命状态一致性</b> — 身份不许被一次网页注入改写</li>
+              <li><b>活动选择</b> — 此刻做什么，由状态和事件决定</li>
+              <li><b>外部副作用幂等</b> — 发帖不重复</li>
+              <li><b>预算硬上限与休眠</b></li>
+              <li><b>长期行为回归</b> — 养 30 天后还是同一个它</li>
+              <li><b>dsh 升级适配</b> — 钉版本，降级而非崩溃</li>
+            </ul>
+          </div>
+        </div>
+        <p class="ar-note">左边那列的每一行，都是我们<b>明确决定不写</b>的代码。照 v0.2 那份规划去做的话，这六项会全部重写一遍。</p>
+      </div>
+    </section>
+
+    <!-- ============ 3. 运行回路 ============ -->
+    <section class="ar-sec" aria-label="一次活动的运行回路">
+      <div class="ar-frame">
+        <header class="ar-bar">
+          <span class="ar-h1">一次活动的运行回路</span>
+          <span class="ar-flex"></span>
+          <span class="ar-tag">模型提出想做什么；可信系统决定能不能做、是否真做成</span>
+        </header>
+        <ol class="ar-flow">
+          <li class="ar-step">
+            <span class="ar-sn">1</span>
+            <div class="ar-sb">
+              <div class="ar-st">唤醒</div>
+              <p class="ar-sd">dsh 的 <code>schedule</code> 到点唤起会话</p>
+              <div class="ar-sown ar-sown--dsh">dsh</div>
+            </div>
+          </li>
+          <li class="ar-step">
+            <span class="ar-sn">2</span>
+            <div class="ar-sb">
+              <div class="ar-st">注入状态</div>
+              <p class="ar-sd">生命层把有界快照拼进系统提示词</p>
+              <div class="ar-sown ar-sown--us">我们</div>
+            </div>
+          </li>
+          <li class="ar-step">
+            <span class="ar-sn">3</span>
+            <div class="ar-sb">
+              <div class="ar-st">选活动</div>
+              <p class="ar-sd">模型在有限候选里挑；同一时刻只允许一个</p>
+              <div class="ar-sown ar-sown--us">我们</div>
+            </div>
+          </li>
+          <li class="ar-step">
+            <span class="ar-sn">4</span>
+            <div class="ar-sb">
+              <div class="ar-st">执行</div>
+              <p class="ar-sd">工具调用过沙箱与批准；外部动作必须带证据</p>
+              <div class="ar-sown ar-sown--dsh">dsh</div>
+            </div>
+          </li>
+          <li class="ar-step">
+            <span class="ar-sn">5</span>
+            <div class="ar-sb">
+              <div class="ar-st">入账</div>
+              <p class="ar-sd">真实结果与证据写进账本；失败也留着</p>
+              <div class="ar-sown ar-sown--us">我们</div>
+            </div>
+          </li>
+          <li class="ar-step ar-step--loop">
+            <span class="ar-sn">↻</span>
+            <div class="ar-sb">
+              <div class="ar-st">下一轮</div>
+              <p class="ar-sd">经历了什么，决定下次想做什么</p>
+              <div class="ar-sown ar-sown--loop">回路</div>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ 4. 验证 ============ -->
+    <section class="ar-sec" aria-label="已经跑通的验证">
+      <div class="ar-frame">
+        <header class="ar-bar">
+          <span class="ar-h1">已经跑通的验证</span>
+          <span class="ar-flex"></span>
+          <span class="ar-tag ar-tag--ok">41 / 41 通过</span>
+        </header>
+        <div class="ar-vers">
+          <article class="ar-ver">
+            <div class="ar-ver-h"><code>verify/smoke.mjs</code><em>26 项</em></div>
+            <ul>
+              <li>未确认改身份 → 被拒；确认后版本号 +1</li>
+              <li>并发起第二个活动 → 被拒</li>
+              <li>JSON 被截断 / 损坏 → <b>降级而不是死掉</b></li>
+              <li>重启后状态仍在，账本上限生效</li>
+            </ul>
+          </article>
+          <article class="ar-ver">
+            <div class="ar-ver-h"><code>verify/e2e-tools.mjs</code><em>15 项</em></div>
+            <ul>
+              <li>用 shipped 模板组合出<b>真实 dsh profile</b></li>
+              <li>用 <code>dsh plugin</code> 装进去，真启动</li>
+              <li>断言生命层进了<b>装配后的系统提示词</b></li>
+              <li>断言 11 个工具全部对模型可见</li>
+              <li>断言真实 <code>turn/end</code> 落进了账本</li>
+            </ul>
+          </article>
+        </div>
+        <p class="ar-note">e2e 那套不是 mock。这一路上它抓出两个只有真跑才会暴露的 bug：输出 schema 用了非法的 <code>type:'json'</code>（11 个工具静默全部注册失败），以及会话事件字段名猜错（账本一条 <code>turn</code> 都没记上）。</p>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<style>
+/* palette sampled from the whale-girl art: #5068a8 / #6078b0 / #7088c0, deep #1b2c61 */
+#ar-root { text-align: left; }
+#ar-root .ar-sec + .ar-sec { margin-top: 18px; }
+
+#ar-root .ar-frame {
+  color-scheme: light dark;
+  --t: light-dark(#161c2c, #e9eef9);
+  --m: light-dark(#6d7893, #8a95ad);
+  --l: light-dark(#e9edf5, #1e2637);
+  --soft: light-dark(#f6f9fd, #131a27);
+  --us: #4f6fc0;
+  --us-soft: color-mix(in oklab, #7597ce 15%, transparent);
+  --dsh: light-dark(#5b6577, #7d879a);
+  --dsh-soft: color-mix(in oklab, light-dark(#5b6577, #7d879a) 12%, transparent);
+  --ok: light-dark(#15803d, #4ade80);
+
+  border-radius: 14px; overflow: hidden;
+  background: light-dark(#fff, #0e131d); color: var(--t);
+  font-size: 13px; line-height: 1.5;
+  box-shadow: 0 24px 56px -38px rgb(20 40 90 / 0.4);
+}
+#ar-root .ar-flex { flex: 1; }
+#ar-root code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+
+#ar-root .ar-bar {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 12px 16px; border-bottom: 1px solid var(--l); background: var(--soft);
+}
+#ar-root .ar-h1 { font-weight: 500; }
+#ar-root .ar-tag {
+  padding: 2px 9px; border-radius: 999px; border: 1px solid var(--l);
+  color: var(--m); font-size: 11px;
+}
+#ar-root .ar-tag--us { color: var(--us); border-color: color-mix(in oklab, var(--us) 32%, transparent); }
+#ar-root .ar-tag--ok { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 32%, transparent); }
+
+/* owners */
+#ar-root .ar-owner {
+  padding: 2px 10px; border-radius: 999px; font-size: 11px; white-space: nowrap;
+  border: 1px solid var(--l); color: var(--m);
+}
+#ar-root .ar-owner--dsh { color: var(--dsh); border-color: color-mix(in oklab, var(--dsh) 34%, transparent); background: var(--dsh-soft); }
+#ar-root .ar-owner--us { color: var(--us); border-color: color-mix(in oklab, var(--us) 34%, transparent); background: var(--us-soft); }
+
+/* shelves */
+#ar-root .ar-shelf { padding: 14px 16px; }
+#ar-root .ar-shelf--dsh { background: var(--dsh-soft); }
+#ar-root .ar-shelf-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 11px; }
+#ar-root .ar-shelf-t { color: var(--m); font-size: 11.5px; }
+#ar-root .ar-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#ar-root .ar-chip {
+  display: inline-flex; flex-direction: column; gap: 0;
+  padding: 5px 11px; border-radius: 9px;
+  background: light-dark(#fff, #0e131d); border: 1px solid var(--l);
+  font-size: 11.5px; color: var(--t);
+}
+#ar-root .ar-chip em { color: var(--m); font-style: normal; font-size: 10.5px; }
+
+/* boundary */
+#ar-root .ar-boundary { display: flex; align-items: center; gap: 12px; padding: 0 16px; }
+#ar-root .ar-bline { flex: 1; height: 1px; background: repeating-linear-gradient(90deg, var(--l) 0 6px, transparent 6px 12px); }
+#ar-root .ar-blabel { color: var(--m); font-size: 11px; white-space: nowrap; }
+
+/* our layer */
+#ar-root .ar-us { padding: 14px 16px 16px; }
+#ar-root .ar-us-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 11px; }
+#ar-root .ar-mods { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 1px; background: var(--l); border: 1px solid var(--l); border-radius: 11px; overflow: hidden; }
+#ar-root .ar-mod { display: flex; flex-direction: column; gap: 7px; padding: 13px 14px; background: light-dark(#fff, #0e131d); }
+#ar-root .ar-mod-h { display: flex; align-items: baseline; gap: 8px; }
+#ar-root .ar-mod-h code { color: var(--us); font-size: 12.5px; }
+#ar-root .ar-mod-h em { margin-left: auto; color: var(--m); font-style: normal; font-size: 11px; }
+#ar-root .ar-mod-b { font-size: 12px; }
+#ar-root .ar-mod-k { color: var(--m); font-size: 11.5px; }
+#ar-root .ar-mod-k b { color: var(--t); font-weight: 500; }
+#ar-root .ar-hooks { display: flex; flex-direction: column; gap: 3px; }
+#ar-root .ar-hooks span {
+  padding: 3px 8px; border-radius: 7px; background: var(--soft);
+  border: 1px solid var(--l); color: var(--m); font-size: 11px;
+}
+#ar-root .ar-hooks code { color: var(--t); }
+
+/* data */
+#ar-root .ar-data { padding: 0 16px 16px; }
+#ar-root .ar-data-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 9px; }
+#ar-root .ar-files { display: flex; flex-wrap: wrap; gap: 6px; }
+#ar-root .ar-file {
+  display: inline-flex; flex-direction: column; gap: 0;
+  padding: 6px 11px; border-radius: 9px;
+  background: var(--soft); border: 1px solid var(--l); font-size: 11.5px;
+}
+#ar-root .ar-file code { color: var(--t); }
+#ar-root .ar-file em { color: var(--m); font-style: normal; font-size: 10.5px; }
+#ar-root .ar-file--log { border-color: color-mix(in oklab, var(--us) 30%, transparent); background: var(--us-soft); }
+
+/* split */
+#ar-root .ar-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1px; background: var(--l); }
+#ar-root .ar-col { display: flex; flex-direction: column; gap: 9px; padding: 14px 16px; background: light-dark(#fff, #0e131d); }
+#ar-root .ar-col-h { display: flex; align-items: center; gap: 8px; }
+#ar-root .ar-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+#ar-root .ar-col li { position: relative; padding-left: 14px; font-size: 12px; color: var(--m); }
+#ar-root .ar-col li::before { content: "·"; position: absolute; left: 3px; top: -1px; color: var(--l); }
+#ar-root .ar-col--us li::before { content: ""; }
+#ar-root .ar-col--us li {
+  padding-left: 18px;
+  color: var(--t);
+  background: linear-gradient(var(--us), var(--us)) left 5px top 7px / 6px 6px no-repeat;
+  background-size: 6px 6px;
+}
+#ar-root .ar-col li b { font-weight: 500; }
+#ar-root .ar-col--dsh li b { color: var(--t); }
+#ar-root .ar-col code { color: var(--t); }
+
+#ar-root .ar-note { margin: 0; padding: 12px 16px; border-top: 1px solid var(--l); background: var(--soft); color: var(--m); font-size: 11.5px; }
+#ar-root .ar-note b { color: var(--t); font-weight: 500; }
+
+/* flow */
+/* One card per step in a fixed grid, so the cards align and the loop-back card
+   shares the same rhythm instead of dropping onto its own ragged line. */
+#ar-root .ar-flow {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px; background: var(--l);
+}
+#ar-root .ar-step { display: flex; gap: 10px; padding: 14px 16px; background: light-dark(#fff, #0e131d); }
+#ar-root .ar-sn {
+  display: grid; place-items: center; flex: none; width: 22px; height: 22px;
+  border-radius: 50%; background: var(--us-soft); color: var(--us);
+  font-size: 11px; line-height: 1;
+}
+#ar-root .ar-sb { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+#ar-root .ar-st { font-weight: 500; font-size: 12.5px; }
+#ar-root .ar-sd { margin: 0; color: var(--m); font-size: 11.5px; }
+#ar-root .ar-sd code { color: var(--t); }
+#ar-root .ar-sown {
+  align-self: flex-start; margin-top: auto; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--l); font-size: 10px;
+}
+#ar-root .ar-sown--dsh { color: var(--dsh); }
+#ar-root .ar-sown--us { color: var(--us); border-color: color-mix(in oklab, var(--us) 30%, transparent); }
+#ar-root .ar-sown--loop { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 30%, transparent); }
+#ar-root .ar-step--loop { background: color-mix(in oklab, var(--ok) 5%, light-dark(#fff, #0e131d)); }
+#ar-root .ar-step--loop .ar-sn { background: color-mix(in oklab, var(--ok) 16%, transparent); color: var(--ok); }
+
+/* verification */
+#ar-root .ar-vers { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1px; background: var(--l); }
+#ar-root .ar-ver { display: flex; flex-direction: column; gap: 9px; padding: 14px 16px; background: light-dark(#fff, #0e131d); }
+#ar-root .ar-ver-h { display: flex; align-items: baseline; gap: 8px; }
+#ar-root .ar-ver-h code { color: var(--us); font-size: 12.5px; }
+#ar-root .ar-ver-h em { margin-left: auto; color: var(--m); font-style: normal; font-size: 11px; }
+#ar-root .ar-ver ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+#ar-root .ar-ver li { position: relative; padding-left: 16px; color: var(--m); font-size: 12px; }
+#ar-root .ar-ver li::before {
+  content: ""; position: absolute; left: 0; top: 6px;
+  width: 8px; height: 8px; border-radius: 3px;
+  background: color-mix(in oklab, var(--ok) 30%, transparent);
+  border: 1px solid color-mix(in oklab, var(--ok) 60%, transparent);
+}
+#ar-root .ar-ver li b { color: var(--t); font-weight: 500; }
+#ar-root .ar-ver code { color: var(--t); }
+
+@media (max-width: 760px) {
+  #ar-root .ar-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  #ar-root .ar-flow { grid-template-columns: minmax(0, 1fr); }
+  #ar-root .ar-blabel { white-space: normal; text-align: center; }
+}
+</style>

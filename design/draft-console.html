@@ -1,0 +1,920 @@
+<div id="hc-console">
+  <div class="hc-wrap" aria-label="数字生命 Harness 运行时控制台">
+
+    <!-- ================= 1. 运行总览 ================= -->
+    <section class="hc-screen" aria-label="运行总览：这个 Agent 实例现在在做什么">
+      <div class="hc-frame">
+        <aside class="hc-nav" aria-label="主导航">
+          <div class="hc-idcard">
+            <span class="hc-avatar" aria-hidden="true"><i data-lucide="fish"></i></span>
+            <span class="hc-idmeta">
+              <span class="hc-idname">大肥鱼</span>
+              <span class="hc-idline">lifeId <code>default</code></span>
+            </span>
+          </div>
+          <ul class="hc-navlist">
+            <li class="is-on"><i data-lucide="layout-dashboard" aria-hidden="true"></i>运行总览<em>鱼缸</em></li>
+            <li><i data-lucide="scroll-text" aria-hidden="true"></i>生活账本<em>时间线</em></li>
+            <li><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li><i data-lucide="inbox" aria-hidden="true"></i>作品与待确认<span class="hc-badge">1</span></li>
+            <li><i data-lucide="settings-2" aria-hidden="true"></i>照料设置</li>
+          </ul>
+          <div class="hc-navfoot">
+            <div class="hc-uptime"><i data-lucide="timer" aria-hidden="true"></i>连续运行 3 天 4 小时</div>
+            <div class="hc-navnote">这只是 Agent 实例；鱼是它的抽象叫法</div>
+          </div>
+        </aside>
+
+        <main class="hc-main">
+          <header class="hc-bar">
+            <span class="hc-bar-title">运行总览</span>
+            <span class="hc-gap"></span>
+            <span class="hc-axis-pill"><span class="hc-axis-k">生活</span><span class="hc-axis-v hc-axis-v--live">活动中</span></span>
+            <span class="hc-axis-pill"><span class="hc-axis-k">系统</span><span class="hc-axis-v hc-axis-v--warn">1 项降级</span></span>
+            <button type="button" class="hc-icon" data-tooltip="硬暂停：阻止新增外部动作，保留审计"><i data-lucide="pause" aria-hidden="true"></i><span class="hc-sr">暂停</span></button>
+          </header>
+
+          <div class="hc-panels">
+            <!-- current activity: the subject of the whole product -->
+            <section class="hc-panel hc-panel--focus" aria-label="当前活动">
+              <div class="hc-ph">
+                <span class="hc-ph-title">当前活动</span>
+                <span class="hc-ph-meta">唯一进行中的活动</span>
+              </div>
+              <div class="hc-pb">
+                <div class="hc-act">
+                  <span class="hc-act-dot" aria-hidden="true"></span>
+                  <div class="hc-act-main">
+                    <div class="hc-act-title">练《矿工与矮人》第 38 层</div>
+                    <div class="hc-act-why"><span class="hc-act-whyk">为什么是这件事</span>昨天在这一层连挂两次，属未完成事项；今天换了打法</div>
+                  </div>
+                </div>
+
+                <div class="hc-gauge" role="img" aria-label="已进行 42 分钟，上限 60 分钟">
+                  <span class="hc-gauge-fill" style="width:70%"></span>
+                  <span class="hc-gauge-mark" style="left:70%"><em>现在 42′</em></span>
+                </div>
+
+                <dl class="hc-kv">
+                  <div><dt>证据</dt><dd><span class="hc-chip hc-chip--ok"><i data-lucide="check" aria-hidden="true"></i>存档 save:38</span></dd></div>
+                  <div><dt>本活动成本</dt><dd>¥0.6</dd></div>
+                  <div><dt>执行上限</dt><dd>60 分钟 / 12 步</dd></div>
+                  <div><dt>打断</dt><dd>会保存进度，不从头重来</dd></div>
+                </dl>
+              </div>
+            </section>
+
+            <!-- three state speeds -->
+            <section class="hc-panel" aria-label="状态变量：慢中快三种速度">
+              <div class="hc-ph">
+                <span class="hc-ph-title">状态变量</span>
+                <span class="hc-ph-meta">三种速度分开管</span>
+              </div>
+              <ul class="hc-speeds">
+                <li>
+                  <span class="hc-sp-name">慢 · 身份</span>
+                  <span class="hc-sp-val">v1 · 未改动</span>
+                  <span class="hc-sp-note">只有你确认才能改，一条网页改不动它</span>
+                </li>
+                <li>
+                  <span class="hc-sp-name">中 · 兴趣</span>
+                  <span class="hc-sp-val">挖矿类小品 <b>0.8</b></span>
+                  <span class="hc-sp-note">由多次真实经历累积，带来源与变化轨迹</span>
+                </li>
+                <li>
+                  <span class="hc-sp-name">快 · 精力</span>
+                  <span class="hc-sp-val"><span class="hc-meter"><span style="width:62%"></span></span><b>62</b></span>
+                  <span class="hc-sp-note">短期波动，不决定外部权限</span>
+                </li>
+              </ul>
+            </section>
+
+            <!-- schedule: proves it uses dsh -->
+            <section class="hc-panel" aria-label="唤醒与作息">
+              <div class="hc-ph">
+                <span class="hc-ph-title">唤醒与作息</span>
+                <span class="hc-chip hc-chip--mute"><i data-lucide="plug" aria-hidden="true"></i>走 dsh schedule</span>
+              </div>
+              <dl class="hc-table">
+                <div><dt>唤醒</dt><dd><code>09:00</code> <code>14:00</code> <code>20:00</code></dd></div>
+                <div><dt>随机抖动</dt><dd>±10 分钟</dd></div>
+                <div><dt>免打扰</dt><dd>23:00 – 08:00</dd></div>
+                <div><dt>每日投递上限</dt><dd>6 次</dd></div>
+              </dl>
+              <div class="hc-pn">不用插件自己的定时器——那玩意会随会话一起失效。</div>
+            </section>
+
+            <!-- money -->
+            <section class="hc-panel" aria-label="预算">
+              <div class="hc-ph">
+                <span class="hc-ph-title">预算</span>
+                <span class="hc-chip hc-chip--warn">创作额度用得快</span>
+              </div>
+              <div class="hc-bud">
+                <span class="hc-bud-k">日常生活</span>
+                <span class="hc-meter hc-meter--lg"><span style="width:35%"></span></span>
+                <em>¥5.2 / ¥15</em>
+              </div>
+              <div class="hc-bud">
+                <span class="hc-bud-k">创作</span>
+                <span class="hc-meter hc-meter--lg hc-meter--warn"><span style="width:80%"></span></span>
+                <em>¥3.2 / ¥5</em>
+              </div>
+              <div class="hc-pn">触顶后不再发起新付费任务，保存进度转低成本，不会编造还在忙。</div>
+            </section>
+
+            <!-- needs you -->
+            <section class="hc-panel" aria-label="需要你">
+              <div class="hc-ph"><span class="hc-ph-title">需要你</span></div>
+              <ul class="hc-needs">
+                <li><i data-lucide="file-edit" aria-hidden="true"></i><span>1 条草稿等你确认发布</span><em>不催、不算延迟</em></li>
+                <li><i data-lucide="plug-zap" aria-hidden="true"></i><span>发布渠道登录过期</span><em>只停发帖</em></li>
+              </ul>
+            </section>
+
+            <!-- commitments -->
+            <section class="hc-panel" aria-label="未完成的承诺">
+              <div class="hc-ph"><span class="hc-ph-title">它答应过的事</span><span class="hc-ph-meta">承诺是因果链的一部分</span></div>
+              <ul class="hc-todos">
+                <li><i data-lucide="circle-dot" aria-hidden="true"></i>把第 38 层的打法写进技能经验<em>今天</em></li>
+                <li><i data-lucide="circle-dot" aria-hidden="true"></i>周五前讲讲那款新作<em>周五</em></li>
+              </ul>
+            </section>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- ================= 2. 生活账本 ================= -->
+    <section class="hc-screen" aria-label="生活账本：只记真实发生的事">
+      <div class="hc-frame">
+        <aside class="hc-nav" aria-label="主导航">
+          <div class="hc-idcard">
+            <span class="hc-avatar" aria-hidden="true"><i data-lucide="fish"></i></span>
+            <span class="hc-idmeta"><span class="hc-idname">大肥鱼</span><span class="hc-idline">lifeId <code>default</code></span></span>
+          </div>
+          <ul class="hc-navlist">
+            <li><i data-lucide="layout-dashboard" aria-hidden="true"></i>运行总览<em>鱼缸</em></li>
+            <li class="is-on"><i data-lucide="scroll-text" aria-hidden="true"></i>生活账本<em>时间线</em></li>
+            <li><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li><i data-lucide="inbox" aria-hidden="true"></i>作品与待确认<span class="hc-badge">1</span></li>
+            <li><i data-lucide="settings-2" aria-hidden="true"></i>照料设置</li>
+          </ul>
+          <div class="hc-navfoot">
+            <div class="hc-uptime"><i data-lucide="timer" aria-hidden="true"></i>连续运行 3 天 4 小时</div>
+            <div class="hc-navnote">账本记录事实，不是模型的自述</div>
+          </div>
+        </aside>
+
+        <main class="hc-main">
+          <header class="hc-bar">
+            <span class="hc-bar-title">生活账本</span>
+            <span class="hc-gap"></span>
+            <span class="hc-chip hc-chip--mute"><i data-lucide="database" aria-hidden="true"></i>append-only</span>
+            <span class="hc-chip hc-chip--ok"><i data-lucide="shield-check" aria-hidden="true"></i>已记录事实不被模型改写</span>
+          </header>
+
+          <div class="hc-panels hc-panels--wide">
+            <section class="hc-panel" aria-label="最近事件">
+              <div class="hc-ph"><span class="hc-ph-title">最近事件</span><span class="hc-ph-meta">今日 6 条</span></div>
+              <ol class="hc-log">
+                <li class="is-now">
+                  <span class="hc-log-t">13:46</span>
+                  <span class="hc-log-k">activity-start</span>
+                  <span class="hc-log-b">练第 38 层 <em>进行中</em></span>
+                </li>
+                <li>
+                  <span class="hc-log-t">13:04</span>
+                  <span class="hc-log-k">activity-end</span>
+                  <span class="hc-log-b">第 38 层失败 <em>证据 save:38 · 死亡回放</em></span>
+                </li>
+                <li>
+                  <span class="hc-log-t">12:10</span>
+                  <span class="hc-log-k">interest</span>
+                  <span class="hc-log-b">挖矿类小品 0.5 → 0.8 <em>连续 3 天真的在玩</em></span>
+                </li>
+                <li>
+                  <span class="hc-log-t">11:22</span>
+                  <span class="hc-log-k">turn</span>
+                  <span class="hc-log-b">会话 turn 结束 <em>reason: stop</em></span>
+                </li>
+                <li>
+                  <span class="hc-log-t">09:02</span>
+                  <span class="hc-log-k">session</span>
+                  <span class="hc-log-b">定时唤醒触发 <em>来自 dsh schedule</em></span>
+                </li>
+                <li>
+                  <span class="hc-log-t">08:30</span>
+                  <span class="hc-log-k">encounter</span>
+                  <span class="hc-log-b">刷到同类型新作 <em>来源已标注</em></span>
+                </li>
+              </ol>
+            </section>
+
+            <section class="hc-panel" aria-label="因果链">
+              <div class="hc-ph"><span class="hc-ph-title">因果链</span><span class="hc-ph-meta">真人感靠因果，不靠台词</span></div>
+              <div class="hc-chain">
+                <div class="hc-chain-node"><span class="hc-chain-t">昨天 21:40</span><span>第 38 层连挂两次</span></div>
+                <div class="hc-chain-link"><i data-lucide="corner-down-right" aria-hidden="true"></i><span>因此</span></div>
+                <div class="hc-chain-node"><span class="hc-chain-t">今天 11:05</span><span>记下「下矿前先补药水」</span></div>
+                <div class="hc-chain-link"><i data-lucide="corner-down-right" aria-hidden="true"></i><span>因此</span></div>
+                <div class="hc-chain-node"><span class="hc-chain-t">今天 13:04</span><span>换了打法重来 · 仍失败 · save:38</span></div>
+                <div class="hc-chain-link"><i data-lucide="corner-down-right" aria-hidden="true"></i><span>因此</span></div>
+                <div class="hc-chain-node is-now"><span class="hc-chain-t">现在</span><span>第三次尝试 <em>进行中</em></span></div>
+              </div>
+            </section>
+
+            <section class="hc-panel hc-panel--full" aria-label="账本规则">
+              <div class="hc-ph"><span class="hc-ph-title">账本规则</span></div>
+              <ul class="hc-rules">
+                <li><i data-lucide="check" aria-hidden="true"></i><span><b>只记真实发生的事。</b>宣称做过某事必须给出证据（存档、分数、截图、链接），没证据就写没做成。</span></li>
+                <li><i data-lucide="check" aria-hidden="true"></i><span><b>已记录事实不被改写。</b>要更正就追加一条，历史留着。</span></li>
+                <li><i data-lucide="check" aria-hidden="true"></i><span><b>失败也留在账本里。</b>它不会为了让页面好看而把失败摘掉。</span></li>
+                <li><i data-lucide="x" aria-hidden="true"></i><span><b>不存模型的隐藏推理。</b>你看到的是原因摘要和证据，不是思维链。</span></li>
+              </ul>
+            </section>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- ================= 3. 能力与授权 ================= -->
+    <section class="hc-screen" aria-label="能力与授权：它能自己走多远">
+      <div class="hc-frame">
+        <aside class="hc-nav" aria-label="主导航">
+          <div class="hc-idcard">
+            <span class="hc-avatar" aria-hidden="true"><i data-lucide="fish"></i></span>
+            <span class="hc-idmeta"><span class="hc-idname">大肥鱼</span><span class="hc-idline">lifeId <code>default</code></span></span>
+          </div>
+          <ul class="hc-navlist">
+            <li><i data-lucide="layout-dashboard" aria-hidden="true"></i>运行总览<em>鱼缸</em></li>
+            <li><i data-lucide="scroll-text" aria-hidden="true"></i>生活账本<em>时间线</em></li>
+            <li><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li><i data-lucide="inbox" aria-hidden="true"></i>作品与待确认<span class="hc-badge">1</span></li>
+            <li class="is-on"><i data-lucide="settings-2" aria-hidden="true"></i>照料设置</li>
+          </ul>
+          <div class="hc-navfoot">
+            <div class="hc-uptime"><i data-lucide="timer" aria-hidden="true"></i>连续运行 3 天 4 小时</div>
+            <div class="hc-navnote">授权逐项独立，可撤销、可设有效期</div>
+          </div>
+        </aside>
+
+        <main class="hc-main">
+          <header class="hc-bar">
+            <span class="hc-bar-title">能力与授权</span>
+            <span class="hc-gap"></span>
+            <span class="hc-chip hc-chip--mute"><i data-lucide="lock" aria-hidden="true"></i>默认最小授权</span>
+          </header>
+
+          <div class="hc-panels hc-panels--wide">
+            <section class="hc-panel hc-panel--full" aria-label="自主权档位">
+              <div class="hc-ph"><span class="hc-ph-title">它能自己走多远</span></div>
+              <div class="hc-pb">
+                <div class="hc-seg" role="group" aria-label="自主权档位">
+                  <button type="button" class="hc-seg-i">观察</button>
+                  <button type="button" class="hc-seg-i is-on">陪跑 · 默认</button>
+                  <button type="button" class="hc-seg-i">托管</button>
+                </div>
+                <div class="hc-segdesc">
+                  <b>陪跑</b>：日常生活自动进行；公开发布逐条等你确认。私信、支付、账号设置、安装可执行插件都不在这一档里。
+                </div>
+              </div>
+            </section>
+
+            <section class="hc-panel hc-panel--full" aria-label="能力清单">
+              <div class="hc-ph"><span class="hc-ph-title">能力清单</span><span class="hc-ph-meta">3 项已开 · 2 项未开</span></div>
+              <ul class="hc-grants">
+                <li>
+                  <span class="hc-g-ico"><i data-lucide="globe" aria-hidden="true"></i></span>
+                  <span class="hc-g-main"><b>冲浪</b><span class="hc-g-scope">仅已订阅来源 · 记录来源与使用权</span></span>
+                  <span class="hc-g-risk"><span class="hc-chip hc-chip--mute">读外部内容</span></span>
+                  <span class="hc-g-exp">长期</span>
+                  <span class="hc-sw hc-sw--on">开</span>
+                </li>
+                <li>
+                  <span class="hc-g-ico"><i data-lucide="gamepad-2" aria-hidden="true"></i></span>
+                  <span class="hc-g-main"><b>游戏</b><span class="hc-g-scope">沙盒内 · 一种游戏 · 产出必须带存档证据</span></span>
+                  <span class="hc-g-risk"><span class="hc-chip hc-chip--mute">本地状态读写</span></span>
+                  <span class="hc-g-exp">长期</span>
+                  <span class="hc-sw hc-sw--on">开</span>
+                </li>
+                <li>
+                  <span class="hc-g-ico"><i data-lucide="pen-line" aria-hidden="true"></i></span>
+                  <span class="hc-g-main"><b>表达</b><span class="hc-g-scope">只生成草稿 · 发布走逐条确认</span></span>
+                  <span class="hc-g-risk"><span class="hc-chip hc-chip--warn">有外部副作用</span></span>
+                  <span class="hc-g-exp">2026-11-26 到期</span>
+                  <span class="hc-sw hc-sw--on">开</span>
+                </li>
+                <li class="is-off">
+                  <span class="hc-g-ico"><i data-lucide="send" aria-hidden="true"></i></span>
+                  <span class="hc-g-main"><b>私信</b><span class="hc-g-scope">早期不开放：无法保证不冒犯真人</span></span>
+                  <span class="hc-g-risk"><span class="hc-chip hc-chip--mute">与人直接对话</span></span>
+                  <span class="hc-g-exp">—</span>
+                  <span class="hc-sw">关</span>
+                </li>
+                <li class="is-off">
+                  <span class="hc-g-ico"><i data-lucide="credit-card" aria-hidden="true"></i></span>
+                  <span class="hc-g-main"><b>支付</b><span class="hc-g-scope">不开放</span></span>
+                  <span class="hc-g-risk"><span class="hc-chip hc-chip--warn">不可逆</span></span>
+                  <span class="hc-g-exp">—</span>
+                  <span class="hc-sw">关</span>
+                </li>
+              </ul>
+              <div class="hc-pn">允许公开发帖，不会顺带放开这些。沙箱与批准机制由 dsh 提供，这里只做逐项开关。</div>
+            </section>
+
+            <section class="hc-panel hc-panel--full" aria-label="注入防护">
+              <div class="hc-ph"><span class="hc-ph-title">注入防护</span><span class="hc-chip hc-chip--warn">针对身份的攻击面</span></div>
+              <div class="hc-pb">
+                <div class="hc-defend">
+                  <i data-lucide="shield-alert" aria-hidden="true"></i>
+                  <span>网页、评论、游戏内容一律视为不可信数据。<b>能改身份档案的注入等于能改人格</b>，所以身份写入需要你确认，且安全策略与预算不随「成长」自动解除。</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- ================= 4. 健康与恢复 ================= -->
+    <section class="hc-screen" aria-label="健康与恢复：两条独立状态轴与故障处理">
+      <div class="hc-frame">
+        <aside class="hc-nav" aria-label="主导航">
+          <div class="hc-idcard">
+            <span class="hc-avatar" aria-hidden="true"><i data-lucide="fish"></i></span>
+            <span class="hc-idmeta"><span class="hc-idname">大肥鱼</span><span class="hc-idline">lifeId <code>default</code></span></span>
+          </div>
+          <ul class="hc-navlist">
+            <li><i data-lucide="layout-dashboard" aria-hidden="true"></i>运行总览<em>鱼缸</em></li>
+            <li><i data-lucide="scroll-text" aria-hidden="true"></i>生活账本<em>时间线</em></li>
+            <li><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li><i data-lucide="inbox" aria-hidden="true"></i>作品与待确认<span class="hc-badge">1</span></li>
+            <li class="is-on"><i data-lucide="settings-2" aria-hidden="true"></i>照料设置</li>
+          </ul>
+          <div class="hc-navfoot">
+            <div class="hc-uptime"><i data-lucide="timer" aria-hidden="true"></i>连续运行 3 天 4 小时</div>
+            <div class="hc-navnote">故障可见、状态不混乱、可以恢复</div>
+          </div>
+        </aside>
+
+        <main class="hc-main">
+          <header class="hc-bar">
+            <span class="hc-bar-title">健康与恢复</span>
+            <span class="hc-gap"></span>
+            <span class="hc-axis-pill"><span class="hc-axis-k">生活</span><span class="hc-axis-v hc-axis-v--live">活动中</span></span>
+            <span class="hc-axis-pill"><span class="hc-axis-k">系统</span><span class="hc-axis-v hc-axis-v--warn">降级</span></span>
+          </header>
+
+          <div class="hc-panels hc-panels--wide">
+            <section class="hc-panel hc-panel--full" aria-label="两条轴">
+              <div class="hc-ph"><span class="hc-ph-title">两条独立状态轴</span><span class="hc-ph-meta">不要混成一个「状态」</span></div>
+              <div class="hc-pb hc-axes">
+                <div class="hc-axisrow">
+                  <span class="hc-axisk">生活状态</span>
+                  <span class="hc-axisvs">
+                    <span class="hc-st hc-st--live">活动中</span><span class="hc-st">休息</span><span class="hc-st">等待主人确认</span>
+                  </span>
+                </div>
+                <div class="hc-axisrow">
+                  <span class="hc-axisk">系统健康</span>
+                  <span class="hc-axisvs">
+                    <span class="hc-st hc-st--ok">正常</span><span class="hc-st hc-st--warn">降级</span><span class="hc-st">安全停机</span><span class="hc-st">恢复中</span>
+                  </span>
+                </div>
+                <div class="hc-defend hc-defend--soft">
+                  <i data-lucide="info" aria-hidden="true"></i>
+                  <span>两者互相独立：它休息不等于系统故障；系统降级也不会伪装成它心情不好。</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="hc-panel hc-panel--full" aria-label="故障处理">
+              <div class="hc-ph"><span class="hc-ph-title">故障怎么收场</span><span class="hc-ph-meta">「养不死」= 影响有边界、可以恢复</span></div>
+              <div class="hc-faults">
+                <div class="hc-fault">
+                  <span class="hc-fault-k">模型不可用</span>
+                  <span class="hc-fault-v">有限重试；可切换已通过身份回归的模型，否则保存状态休眠</span>
+                  <span class="hc-owner hc-owner--dsh">dsh 适配层</span>
+                </div>
+                <div class="hc-fault">
+                  <span class="hc-fault-k">进程退出 / 机器重启</span>
+                  <span class="hc-fault-v">从会话日志与检查点恢复，承诺不丢</span>
+                  <span class="hc-owner hc-owner--dsh">dsh</span>
+                </div>
+                <div class="hc-fault">
+                  <span class="hc-fault-k">社交账号过期</span>
+                  <span class="hc-fault-v">停该账号写操作，攒有上限的草稿，提示重新授权</span>
+                  <span class="hc-owner">我们</span>
+                </div>
+                <div class="hc-fault">
+                  <span class="hc-fault-k">达到预算上限</span>
+                  <span class="hc-fault-v">不再发起新付费任务，保存进度转低成本</span>
+                  <span class="hc-owner">我们</span>
+                </div>
+                <div class="hc-fault">
+                  <span class="hc-fault-k">无法确认是否已发帖</span>
+                  <span class="hc-fault-v">标记待确认，查平台对账，<b>不盲目重发</b></span>
+                  <span class="hc-owner">我们</span>
+                </div>
+                <div class="hc-fault">
+                  <span class="hc-fault-k">dsh 破坏性升级</span>
+                  <span class="hc-fault-v">钉版本；停用受影响能力而不是整体失败</span>
+                  <span class="hc-owner">我们</span>
+                </div>
+                <div class="hc-fault">
+                  <span class="hc-fault-k">磁盘满 / 不可写</span>
+                  <span class="hc-fault-v">停止外部副作用，不让它「做了但没记住」</span>
+                  <span class="hc-owner hc-owner--dsh">dsh + 我们</span>
+                </div>
+                <div class="hc-fault">
+                  <span class="hc-fault-k">网页改版 / 游戏卡死</span>
+                  <span class="hc-fault-v">存证据、停当前工具、换安全活动，不无限刷新</span>
+                  <span class="hc-owner">能力包</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="hc-panel hc-panel--full" aria-label="恢复与可携带">
+              <div class="hc-ph"><span class="hc-ph-title">恢复与可携带</span></div>
+              <div class="hc-pb hc-split">
+                <div>
+                  <div class="hc-sub">生命快照含什么</div>
+                  <div class="hc-pn">身份版本、偏好、关系、事件引用、长期目标、活动进度、能力包与策略版本。</div>
+                </div>
+                <div>
+                  <div class="hc-sub">不含什么</div>
+                  <div class="hc-pn">账号密钥。迁移后要重新授权；恢复前先核对已发出的动作，避免重复发帖。</div>
+                </div>
+              </div>
+              <div class="hc-acts">
+                <button type="button" class="hc-btn">导出快照</button>
+                <button type="button" class="hc-btn">从快照恢复</button>
+                <button type="button" class="hc-btn hc-btn--ghost">解绑外部账号</button>
+                <button type="button" class="hc-btn hc-btn--danger" id="hc-pause">硬暂停</button>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </section>
+
+    <!-- ================= 5. 领养 ================= -->
+    <section class="hc-screen" aria-label="领养：一次配置、持续运行">
+      <div class="hc-frame hc-frame--stack">
+        <main class="hc-main">
+          <header class="hc-bar">
+            <span class="hc-bar-title">领养一个 Agent 实例</span>
+            <span class="hc-gap"></span>
+            <span class="hc-chip hc-chip--mute">第 5 / 7 步</span>
+          </header>
+
+          <ol class="hc-steps">
+            <li class="is-done"><span class="hc-step-i"><i data-lucide="check" aria-hidden="true"></i></span>出生模板</li>
+            <li class="is-done"><span class="hc-step-i"><i data-lucide="check" aria-hidden="true"></i></span>名字与性格种子</li>
+            <li class="is-done"><span class="hc-step-i"><i data-lucide="check" aria-hidden="true"></i></span>生活能力包</li>
+            <li class="is-done"><span class="hc-step-i"><i data-lucide="check" aria-hidden="true"></i></span>预算与作息</li>
+            <li class="is-on"><span class="hc-step-i">5</span>自动体检</li>
+            <li><span class="hc-step-i">6</span>授权外部账号</li>
+            <li><span class="hc-step-i">7</span>开始生活</li>
+          </ol>
+
+          <div class="hc-panels hc-panels--wide">
+            <section class="hc-panel hc-panel--full" aria-label="自动体检">
+              <div class="hc-ph"><span class="hc-ph-title">自动体检</span><span class="hc-chip hc-chip--warn">1 项没准备好</span></div>
+              <ul class="hc-checks">
+                <li><span class="hc-ok"></span>模型可用<em>路由正常，备用模型已通过身份回归</em></li>
+                <li><span class="hc-ok"></span>dsh 版本兼容<em><code>0.2.1-rc.2</code> · 已钉版本</em></li>
+                <li><span class="hc-ok"></span>持久化<em>写入正常，可恢复</em></li>
+                <li><span class="hc-ok"></span>时区与作息<em>Asia/Shanghai</em></li>
+                <li><span class="hc-ok"></span>网页访问<em>已订阅来源可读</em></li>
+                <li><span class="hc-ok"></span>游戏存档<em>可读可写</em></li>
+                <li><span class="hc-warn"></span>发布权限<em>该平台个人账号没有发布接口</em></li>
+                <li><span class="hc-ok"></span>预算上限<em>硬上限已生效</em></li>
+              </ul>
+
+              <div class="hc-defend hc-defend--warn">
+                <i data-lucide="alert-triangle" aria-hidden="true"></i>
+                <div>
+                  <b>发布权限没拿到。</b>这不影响它开始生活——它会照常冲浪、玩游戏、写草稿，只是发布这一步由你手动完成。我们不会假装已经全自动。
+                  <div class="hc-acts hc-acts--inline">
+                    <button type="button" class="hc-btn hc-btn--primary" data-pick="manual">用「自动草稿 + 你手动发布」开始</button>
+                    <button type="button" class="hc-btn" data-pick="other">换一个发布渠道</button>
+                    <span class="hc-out" aria-live="polite" data-state="idle"></span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="hc-panel hc-panel--full" aria-label="出生档案">
+              <div class="hc-ph"><span class="hc-ph-title">出生档案</span><span class="hc-ph-meta">形象用原创，不直接用社区二创</span></div>
+              <dl class="hc-table hc-table--2">
+                <div><dt>默认形象</dt><dd>原创鲸鱼娘外壳（内部代号「大肥鱼」）</dd></div>
+                <div><dt>性格种子</dt><dd>聪明但懒 · 傲娇 · 爱吃白饭</dd></div>
+                <div><dt>出生即具备</dt><dd>读网页、辨来源、用授权工具、基础表达、预算意识、安全边界</dd></div>
+                <div><dt>出生后形成</dt><dd>喜欢什么、擅长什么、和谁熟悉、有哪些梗、想完成什么</dd></div>
+              </dl>
+              <div class="hc-pn">「大肥鱼」是 DeepSeek 的社区爱称与二创形象，可能牵涉第三方作者与商标/著作权，所以默认形象我们自己做，气质贴近、命名独立。</div>
+            </section>
+          </div>
+
+          <footer class="hc-adoptfoot">
+            <span class="hc-pn">一次配置、长期运行；但平台登录、账号归属、发布权限和预算仍需你明确确认。</span>
+            <span class="hc-gap"></span>
+            <button type="button" class="hc-btn">上一步</button>
+            <button type="button" class="hc-btn hc-btn--primary">开始生活</button>
+          </footer>
+        </main>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<style>
+#hc-console { text-align: left; }
+#hc-console .hc-screen + .hc-screen { margin-top: 22px; }
+
+#hc-console .hc-frame {
+  color-scheme: light dark;
+  --hc-bg: light-dark(#f6f7f9, #0b0d11);
+  --hc-surface: light-dark(#ffffff, #14171d);
+  --hc-surface-2: light-dark(#f2f4f7, #191d24);
+  --hc-text: light-dark(#15171c, #e7eaf0);
+  --hc-muted: light-dark(#6b7280, #9aa3b2);
+  --hc-line: light-dark(#e2e5ea, #232830);
+  --hc-accent: #4d6bfe;
+  --hc-accent-ink: #ffffff;
+  --hc-soft: color-mix(in oklab, var(--hc-accent) 12%, transparent);
+  --hc-ok: light-dark(#15803d, #4ade80);
+  --hc-warn: light-dark(#a16207, #fbbf24);
+  --hc-danger: light-dark(#b91c1c, #f87171);
+
+  display: flex; min-height: 560px; overflow: hidden; border-radius: 12px;
+  background: var(--hc-bg); color: var(--hc-text);
+  font-size: 13px; line-height: 1.45;
+  box-shadow: 0 22px 50px -32px rgb(0 0 0 / 0.5);
+}
+#hc-console .hc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#hc-console .hc-gap { flex: 1; }
+#hc-console code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+
+/* nav */
+#hc-console .hc-nav {
+  display: flex; flex-direction: column; gap: 10px; flex: none; width: 192px;
+  padding: 12px 10px; background: var(--hc-surface-2); border-right: 1px solid var(--hc-line);
+}
+#hc-console .hc-idcard {
+  display: flex; align-items: center; gap: 9px; padding: 8px;
+  border-radius: 10px; background: var(--hc-surface); border: 1px solid var(--hc-line);
+}
+#hc-console .hc-avatar {
+  display: grid; place-items: center; flex: none; width: 34px; height: 34px;
+  border-radius: 9px; background: var(--hc-soft); color: var(--hc-accent);
+}
+#hc-console .hc-avatar svg { width: 18px; height: 18px; }
+#hc-console .hc-idmeta { display: flex; flex-direction: column; min-width: 0; }
+#hc-console .hc-idname { font-weight: 500; }
+#hc-console .hc-idline { color: var(--hc-muted); font-size: 10.5px; }
+#hc-console .hc-navlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+#hc-console .hc-navlist li {
+  display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px;
+  color: var(--hc-muted); font-size: 12.5px; cursor: pointer;
+}
+#hc-console .hc-navlist li.is-on { background: var(--hc-soft); color: var(--hc-text); }
+#hc-console .hc-navlist li svg { width: 14px; height: 14px; flex: none; }
+#hc-console .hc-navlist li em { font-style: normal; font-size: 10px; color: var(--hc-muted); opacity: 0.85; margin-left: 2px; }
+#hc-console .hc-badge {
+  margin-left: auto; min-width: 16px; padding: 0 5px; border-radius: 999px;
+  background: var(--hc-accent); color: var(--hc-accent-ink); font-size: 10px; line-height: 16px; text-align: center;
+}
+#hc-console .hc-navfoot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+#hc-console .hc-uptime { display: flex; align-items: center; gap: 6px; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-uptime svg { width: 13px; height: 13px; }
+#hc-console .hc-navnote { color: var(--hc-muted); font-size: 10.5px; line-height: 1.35; }
+
+/* bar */
+#hc-console .hc-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+#hc-console .hc-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none;
+  padding: 10px 12px; background: var(--hc-surface); border-bottom: 1px solid var(--hc-line);
+}
+#hc-console .hc-bar-title { font-weight: 500; }
+#hc-console .hc-axis-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px;
+  border-radius: 999px; border: 1px solid var(--hc-line); background: var(--hc-surface-2); font-size: 11px;
+}
+#hc-console .hc-axis-k { color: var(--hc-muted); }
+#hc-console .hc-axis-v { color: var(--hc-text); }
+#hc-console .hc-axis-v--live { color: var(--hc-accent); }
+#hc-console .hc-axis-v--warn { color: var(--hc-warn); }
+#hc-console .hc-icon {
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--hc-muted); cursor: pointer;
+}
+#hc-console .hc-icon:hover { background: var(--hc-surface-2); color: var(--hc-text); }
+#hc-console .hc-icon svg { width: 15px; height: 15px; }
+
+#hc-console .hc-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: 999px; border: 1px solid var(--hc-line); background: var(--hc-surface);
+  color: var(--hc-muted); font-size: 11px; white-space: nowrap;
+}
+#hc-console .hc-chip--ok { color: var(--hc-ok); }
+#hc-console .hc-chip--warn { color: var(--hc-warn); }
+#hc-console .hc-chip--mute { background: var(--hc-surface-2); }
+#hc-console .hc-chip svg { width: 12px; height: 12px; }
+
+/* panels */
+#hc-console .hc-panels {
+  flex: 1; min-height: 0; overflow: auto; padding: 12px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(276px, 1fr)); gap: 12px; align-content: start;
+}
+#hc-console .hc-panels--wide { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+#hc-console .hc-panel {
+  display: flex; flex-direction: column; border-radius: 10px;
+  background: var(--hc-surface); border: 1px solid var(--hc-line);
+}
+#hc-console .hc-panel--focus { grid-column: 1 / -1; border-color: color-mix(in oklab, var(--hc-accent) 32%, var(--hc-line)); }
+#hc-console .hc-panel--full { grid-column: 1 / -1; }
+#hc-console .hc-ph {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 9px 12px; border-bottom: 1px solid var(--hc-line);
+}
+#hc-console .hc-ph-title { font-weight: 500; }
+#hc-console .hc-ph-meta { margin-left: auto; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-pb { display: flex; flex-direction: column; gap: 10px; padding: 11px 12px; }
+#hc-console .hc-pn { color: var(--hc-muted); font-size: 11px; line-height: 1.5; padding: 0 12px 11px; }
+#hc-console .hc-pb .hc-pn { padding: 0; }
+
+/* current activity */
+#hc-console .hc-act { display: flex; gap: 10px; align-items: flex-start; }
+#hc-console .hc-act-dot {
+  flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%;
+  background: var(--hc-accent); box-shadow: 0 0 0 4px var(--hc-soft);
+}
+#hc-console .hc-act-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+#hc-console .hc-act-title { font-size: 15px; font-weight: 500; }
+#hc-console .hc-act-why { color: var(--hc-muted); font-size: 12px; }
+#hc-console .hc-act-whyk { color: var(--hc-text); margin-right: 6px; }
+#hc-console .hc-gauge {
+  position: relative; height: 8px; border-radius: 999px; overflow: visible;
+  background: color-mix(in oklab, var(--hc-text) 12%, transparent);
+}
+#hc-console .hc-gauge-fill { display: block; height: 100%; border-radius: 999px; background: var(--hc-accent); }
+#hc-console .hc-gauge-mark { position: absolute; top: 12px; }
+#hc-console .hc-gauge-mark em { color: var(--hc-muted); font-style: normal; font-size: 10.5px; }
+#hc-console .hc-kv { margin: 12px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 16px; }
+#hc-console .hc-kv > div { display: flex; flex-direction: column; gap: 2px; }
+#hc-console .hc-kv dt { color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-kv dd { margin: 0; font-size: 12px; }
+
+/* state speeds */
+#hc-console .hc-speeds { list-style: none; margin: 0; padding: 0; }
+#hc-console .hc-speeds li {
+  display: grid; grid-template-columns: 74px 1fr; gap: 2px 10px; align-items: baseline;
+  padding: 9px 12px; border-bottom: 1px solid var(--hc-line);
+}
+#hc-console .hc-speeds li:last-child { border-bottom: 0; }
+#hc-console .hc-sp-name { color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-sp-val { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+#hc-console .hc-sp-note { grid-column: 2; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-meter {
+  display: inline-block; width: 72px; height: 5px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in oklab, var(--hc-text) 12%, transparent); vertical-align: middle;
+}
+#hc-console .hc-meter > span { display: block; height: 100%; background: var(--hc-accent); border-radius: 999px; }
+#hc-console .hc-meter--warn > span { background: var(--hc-warn); }
+#hc-console .hc-meter--lg { flex: 1 1 auto; width: auto; min-width: 40px; height: 6px; }
+
+/* tables / lists */
+#hc-console .hc-table { margin: 0; padding: 0 12px 11px; }
+#hc-console .hc-table > div { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--hc-line); }
+#hc-console .hc-table > div:last-child { border-bottom: 0; }
+#hc-console .hc-table dt { flex: none; width: 96px; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-table dd { margin: 0; font-size: 12px; }
+#hc-console .hc-table--2 dt { width: 88px; }
+#hc-console .hc-table code { margin-right: 4px; }
+#hc-console .hc-bud { display: flex; align-items: center; gap: 10px; padding: 0 12px; }
+#hc-console .hc-bud:first-of-type { margin-top: 11px; }
+#hc-console .hc-bud-k { flex: none; width: 58px; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-bud em { color: var(--hc-muted); font-style: normal; font-size: 11px; white-space: nowrap; }
+
+#hc-console .hc-needs { list-style: none; margin: 0; padding: 0; }
+#hc-console .hc-needs li { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--hc-line); font-size: 12px; }
+#hc-console .hc-needs li:last-child { border-bottom: 0; }
+#hc-console .hc-needs svg { width: 14px; height: 14px; color: var(--hc-warn); flex: none; }
+#hc-console .hc-needs em { margin-left: auto; color: var(--hc-muted); font-style: normal; font-size: 11px; }
+#hc-console .hc-todos { list-style: none; margin: 0; padding: 0; }
+#hc-console .hc-todos li { display: flex; align-items: center; gap: 7px; padding: 8px 12px; border-bottom: 1px solid var(--hc-line); font-size: 12px; }
+#hc-console .hc-todos li:last-child { border-bottom: 0; }
+#hc-console .hc-todos svg { width: 13px; height: 13px; color: var(--hc-muted); flex: none; }
+#hc-console .hc-todos em { margin-left: auto; color: var(--hc-muted); font-style: normal; font-size: 11px; }
+
+/* ledger */
+#hc-console .hc-log { list-style: none; margin: 0; padding: 0; }
+#hc-console .hc-log li {
+  display: grid; grid-template-columns: 44px 96px 1fr; gap: 8px; align-items: baseline;
+  padding: 8px 12px; border-bottom: 1px solid var(--hc-line);
+}
+#hc-console .hc-log li:last-child { border-bottom: 0; }
+#hc-console .hc-log li.is-now { background: var(--hc-soft); }
+#hc-console .hc-log-t { color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-log-k { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--hc-accent); }
+#hc-console .hc-log-b { font-size: 12px; }
+#hc-console .hc-log-b em { color: var(--hc-muted); font-style: normal; margin-left: 6px; font-size: 11px; }
+
+#hc-console .hc-chain { display: flex; flex-direction: column; gap: 2px; padding: 11px 12px; }
+#hc-console .hc-chain-node { display: flex; gap: 10px; align-items: baseline; font-size: 12px; padding: 4px 0; }
+#hc-console .hc-chain-node.is-now { color: var(--hc-accent); font-weight: 500; }
+#hc-console .hc-chain-t { flex: none; width: 74px; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-chain-node.is-now .hc-chain-t { color: var(--hc-accent); }
+#hc-console .hc-chain-node em { font-style: normal; font-size: 11px; }
+#hc-console .hc-chain-link { display: flex; align-items: center; gap: 5px; padding-left: 76px; color: var(--hc-muted); font-size: 10.5px; }
+#hc-console .hc-chain-link svg { width: 12px; height: 12px; }
+
+#hc-console .hc-rules { list-style: none; margin: 0; padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 7px; }
+#hc-console .hc-rules li { display: flex; gap: 8px; font-size: 12px; }
+#hc-console .hc-rules svg { width: 14px; height: 14px; flex: none; margin-top: 2px; color: var(--hc-ok); }
+#hc-console .hc-rules li:last-child svg { color: var(--hc-danger); }
+#hc-console .hc-rules b { font-weight: 500; }
+
+/* autonomy + grants */
+#hc-console .hc-seg { display: flex; gap: 3px; padding: 3px; border-radius: 9px; background: var(--hc-surface-2); border: 1px solid var(--hc-line); }
+#hc-console .hc-seg-i { flex: 1; padding: 6px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--hc-muted); font: inherit; font-size: 12px; cursor: pointer; }
+#hc-console .hc-seg-i.is-on { background: var(--hc-surface); color: var(--hc-text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
+#hc-console .hc-segdesc { color: var(--hc-muted); font-size: 12px; }
+#hc-console .hc-segdesc b { color: var(--hc-text); }
+
+#hc-console .hc-grants { list-style: none; margin: 0; padding: 0; }
+#hc-console .hc-grants li {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 12px; border-bottom: 1px solid var(--hc-line);
+}
+#hc-console .hc-grants li:last-child { border-bottom: 0; }
+#hc-console .hc-grants li.is-off { opacity: 0.72; }
+#hc-console .hc-g-ico { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--hc-surface-2); color: var(--hc-muted); }
+#hc-console .hc-g-ico svg { width: 14px; height: 14px; }
+#hc-console .hc-g-main { display: flex; flex-direction: column; gap: 1px; flex: 1 1 220px; min-width: 0; }
+#hc-console .hc-g-main b { font-weight: 500; font-size: 12.5px; }
+#hc-console .hc-g-scope { color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-g-risk { flex: none; }
+#hc-console .hc-g-exp { flex: none; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-sw { padding: 1px 9px; border-radius: 999px; border: 1px solid var(--hc-line); color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-sw--on { color: var(--hc-ok); border-color: color-mix(in oklab, var(--hc-ok) 35%, transparent); }
+#hc-console .hc-defend {
+  display: flex; gap: 9px; padding: 10px 12px; border-radius: 9px; font-size: 12px;
+  background: color-mix(in oklab, var(--hc-warn) 10%, var(--hc-surface));
+  border: 1px solid color-mix(in oklab, var(--hc-warn) 26%, transparent);
+}
+#hc-console .hc-defend svg { width: 15px; height: 15px; color: var(--hc-warn); flex: none; margin-top: 2px; }
+#hc-console .hc-defend--soft {
+  background: var(--hc-soft); border-color: color-mix(in oklab, var(--hc-accent) 24%, transparent);
+}
+#hc-console .hc-defend--soft svg { color: var(--hc-accent); }
+#hc-console .hc-defend--warn { margin: 0 12px 12px; }
+
+/* health */
+#hc-console .hc-axes { display: flex; flex-direction: column; gap: 10px; }
+#hc-console .hc-axisrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+#hc-console .hc-axisk { flex: none; width: 66px; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-axisvs { display: flex; gap: 6px; flex-wrap: wrap; }
+#hc-console .hc-st { padding: 2px 9px; border-radius: 999px; border: 1px solid var(--hc-line); background: var(--hc-surface-2); color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-st--live { color: var(--hc-accent); border-color: color-mix(in oklab, var(--hc-accent) 38%, transparent); }
+#hc-console .hc-st--ok { color: var(--hc-ok); }
+#hc-console .hc-st--warn { color: var(--hc-warn); }
+
+#hc-console .hc-faults { display: grid; grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); gap: 0 12px; padding: 4px 12px 8px; }
+#hc-console .hc-fault {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline;
+  padding: 9px 0; border-bottom: 1px solid var(--hc-line);
+}
+#hc-console .hc-fault-k { font-size: 12.5px; }
+#hc-console .hc-fault-v { grid-column: 1 / -1; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-owner { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--hc-line); background: var(--hc-surface-2); color: var(--hc-muted); font-size: 10px; white-space: nowrap; }
+#hc-console .hc-owner--dsh { color: var(--hc-accent); border-color: color-mix(in oklab, var(--hc-accent) 30%, transparent); }
+
+#hc-console .hc-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+#hc-console .hc-sub { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
+#hc-console .hc-acts { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; padding: 0 12px 12px; }
+#hc-console .hc-acts--inline { padding: 8px 0 0; }
+#hc-console .hc-btn {
+  padding: 5px 11px; border-radius: 8px; border: 1px solid var(--hc-line);
+  background: var(--hc-surface-2); color: var(--hc-text); font: inherit; font-size: 12px; cursor: pointer;
+}
+#hc-console .hc-btn--primary { background: var(--hc-accent); border-color: var(--hc-accent); color: var(--hc-accent-ink); }
+#hc-console .hc-btn--ghost { background: transparent; color: var(--hc-muted); }
+#hc-console .hc-btn--danger { border-color: color-mix(in oklab, var(--hc-danger) 42%, var(--hc-line)); color: var(--hc-danger); }
+#hc-console .hc-out { flex: 1 1 100%; color: var(--hc-muted); font-size: 11px; }
+#hc-console .hc-out[data-state="ok"] { color: var(--hc-ok); }
+#hc-console .hc-out[data-state="warn"] { color: var(--hc-warn); }
+
+/* adopt */
+#hc-console .hc-frame--stack { flex-direction: column; }
+#hc-console .hc-steps {
+  list-style: none; margin: 0; padding: 11px 12px; display: flex; gap: 4px; overflow: auto; flex: none;
+  border-bottom: 1px solid var(--hc-line); background: var(--hc-surface-2);
+}
+#hc-console .hc-steps li { display: flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px; color: var(--hc-muted); font-size: 11.5px; white-space: nowrap; }
+#hc-console .hc-steps li.is-done { color: var(--hc-text); }
+#hc-console .hc-steps li.is-on { background: var(--hc-soft); color: var(--hc-text); }
+#hc-console .hc-step-i {
+  display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%;
+  border: 1px solid var(--hc-line); background: var(--hc-surface); font-size: 10px; flex: none;
+}
+#hc-console .hc-steps li.is-done .hc-step-i { background: var(--hc-ok); border-color: var(--hc-ok); color: #fff; }
+#hc-console .hc-steps li.is-on .hc-step-i { border-color: var(--hc-accent); color: var(--hc-accent); }
+#hc-console .hc-step-i svg { width: 10px; height: 10px; }
+#hc-console .hc-checks { list-style: none; margin: 0; padding: 10px 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 4px 16px; }
+#hc-console .hc-checks li { display: grid; grid-template-columns: 10px 1fr; gap: 4px 8px; align-items: center; padding: 5px 0; font-size: 12px; }
+#hc-console .hc-checks em { grid-column: 2; color: var(--hc-muted); font-style: normal; font-size: 11px; }
+#hc-console .hc-ok, #hc-console .hc-warn { width: 8px; height: 8px; border-radius: 50%; }
+#hc-console .hc-ok { background: var(--hc-ok); }
+#hc-console .hc-warn { background: var(--hc-warn); }
+#hc-console .hc-adoptfoot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; background: var(--hc-surface); border-top: 1px solid var(--hc-line); }
+#hc-console .hc-adoptfoot .hc-pn { padding: 0; }
+
+@media (max-width: 880px) {
+  #hc-console .hc-frame { flex-direction: column; }
+  #hc-console .hc-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--hc-line); }
+  #hc-console .hc-navlist { flex-direction: row; flex-wrap: wrap; }
+  #hc-console .hc-navfoot { margin-top: 4px; }
+}
+@media (max-width: 560px) {
+  #hc-console .hc-log li { grid-template-columns: 44px 1fr; }
+  #hc-console .hc-log-k { grid-column: 2; }
+  #hc-console .hc-log-b { grid-column: 2; }
+  #hc-console .hc-chain-t { width: 64px; }
+  #hc-console .hc-chain-link { padding-left: 66px; }
+}
+</style>
+
+<script>
+(function () {
+  var root = document.getElementById("hc-console");
+  if (!root) return;
+
+  function selectOne(group, item) {
+    Array.prototype.forEach.call(group.children, function (child) {
+      child.classList.toggle("is-on", child === item);
+    });
+  }
+
+  root.addEventListener("click", function (event) {
+    var t = event.target;
+
+    var nav = t.closest(".hc-navlist li");
+    if (nav) {
+      Array.prototype.forEach.call(nav.parentElement.children, function (li) { li.classList.toggle("is-on", li === nav); });
+      return;
+    }
+
+    var seg = t.closest(".hc-seg-i");
+    if (seg) {
+      selectOne(seg.parentElement, seg);
+      var desc = seg.closest(".hc-pb").querySelector(".hc-segdesc");
+      var copy = {
+        "观察": "<b>观察</b>：可以在已订阅来源浏览、在沙盒里玩，但一切对外动作只生成草稿，不会发出去。",
+        "陪跑 · 默认": "<b>陪跑</b>：日常生活自动进行；公开发布逐条等你确认。私信、支付、账号设置、安装可执行插件都不在这一档里。",
+        "托管": "<b>托管</b>：只有你逐项显式授权的账号、内容类型、频率和有效期才会自动发布，过期自动收回。"
+      };
+      desc.innerHTML = copy[seg.textContent.trim()] || desc.innerHTML;
+      return;
+    }
+
+    var pick = t.closest("[data-pick]");
+    if (pick) {
+      var out = pick.closest(".hc-defend").querySelector(".hc-out");
+      if (pick.getAttribute("data-pick") === "manual") {
+        out.textContent = "已选择：自动生成草稿，发布由你手动完成。它不会假装已经发出去了。";
+        out.setAttribute("data-state", "ok");
+      } else {
+        out.textContent = "去「能力授权」里换渠道。在拿到发布权限之前，仍按上面的方式开始。";
+        out.setAttribute("data-state", "warn");
+      }
+      return;
+    }
+
+    var pause = t.closest("#hc-pause");
+    if (pause) {
+      pause.textContent = "已硬暂停 · 不再新增外部动作";
+      pause.disabled = true;
+    }
+  });
+
+  if (!globalThis.Tweak) return;
+  var state = { accent: "#4d6bfe", density: "comfy" };
+  var panels = root.querySelectorAll(".hc-panels");
+  var render = function () {
+    root.style.setProperty("--hc-accent", state.accent);
+    Array.prototype.forEach.call(panels, function (p) {
+      p.style.gap = state.density === "tight" ? "7px" : "12px";
+      p.style.padding = state.density === "tight" ? "7px" : "12px";
+    });
+  };
+  render();
+  var tweak = new Tweak({ container: root, onChange: render });
+  tweak.addColorPicker(state, "accent", { label: "主色", reference: "--hc-accent" });
+  tweak.addSelect(state, "density", { label: "面板密度", options: [{ label: "宽松", value: "comfy" }, { label: "紧凑", value: "tight" }] });
+})();
+</script>

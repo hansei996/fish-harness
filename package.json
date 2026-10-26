@@ -1,0 +1,13 @@
+{
+  "name": "fish-harness",
+  "private": true,
+  "version": "0.1.0",
+  "description": "数字生命 Harness：在 DeepSeek Harness 之上把 Agent 养起来。",
+  "type": "module",
+  "scripts": {
+    "verify": "node verify/smoke.mjs && node verify/e2e-tools.mjs",
+    "verify:smoke": "node verify/smoke.mjs",
+    "verify:e2e": "node verify/e2e-tools.mjs"
+  },
+  "license": "MIT"
+}

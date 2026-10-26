@@ -1,0 +1,6 @@
+# dsh-life —— DSH bundle patch
+# 安装：dsh plugin --profile web add link:<本目录绝对路径>
+#      或 dsh plugin --profile web add dsh-life
+- insert:
+    - id: dsh-life
+      name: dsh-life

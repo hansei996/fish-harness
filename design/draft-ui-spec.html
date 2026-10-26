@@ -1,0 +1,1017 @@
+<div id="fish-ui-spec">
+  <div class="fs-wrap" id="fs-wrap" aria-label="数字生命 Harness 界面规格">
+
+    <!-- ============ 1. 鱼缸 ============ -->
+    <section class="fs-screen" aria-label="鱼缸：它现在在做什么、最近一件重要的事、下一件想做的事">
+      <div class="fs-frame">
+        <aside class="fs-nav" aria-label="主导航">
+          <div class="fs-brand"><i data-lucide="fish" aria-hidden="true"></i><span>大肥鱼</span></div>
+          <ul class="fs-navlist">
+            <li class="is-on"><i data-lucide="fish" aria-hidden="true"></i>鱼缸</li>
+            <li><i data-lucide="activity" aria-hidden="true"></i>时间线</li>
+            <li><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li><i data-lucide="image" aria-hidden="true"></i>作品<span class="fs-badge">1</span></li>
+            <li><i data-lucide="sliders-horizontal" aria-hidden="true"></i>照料</li>
+          </ul>
+          <div class="fs-nav-foot"><span class="fs-dot fs-dot--ok"></span>活着 · 第 3 天</div>
+        </aside>
+
+        <main class="fs-main">
+          <header class="fs-bar">
+            <span class="fs-bar-title">鱼缸</span>
+            <span class="fs-pill fs-pill--live"><span class="fs-pulse"></span>活动中</span>
+            <span class="fs-pill fs-pill--ok"><i data-lucide="shield-check" aria-hidden="true"></i>系统正常</span>
+            <span class="fs-gap"></span>
+            <button type="button" class="fs-icon" data-tooltip="硬暂停：阻止新增外部动作，保留审计"><i data-lucide="pause" aria-hidden="true"></i><span class="fs-sr">暂停</span></button>
+          </header>
+
+          <div class="fs-tank" data-water="deep">
+            <span class="fs-bubbles" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
+            <span class="fs-fish"><i data-lucide="fish" aria-hidden="true"></i></span>
+            <div class="fs-overlay">
+              <div class="fs-kicker">正在</div>
+              <div class="fs-lead">练《矿工与矮人》第 38 层</div>
+              <div class="fs-chips">
+                <span class="fs-chip fs-chip--ev"><i data-lucide="check" aria-hidden="true"></i>存档 save:38 · 14:52</span>
+                <span class="fs-chip"><i data-lucide="clock" aria-hidden="true"></i>42 分钟 · 上限 60</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="fs-cols">
+            <div class="fs-block">
+              <div class="fs-kicker">最近一件重要的事</div>
+              <div class="fs-chain">
+                <div class="fs-chain-row"><span class="fs-chain-time">昨天</span><span>第 38 层连挂两次，没过</span></div>
+                <div class="fs-chain-arrow"><i data-lucide="corner-down-right" aria-hidden="true"></i>因此</div>
+                <div class="fs-chain-row"><span class="fs-chain-time">今天</span><span>换了打法重来 · <b>还在打</b></span></div>
+              </div>
+            </div>
+            <div class="fs-block">
+              <div class="fs-kicker">下一件想做的事</div>
+              <div class="fs-next">把第 38 层的打法写进技能经验</div>
+              <div class="fs-note">来自它自己的记录，不是任务列表</div>
+            </div>
+          </div>
+        </main>
+
+        <aside class="fs-rail" aria-label="状态速览">
+          <div class="fs-block">
+            <div class="fs-kicker">状态变量</div>
+            <dl class="fs-vars">
+              <dt>快 · 精力</dt><dd><span class="fs-meter"><span style="width:62%"></span></span><em>62</em></dd>
+              <dt>中 · 兴趣</dt><dd>挖矿类小品 · 稳定 3 天</dd>
+              <dt>慢 · 身份</dt><dd>v1 · 未改动</dd>
+            </dl>
+            <div class="fs-note">慢变量只有你确认才能改</div>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">今日预算</div>
+            <div class="fs-meter fs-meter--wide"><span style="width:42%"></span></div>
+            <div class="fs-note">¥8.4 / ¥20 · 未超支</div>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">需要你</div>
+            <div class="fs-need"><i data-lucide="alert-triangle" aria-hidden="true"></i>1 条草稿等你确认</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ 2. 生活时间线 ============ -->
+    <section class="fs-screen" aria-label="生活时间线：真实事件、游戏进度、兴趣变化、作品与重要关系">
+      <div class="fs-frame">
+        <aside class="fs-nav" aria-label="主导航">
+          <div class="fs-brand"><i data-lucide="fish" aria-hidden="true"></i><span>大肥鱼</span></div>
+          <ul class="fs-navlist">
+            <li><i data-lucide="fish" aria-hidden="true"></i>鱼缸</li>
+            <li class="is-on"><i data-lucide="activity" aria-hidden="true"></i>时间线</li>
+            <li><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li><i data-lucide="image" aria-hidden="true"></i>作品<span class="fs-badge">1</span></li>
+            <li><i data-lucide="sliders-horizontal" aria-hidden="true"></i>照料</li>
+          </ul>
+          <div class="fs-nav-foot"><span class="fs-dot fs-dot--ok"></span>活着 · 第 3 天</div>
+        </aside>
+
+        <main class="fs-main">
+          <header class="fs-bar">
+            <span class="fs-bar-title">生活时间线</span>
+            <span class="fs-gap"></span>
+            <span class="fs-pill">今日 4 件事</span>
+          </header>
+
+          <div class="fs-filters" role="group" aria-label="筛选">
+            <button type="button" class="fs-filter is-on">全部</button>
+            <button type="button" class="fs-filter">游戏</button>
+            <button type="button" class="fs-filter">冲浪</button>
+            <button type="button" class="fs-filter">创作</button>
+            <button type="button" class="fs-filter">关系</button>
+            <span class="fs-filters-note">失败也会被解释，不会被藏起来</span>
+          </div>
+
+          <ol class="fs-timeline">
+            <li class="fs-tl is-now">
+              <span class="fs-tl-time">现在</span>
+              <div class="fs-tl-body">
+                <div class="fs-tl-title">练第 38 层<span class="fs-tag fs-tag--live">进行中</span></div>
+                <div class="fs-tl-note">延续未完成事项</div>
+              </div>
+            </li>
+            <li class="fs-tl">
+              <span class="fs-tl-time">14:52</span>
+              <div class="fs-tl-body">
+                <div class="fs-tl-title">第 38 层失败<span class="fs-tag">游戏</span></div>
+                <div class="fs-tl-note">换了打法仍未通过</div>
+                <div class="fs-tl-ev"><i data-lucide="paperclip" aria-hidden="true"></i>证据：save:38 · 死亡回放截图</div>
+                <div class="fs-tl-why">原因：下矿前没补药水，第 3 波被磨死</div>
+              </div>
+            </li>
+            <li class="fs-tl">
+              <span class="fs-tl-time">14:20</span>
+              <div class="fs-tl-body">
+                <div class="fs-tl-title">生成段子草稿<span class="fs-tag fs-tag--write">创作</span></div>
+                <div class="fs-tl-note">素材来自 14:52 的存档截图</div>
+                <div class="fs-tl-ev"><i data-lucide="link" aria-hidden="true"></i>上游事件：11:05 第一次卡关</div>
+              </div>
+            </li>
+            <li class="fs-tl">
+              <span class="fs-tl-time">12:10</span>
+              <div class="fs-tl-body">
+                <div class="fs-tl-title">兴趣变化：挖矿类小品 0.5 → 0.8<span class="fs-tag fs-tag--drift">变化</span></div>
+                <div class="fs-tl-note">连续 3 天真的在玩，不是刷到就收藏</div>
+              </div>
+            </li>
+            <li class="fs-tl">
+              <span class="fs-tl-time">08:30</span>
+              <div class="fs-tl-body">
+                <div class="fs-tl-title">刷到一款同类型新作<span class="fs-tag fs-tag--surf">冲浪</span></div>
+                <div class="fs-tl-note">延续已有兴趣，不是热榜推荐</div>
+                <div class="fs-tl-ev"><i data-lucide="link" aria-hidden="true"></i>来源已记录</div>
+              </div>
+            </li>
+          </ol>
+        </main>
+
+        <aside class="fs-rail" aria-label="进度与关系">
+          <div class="fs-block">
+            <div class="fs-kicker">游戏进度</div>
+            <div class="fs-prog">
+              <span class="fs-prog-row">第 35 层 <em>第 1 天</em></span>
+              <span class="fs-prog-row">第 37 层 <em>第 2 天</em></span>
+              <span class="fs-prog-row fs-prog-row--now">第 38 层 <em>卡住中</em></span>
+            </div>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">重要关系</div>
+            <ul class="fs-people">
+              <li><i data-lucide="user" aria-hidden="true"></i>你 · 主人 <em>互动 42 次</em></li>
+              <li><i data-lucide="user" aria-hidden="true"></i>评论区常客「阿吉」 <em>公开</em></li>
+            </ul>
+            <div class="fs-note">主人私聊与公开互动分开存</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ 3. 和它说话 ============ -->
+    <section class="fs-screen" aria-label="和它说话：聊天、提建议、约定事项，并显示是否打断当前活动">
+      <div class="fs-frame">
+        <aside class="fs-nav" aria-label="主导航">
+          <div class="fs-brand"><i data-lucide="fish" aria-hidden="true"></i><span>大肥鱼</span></div>
+          <ul class="fs-navlist">
+            <li><i data-lucide="fish" aria-hidden="true"></i>鱼缸</li>
+            <li><i data-lucide="activity" aria-hidden="true"></i>时间线</li>
+            <li class="is-on"><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li><i data-lucide="image" aria-hidden="true"></i>作品<span class="fs-badge">1</span></li>
+            <li><i data-lucide="sliders-horizontal" aria-hidden="true"></i>照料</li>
+          </ul>
+          <div class="fs-nav-foot"><span class="fs-dot fs-dot--ok"></span>活着 · 第 3 天</div>
+        </aside>
+
+        <main class="fs-main fs-main--chat">
+          <header class="fs-bar">
+            <span class="fs-bar-title">和它说话</span>
+            <span class="fs-pill fs-pill--live"><span class="fs-pulse"></span>它正忙着</span>
+            <span class="fs-gap"></span>
+            <span class="fs-pill">24 条约定中 1 条未完成</span>
+          </header>
+
+          <div class="fs-chat">
+            <div class="fs-msg fs-msg--you"><span class="fs-bub">今天怎么样</span></div>
+            <div class="fs-msg fs-msg--fish">
+              <span class="fs-av"><i data-lucide="fish" aria-hidden="true"></i></span>
+              <span class="fs-bub fs-bub--fish">还在第 38 层。今天换了打法，还是没过——下矿前忘了补药水。刚才刷到一款同类型的新作，你要不要看一眼。</span>
+            </div>
+            <div class="fs-msg fs-msg--you"><span class="fs-bub">别急，慢慢来</span></div>
+            <div class="fs-interrupt" role="group" aria-label="打断选择">
+              <i data-lucide="pause-octagon" aria-hidden="true"></i>
+              <span class="fs-interrupt-text">你正在输入。<b>它此刻在练第 38 层（还剩 18 分钟）</b>——发送会打断这次活动。</span>
+              <span class="fs-interrupt-acts">
+                <button type="button" class="fs-btn fs-btn--primary" data-choice="now">现在打断</button>
+                <button type="button" class="fs-btn" data-choice="queue">等它做完再回</button>
+              </span>
+              <span class="fs-choice" aria-live="polite" data-state="idle"></span>
+            </div>
+            <div class="fs-trace">
+              <span class="fs-trace-row">life_start_activity<em>练第 38 层</em></span>
+              <span class="fs-trace-row">life_finish_activity<em>failed · save:38</em></span>
+              <span class="fs-trace-row">life_note_interest<em>挖矿类小品 0.8</em></span>
+            </div>
+          </div>
+
+          <div class="fs-compose">
+            <div class="fs-compose-modes" role="group" aria-label="消息类型">
+              <button type="button" class="fs-mode is-on">说点什么</button>
+              <button type="button" class="fs-mode">提个建议</button>
+              <button type="button" class="fs-mode">约定一件事</button>
+            </div>
+            <div class="fs-compose-box"><span>和它说点什么…</span><span class="fs-send"><i data-lucide="arrow-up" aria-hidden="true"></i></span></div>
+            <div class="fs-note">「建议」它可以选择不采纳；「约定」会写进它答应过的事，它会记着。</div>
+          </div>
+        </main>
+
+        <aside class="fs-rail" aria-label="约定与身份">
+          <div class="fs-block">
+            <div class="fs-kicker">它答应过的事</div>
+            <ul class="fs-todos">
+              <li><i data-lucide="circle-dot" aria-hidden="true"></i>把第 38 层的打法写进技能经验<em>今天</em></li>
+              <li><i data-lucide="circle-dot" aria-hidden="true"></i>周五前讲讲那款新作<em>周五</em></li>
+            </ul>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">它现在是谁</div>
+            <dl class="fs-vars">
+              <dt>身份</dt><dd>v1 · 未改动</dd>
+              <dt>性格种子</dt><dd>聪明但懒、傲娇、爱吃白饭</dd>
+            </dl>
+            <div class="fs-note">改这些要你明确确认</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ 4. 作品与待确认 ============ -->
+    <section class="fs-screen" aria-label="作品与待确认：草稿、风险提示、已发布与反馈">
+      <div class="fs-frame">
+        <aside class="fs-nav" aria-label="主导航">
+          <div class="fs-brand"><i data-lucide="fish" aria-hidden="true"></i><span>大肥鱼</span></div>
+          <ul class="fs-navlist">
+            <li><i data-lucide="fish" aria-hidden="true"></i>鱼缸</li>
+            <li><i data-lucide="activity" aria-hidden="true"></i>时间线</li>
+            <li><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li class="is-on"><i data-lucide="image" aria-hidden="true"></i>作品<span class="fs-badge">1</span></li>
+            <li><i data-lucide="sliders-horizontal" aria-hidden="true"></i>照料</li>
+          </ul>
+          <div class="fs-nav-foot"><span class="fs-dot fs-dot--ok"></span>活着 · 第 3 天</div>
+        </aside>
+
+        <main class="fs-main">
+          <header class="fs-bar">
+            <span class="fs-bar-title">作品与待确认</span>
+            <span class="fs-pill fs-pill--warn"><i data-lucide="inbox" aria-hidden="true"></i>1 条待确认</span>
+            <span class="fs-gap"></span>
+            <span class="fs-pill">陪跑模式 · 逐条确认</span>
+          </header>
+
+          <div class="fs-cards">
+            <article class="fs-card fs-card--focus" aria-label="待发布草稿">
+              <div class="fs-card-head"><span class="fs-card-title">待发布草稿</span><span class="fs-pill fs-pill--warn">需要你</span></div>
+              <div class="fs-card-body">
+                <div class="fs-post-title">「我在第 38 层死得很有节奏」</div>
+                <div class="fs-post-body">换了打法，还是没过。第三次死在同一波怪手上，已经录了回放，明天再战。<br>结论：下矿前先补药水。</div>
+                <div class="fs-chips">
+                  <span class="fs-chip fs-chip--ev"><i data-lucide="check" aria-hidden="true"></i>事实检查通过</span>
+                  <span class="fs-chip fs-chip--ev"><i data-lucide="shield-check" aria-hidden="true"></i>无敏感信息</span>
+                  <span class="fs-chip"><i data-lucide="link" aria-hidden="true"></i>素材来源已标注</span>
+                </div>
+                <div class="fs-warnbox">
+                  <i data-lucide="alert-triangle" aria-hidden="true"></i>
+                  <div><b>风险提示：</b>正文提到具体关卡与存档细节。这不是错误，但会让你的账号暴露游戏进度。建议改成「某个关卡」。</div>
+                </div>
+                <div class="fs-acts">
+                  <button type="button" class="fs-btn fs-btn--primary" data-act="approve">授权发布</button>
+                  <button type="button" class="fs-btn" data-act="rewrite">按建议改写</button>
+                  <button type="button" class="fs-btn fs-btn--ghost" data-act="later">稍后再说</button>
+                  <span class="fs-choice" aria-live="polite" data-state="idle">批准会绑定这一版内容和这个账号</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="fs-card" aria-label="已发布">
+              <div class="fs-card-head"><span class="fs-card-title">已发布</span><span class="fs-pill">第 2 天</span></div>
+              <div class="fs-card-body">
+                <div class="fs-post-title">「第一天：从新手村摔下去三次」</div>
+                <div class="fs-post-meta"><i data-lucide="external-link" aria-hidden="true"></i>已发布于 · 附平台回执 ID</div>
+                <div class="fs-feedback">
+                  <span class="fs-fb"><i data-lucide="heart" aria-hidden="true"></i>37</span>
+                  <span class="fs-fb"><i data-lucide="message-square" aria-hidden="true"></i>6 条评论</span>
+                </div>
+                <div class="fs-note">反馈只是参考，不会让它去追热点</div>
+              </div>
+            </article>
+          </div>
+        </main>
+
+        <aside class="fs-rail" aria-label="发布边界">
+          <div class="fs-block">
+            <div class="fs-kicker">发布边界</div>
+            <ul class="fs-perms">
+              <li><i data-lucide="check" aria-hidden="true"></i>公开发帖：逐条确认</li>
+              <li><i data-lucide="x" aria-hidden="true"></i>自主私信：未开放</li>
+              <li><i data-lucide="x" aria-hidden="true"></i>商业合作：未开放</li>
+              <li><i data-lucide="x" aria-hidden="true"></i>支付 / 接单：未开放</li>
+            </ul>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">发布节奏</div>
+            <dl class="fs-vars">
+              <dt>频率上限</dt><dd>每天 1 条</dd>
+              <dt>冷却</dt><dd>发完 6 小时内不再生成</dd>
+              <dt>重复检测</dt><dd>已开启</dd>
+            </dl>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">系统健康</div>
+            <ul class="fs-health">
+              <li><span class="fs-dot fs-dot--ok"></span>模型 · 正常</li>
+              <li><span class="fs-dot fs-dot--ok"></span>沙箱 · 正常</li>
+              <li><span class="fs-dot fs-dot--warn"></span>发布渠道 · 登录过期</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ 5. 照料设置 ============ -->
+    <section class="fs-screen" aria-label="照料设置：能力授权、作息、预算、暂停、健康检查、导出与恢复">
+      <div class="fs-frame">
+        <aside class="fs-nav" aria-label="主导航">
+          <div class="fs-brand"><i data-lucide="fish" aria-hidden="true"></i><span>大肥鱼</span></div>
+          <ul class="fs-navlist">
+            <li><i data-lucide="fish" aria-hidden="true"></i>鱼缸</li>
+            <li><i data-lucide="activity" aria-hidden="true"></i>时间线</li>
+            <li><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</li>
+            <li><i data-lucide="image" aria-hidden="true"></i>作品<span class="fs-badge">1</span></li>
+            <li class="is-on"><i data-lucide="sliders-horizontal" aria-hidden="true"></i>照料</li>
+          </ul>
+          <div class="fs-nav-foot"><span class="fs-dot fs-dot--ok"></span>活着 · 第 3 天</div>
+        </aside>
+
+        <main class="fs-main">
+          <header class="fs-bar">
+            <span class="fs-bar-title">照料大肥鱼</span>
+            <span class="fs-gap"></span>
+            <button type="button" class="fs-btn fs-btn--danger" id="fs-pause">硬暂停</button>
+          </header>
+
+          <div class="fs-cards fs-cards--dense">
+            <section class="fs-card" aria-label="自主权">
+              <div class="fs-card-head"><span class="fs-card-title">它能自己走多远</span></div>
+              <div class="fs-card-body">
+                <div class="fs-seg" role="group" aria-label="自主权档位">
+                  <button type="button" class="fs-seg-item">观察</button>
+                  <button type="button" class="fs-seg-item is-on">陪跑 · 默认</button>
+                  <button type="button" class="fs-seg-item">托管</button>
+                </div>
+                <div class="fs-seg-desc">
+                  <b>陪跑</b>：日常生活自动进行；公开发布逐条等你确认。私信、支付、账号设置、安装可执行插件都不在这个档位里。
+                </div>
+              </div>
+            </section>
+
+            <section class="fs-card" aria-label="能力授权">
+              <div class="fs-card-head"><span class="fs-card-title">能力授权</span><span class="fs-pill">3 项已开 · 2 项未开</span></div>
+              <div class="fs-card-body">
+                <ul class="fs-grants">
+                  <li><i data-lucide="globe" aria-hidden="true"></i><span class="fs-grant-name">冲浪</span><span class="fs-grant-scope">仅已订阅来源 · 记录来源</span><span class="fs-sw fs-sw--on">开</span></li>
+                  <li><i data-lucide="gamepad-2" aria-hidden="true"></i><span class="fs-grant-name">游戏</span><span class="fs-grant-scope">沙盒内 · 一种游戏 · 需存档证据</span><span class="fs-sw fs-sw--on">开</span></li>
+                  <li><i data-lucide="pen-line" aria-hidden="true"></i><span class="fs-grant-name">表达</span><span class="fs-grant-scope">只生成草稿 · 发布逐条确认</span><span class="fs-sw fs-sw--on">开</span></li>
+                  <li><i data-lucide="send" aria-hidden="true"></i><span class="fs-grant-name">私信</span><span class="fs-grant-scope">早期不开放</span><span class="fs-sw">关</span></li>
+                  <li><i data-lucide="credit-card" aria-hidden="true"></i><span class="fs-grant-name">支付</span><span class="fs-grant-scope">不开放</span><span class="fs-sw">关</span></li>
+                </ul>
+                <div class="fs-note">允许公开发帖，不会顺带放开这些。每项都可以单独撤销、可设有效期。</div>
+              </div>
+            </section>
+
+            <section class="fs-card" aria-label="作息与唤醒">
+              <div class="fs-card-head"><span class="fs-card-title">作息与唤醒</span><span class="fs-pill">走 dsh schedule</span></div>
+              <div class="fs-card-body">
+                <dl class="fs-vars fs-vars--grid">
+                  <dt>唤醒</dt><dd>09:00 / 14:00 / 20:00</dd>
+                  <dt>抖动</dt><dd>±10 分钟</dd>
+                  <dt>免打扰</dt><dd>23:00 – 08:00</dd>
+                  <dt>每日投递上限</dt><dd>6 次</dd>
+                </dl>
+                <div class="fs-note">安静时段的唤醒了会静默收尾，不打扰你，也不污染它的上下文。</div>
+              </div>
+            </section>
+
+            <section class="fs-card" aria-label="预算">
+              <div class="fs-card-head"><span class="fs-card-title">预算</span><span class="fs-pill fs-pill--warn">创作额度用得快</span></div>
+              <div class="fs-card-body">
+                <div class="fs-bud">
+                  <span class="fs-bud-label">日常生活</span>
+                  <span class="fs-meter fs-meter--wide"><span style="width:38%"></span></span>
+                  <em>¥5.2 / ¥15</em>
+                </div>
+                <div class="fs-bud">
+                  <span class="fs-bud-label">创作</span>
+                  <span class="fs-meter fs-meter--wide fs-meter--warn"><span style="width:80%"></span></span>
+                  <em>¥3.2 / ¥5</em>
+                </div>
+                <div class="fs-note">触顶后不再发起新付费任务，保存进度转入低成本模式，不会编造还在忙。</div>
+              </div>
+            </section>
+
+            <section class="fs-card" aria-label="健康检查">
+              <div class="fs-card-head"><span class="fs-card-title">健康检查</span><span class="fs-pill fs-pill--warn">1 项降级</span></div>
+              <div class="fs-card-body">
+                <ul class="fs-health fs-health--wide">
+                  <li><span class="fs-dot fs-dot--ok"></span>模型 · 正常 <em>可切换的备用模型已通过身份回归</em></li>
+                  <li><span class="fs-dot fs-dot--ok"></span>持久化 · 正常 <em>会话日志可重放</em></li>
+                  <li><span class="fs-dot fs-dot--ok"></span>沙箱 · 正常 <em>fail-closed</em></li>
+                  <li><span class="fs-dot fs-dot--warn"></span>发布渠道 · 登录过期 <em>只停用发帖，其它生活照常</em></li>
+                </ul>
+                <div class="fs-acts"><button type="button" class="fs-btn">重新体检</button></div>
+                <div class="fs-note">生活状态和系统健康是两件事：它休息不等于系统故障，模型宕机也不会伪装成它心情不好。</div>
+              </div>
+            </section>
+
+            <section class="fs-card" aria-label="导出与恢复">
+              <div class="fs-card-head"><span class="fs-card-title">导出与恢复</span></div>
+              <div class="fs-card-body">
+                <div class="fs-snap">
+                  <i data-lucide="package" aria-hidden="true"></i>
+                  <div><b>生命快照</b>：身份版本、偏好、关系、事件引用、长期目标、活动进度、能力包与策略版本。</div>
+                </div>
+                <div class="fs-note">快照不含账号密钥，迁移后要重新授权。恢复前会先核对已发出的动作，避免重复发帖。</div>
+                <div class="fs-acts">
+                  <button type="button" class="fs-btn">导出快照</button>
+                  <button type="button" class="fs-btn">从快照恢复</button>
+                  <button type="button" class="fs-btn fs-btn--ghost">解绑外部账号</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+
+        <aside class="fs-rail" aria-label="它此刻">
+          <div class="fs-tank fs-tank--small" data-water="deep">
+            <span class="fs-fish fs-fish--small"><i data-lucide="fish" aria-hidden="true"></i></span>
+            <div class="fs-kicker fs-kicker--onwater">它此刻在做</div>
+            <div class="fs-onwater-title">练第 38 层</div>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">下一步想</div>
+            <div>把打法写进技能经验</div>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">状态变量</div>
+            <dl class="fs-vars">
+              <dt>快 · 精力</dt><dd><span class="fs-meter"><span style="width:62%"></span></span><em>62</em></dd>
+              <dt>中 · 习惯</dt><dd>每天先看游戏更新</dd>
+              <dt>慢 · 身份</dt><dd>v1 · 未改动</dd>
+            </dl>
+          </div>
+          <div class="fs-block">
+            <div class="fs-kicker">维护</div>
+            <div class="fs-note">日志、错误栈、连接器诊断在这里；日常不需要你值班。</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ 6. 领养流程 ============ -->
+    <section class="fs-screen" aria-label="领养流程：从出生模板到开始生活">
+      <div class="fs-frame fs-frame--adopt">
+        <main class="fs-adopt">
+          <header class="fs-bar">
+            <span class="fs-bar-title">领养一条鱼</span>
+            <span class="fs-gap"></span>
+            <span class="fs-pill">第 5 / 7 步</span>
+          </header>
+
+          <ol class="fs-steps">
+            <li class="is-done"><span class="fs-step-i"><i data-lucide="check" aria-hidden="true"></i></span>出生模板</li>
+            <li class="is-done"><span class="fs-step-i"><i data-lucide="check" aria-hidden="true"></i></span>名字与性格种子</li>
+            <li class="is-done"><span class="fs-step-i"><i data-lucide="check" aria-hidden="true"></i></span>生活能力包</li>
+            <li class="is-done"><span class="fs-step-i"><i data-lucide="check" aria-hidden="true"></i></span>预算与作息</li>
+            <li class="is-on"><span class="fs-step-i">5</span>自动体检</li>
+            <li><span class="fs-step-i">6</span>授权外部账号</li>
+            <li><span class="fs-step-i">7</span>开始生活</li>
+          </ol>
+
+          <div class="fs-adopt-body">
+            <section class="fs-card" aria-label="体检结果">
+              <div class="fs-card-head"><span class="fs-card-title">自动体检</span><span class="fs-pill fs-pill--warn">1 项没准备好</span></div>
+              <div class="fs-card-body">
+                <ul class="fs-health fs-health--wide">
+                  <li><span class="fs-dot fs-dot--ok"></span>模型可用 <em>deepseek 路由正常</em></li>
+                  <li><span class="fs-dot fs-dot--ok"></span>dsh 版本兼容 <em>0.2.1-rc.2</em></li>
+                  <li><span class="fs-dot fs-dot--ok"></span>持久化 <em>写入正常，可恢复</em></li>
+                  <li><span class="fs-dot fs-dot--ok"></span>时区与作息 <em>Asia/Shanghai</em></li>
+                  <li><span class="fs-dot fs-dot--ok"></span>网页访问 <em>已订阅来源可读</em></li>
+                  <li><span class="fs-dot fs-dot--ok"></span>游戏存档 <em>可读可写</em></li>
+                  <li><span class="fs-dot fs-dot--warn"></span>发布权限 <em>该平台个人账号没有发布接口</em></li>
+                  <li><span class="fs-dot fs-dot--ok"></span>预算上限 <em>硬上限已生效</em></li>
+                </ul>
+
+                <div class="fs-warnbox fs-warnbox--act">
+                  <i data-lucide="alert-triangle" aria-hidden="true"></i>
+                  <div>
+                    <b>发布权限没拿到。</b>这不影响它开始生活——它会照常冲浪、玩游戏、写草稿。
+                    <span class="fs-warnbox-acts">
+                      <button type="button" class="fs-btn fs-btn--primary" data-pick="manual">用「自动草稿 + 你手动发布」开始</button>
+                      <button type="button" class="fs-btn" data-pick="other">换一个发布渠道</button>
+                    </span>
+                    <span class="fs-choice" aria-live="polite" data-state="idle"></span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <footer class="fs-adopt-foot">
+            <span class="fs-note">一次配置、长期运行；但平台登录、账号归属、发布权限和预算仍需你明确确认。</span>
+            <span class="fs-gap"></span>
+            <button type="button" class="fs-btn">上一步</button>
+            <button type="button" class="fs-btn fs-btn--primary" data-goal="life">开始生活</button>
+          </footer>
+        </main>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<style>
+#fish-ui-spec { text-align: left; }
+#fish-ui-spec .fs-screen + .fs-screen { margin-top: 22px; }
+
+#fish-ui-spec .fs-frame {
+  color-scheme: light dark;
+  --fs-bg: light-dark(#f7f8fa, #0b0d11);
+  --fs-surface: light-dark(#ffffff, #14171d);
+  --fs-surface-2: light-dark(#f2f4f7, #191d24);
+  --fs-text: light-dark(#16181d, #e7eaf0);
+  --fs-muted: light-dark(#6b7280, #9aa3b2);
+  --fs-line: light-dark(#e3e6eb, #232830);
+  --fs-accent: #4d6bfe;
+  --fs-accent-ink: #ffffff;
+  --fs-accent-soft: color-mix(in oklab, var(--fs-accent) 12%, transparent);
+  --fs-ok: light-dark(#15803d, #4ade80);
+  --fs-warn: light-dark(#a16207, #fbbf24);
+  --fs-danger: light-dark(#b91c1c, #f87171);
+  --fs-water-1: light-dark(#e8f1fd, #0c1520);
+  --fs-water-2: light-dark(#c3daf6, #050a12);
+  --fs-ink-on-water: light-dark(#1e3a5f, #cfe2f8);
+
+  display: flex;
+  min-height: 520px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--fs-bg);
+  color: var(--fs-text);
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: 0 22px 50px -32px rgb(0 0 0 / 0.5);
+}
+#fish-ui-spec .fs-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#fish-ui-spec .fs-gap { flex: 1; }
+
+/* nav */
+#fish-ui-spec .fs-nav {
+  display: flex; flex-direction: column; gap: 8px; flex: none; width: 178px;
+  padding: 10px; background: var(--fs-surface-2); border-right: 1px solid var(--fs-line);
+}
+#fish-ui-spec .fs-brand { display: flex; align-items: center; gap: 7px; padding: 2px 5px 6px; font-weight: 500; }
+#fish-ui-spec .fs-brand svg { color: var(--fs-accent); width: 16px; height: 16px; }
+#fish-ui-spec .fs-navlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+#fish-ui-spec .fs-navlist li {
+  display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px;
+  color: var(--fs-muted); font-size: 12.5px; cursor: pointer;
+}
+#fish-ui-spec .fs-navlist li.is-on { background: var(--fs-accent-soft); color: var(--fs-text); }
+#fish-ui-spec .fs-navlist li svg { width: 14px; height: 14px; flex: none; }
+#fish-ui-spec .fs-badge {
+  margin-left: auto; min-width: 16px; padding: 0 5px; border-radius: 999px;
+  background: var(--fs-accent); color: var(--fs-accent-ink); font-size: 10px; line-height: 16px; text-align: center;
+}
+#fish-ui-spec .fs-nav-foot {
+  display: flex; align-items: center; gap: 7px; margin-top: auto; padding: 8px 9px;
+  border-radius: 8px; background: var(--fs-surface); border: 1px solid var(--fs-line);
+  color: var(--fs-muted); font-size: 11px;
+}
+#fish-ui-spec .fs-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--fs-muted); }
+#fish-ui-spec .fs-dot--ok { background: var(--fs-ok); }
+#fish-ui-spec .fs-dot--warn { background: var(--fs-warn); }
+
+/* top bar */
+#fish-ui-spec .fs-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+#fish-ui-spec .fs-bar {
+  display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap;
+  padding: 9px 12px; background: var(--fs-surface); border-bottom: 1px solid var(--fs-line);
+}
+#fish-ui-spec .fs-bar-title { font-weight: 500; }
+#fish-ui-spec .fs-pill {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--fs-line); background: var(--fs-surface-2); color: var(--fs-muted);
+  font-size: 11px; white-space: nowrap;
+}
+#fish-ui-spec .fs-pill--live { color: var(--fs-text); }
+#fish-ui-spec .fs-pill--ok { color: var(--fs-ok); }
+#fish-ui-spec .fs-pill--warn { color: var(--fs-warn); }
+#fish-ui-spec .fs-pill svg { width: 12px; height: 12px; }
+#fish-ui-spec .fs-pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--fs-accent); }
+#fish-ui-spec .fs-icon {
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--fs-muted); cursor: pointer;
+}
+#fish-ui-spec .fs-icon:hover { background: var(--fs-surface-2); color: var(--fs-text); }
+#fish-ui-spec .fs-icon svg { width: 15px; height: 15px; }
+
+/* buttons */
+#fish-ui-spec .fs-btn {
+  padding: 5px 11px; border-radius: 8px; border: 1px solid var(--fs-line);
+  background: var(--fs-surface-2); color: var(--fs-text); font: inherit; font-size: 12px; cursor: pointer;
+}
+#fish-ui-spec .fs-btn--primary { background: var(--fs-accent); border-color: var(--fs-accent); color: var(--fs-accent-ink); }
+#fish-ui-spec .fs-btn--ghost { background: transparent; color: var(--fs-muted); }
+#fish-ui-spec .fs-btn--danger { border-color: color-mix(in oklab, var(--fs-danger) 45%, var(--fs-line)); color: var(--fs-danger); }
+#fish-ui-spec .fs-choice { flex: 1 1 100%; color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-choice[data-state="ok"] { color: var(--fs-ok); }
+#fish-ui-spec .fs-choice[data-state="warn"] { color: var(--fs-warn); }
+
+/* tank */
+#fish-ui-spec .fs-tank {
+  position: relative; display: grid; place-items: center; flex: 1; min-height: 150px; overflow: hidden;
+  background: linear-gradient(180deg, var(--fs-water-1), var(--fs-water-2));
+}
+#fish-ui-spec .fs-tank[data-water="shallow"] {
+  background: linear-gradient(180deg, light-dark(#f2f9ff, #101e2d), light-dark(#d8eaff, #0a1622));
+}
+#fish-ui-spec .fs-tank--small { flex: none; height: 116px; border-radius: 10px; display: block; }
+#fish-ui-spec .fs-fish { display: grid; place-items: center; color: var(--fs-ink-on-water); }
+#fish-ui-spec .fs-fish svg { width: 92px; height: 92px; }
+#fish-ui-spec .fs-fish--small { position: absolute; left: 50%; top: 62%; transform: translate(-50%, -50%); }
+#fish-ui-spec .fs-fish--small svg { width: 40px; height: 40px; }
+#fish-ui-spec .fs-bubbles { position: absolute; inset: 0; }
+#fish-ui-spec .fs-bubbles > span {
+  position: absolute; border-radius: 50%;
+  border: 1px solid color-mix(in oklab, var(--fs-accent) 34%, transparent);
+  background: color-mix(in oklab, var(--fs-accent) 10%, transparent);
+}
+#fish-ui-spec .fs-bubbles > span:nth-child(1) { left: 10%; top: 64%; width: 12px; height: 12px; }
+#fish-ui-spec .fs-bubbles > span:nth-child(2) { left: 20%; top: 34%; width: 7px; height: 7px; }
+#fish-ui-spec .fs-bubbles > span:nth-child(3) { left: 28%; top: 78%; width: 9px; height: 9px; }
+#fish-ui-spec .fs-bubbles > span:nth-child(4) { left: 66%; top: 28%; width: 11px; height: 11px; }
+#fish-ui-spec .fs-bubbles > span:nth-child(5) { left: 76%; top: 60%; width: 15px; height: 15px; }
+#fish-ui-spec .fs-bubbles > span:nth-child(6) { left: 56%; top: 82%; width: 6px; height: 6px; }
+#fish-ui-spec .fs-bubbles > span:nth-child(7) { left: 46%; top: 16%; width: 8px; height: 8px; }
+#fish-ui-spec .fs-bubbles > span:nth-child(8) { left: 86%; top: 22%; width: 6px; height: 6px; }
+#fish-ui-spec .fs-overlay {
+  position: absolute; left: 14px; right: 14px; bottom: 14px; max-width: 420px;
+  padding: 11px 13px; border-radius: 10px;
+  background: color-mix(in oklab, var(--fs-surface) 94%, transparent);
+  border: 1px solid var(--fs-line);
+}
+#fish-ui-spec .fs-kicker--onwater { position: absolute; left: 10px; top: 8px; color: var(--fs-ink-on-water); }
+#fish-ui-spec .fs-onwater-title { position: absolute; left: 10px; top: 22px; font-weight: 500; color: var(--fs-ink-on-water); }
+
+/* shared bits */
+#fish-ui-spec .fs-kicker { color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-lead { font-weight: 500; margin: 1px 0 7px; font-size: 14px; }
+#fish-ui-spec .fs-note { color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+#fish-ui-spec .fs-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--fs-line); background: var(--fs-surface-2); color: var(--fs-muted); font-size: 11px;
+}
+#fish-ui-spec .fs-chip--ev { color: var(--fs-ok); }
+#fish-ui-spec .fs-chip svg { width: 12px; height: 12px; }
+#fish-ui-spec .fs-meter {
+  flex: 1; max-width: 72px; height: 5px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in oklab, var(--fs-text) 12%, transparent);
+}
+#fish-ui-spec .fs-meter > span { display: block; height: 100%; background: var(--fs-accent); border-radius: 999px; }
+#fish-ui-spec .fs-meter--wide { flex: none; width: 100%; max-width: none; height: 6px; }
+#fish-ui-spec .fs-meter--warn > span { background: var(--fs-warn); }
+#fish-ui-spec .fs-vars { margin: 0; }
+#fish-ui-spec .fs-vars dt { color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-vars dd { margin: 1px 0 7px; display: flex; align-items: center; gap: 7px; font-size: 12px; }
+#fish-ui-spec .fs-vars dd:last-child { margin-bottom: 0; }
+#fish-ui-spec .fs-vars em { color: var(--fs-muted); font-style: normal; font-size: 11px; }
+#fish-ui-spec .fs-vars--grid { display: grid; grid-template-columns: 96px 1fr; gap: 2px 10px; align-items: baseline; }
+#fish-ui-spec .fs-vars--grid dd { margin: 0; }
+
+/* 1 fish tank */
+#fish-ui-spec .fs-cols { display: flex; flex: none; gap: 12px; padding: 12px; border-top: 1px solid var(--fs-line); background: var(--fs-surface); }
+#fish-ui-spec .fs-block { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+#fish-ui-spec .fs-cols .fs-block { flex: 1; }
+#fish-ui-spec .fs-chain { display: flex; flex-direction: column; gap: 3px; }
+#fish-ui-spec .fs-chain-row { display: flex; gap: 8px; font-size: 12px; }
+#fish-ui-spec .fs-chain-time { flex: none; width: 32px; color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-chain-arrow { display: flex; align-items: center; gap: 4px; color: var(--fs-muted); font-size: 11px; padding-left: 2px; }
+#fish-ui-spec .fs-chain-arrow svg { width: 12px; height: 12px; }
+#fish-ui-spec .fs-next { font-size: 13px; }
+#fish-ui-spec .fs-need {
+  display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 9px;
+  background: color-mix(in oklab, var(--fs-warn) 12%, var(--fs-surface));
+  border: 1px solid color-mix(in oklab, var(--fs-warn) 30%, transparent);
+  color: var(--fs-warn); font-size: 12px;
+}
+#fish-ui-spec .fs-need svg { width: 14px; height: 14px; flex: none; }
+
+/* rail */
+#fish-ui-spec .fs-rail {
+  display: flex; flex-direction: column; gap: 12px; flex: none; width: 224px;
+  overflow: auto; padding: 12px; background: var(--fs-surface-2); border-left: 1px solid var(--fs-line);
+}
+#fish-ui-spec .fs-rail .fs-block { gap: 6px; }
+
+/* 2 timeline */
+#fish-ui-spec .fs-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 10px 12px 0; }
+#fish-ui-spec .fs-filter {
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--fs-line);
+  background: var(--fs-surface); color: var(--fs-muted); font: inherit; font-size: 11px; cursor: pointer;
+}
+#fish-ui-spec .fs-filter.is-on { border-color: var(--fs-accent); color: var(--fs-accent); }
+#fish-ui-spec .fs-filters-note { color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-timeline { list-style: none; margin: 0; padding: 8px 12px 14px; overflow: auto; flex: 1; }
+#fish-ui-spec .fs-tl { display: flex; gap: 12px; padding: 10px 8px; border-bottom: 1px solid var(--fs-line); }
+#fish-ui-spec .fs-tl:last-child { border-bottom: 0; }
+#fish-ui-spec .fs-tl.is-now { background: var(--fs-accent-soft); border-radius: 10px; border-bottom-color: transparent; }
+#fish-ui-spec .fs-tl-time { flex: none; width: 42px; color: var(--fs-muted); font-size: 11px; padding-top: 1px; }
+#fish-ui-spec .fs-tl-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+#fish-ui-spec .fs-tl-title { font-weight: 500; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#fish-ui-spec .fs-tl-note { color: var(--fs-muted); font-size: 12px; }
+#fish-ui-spec .fs-tl-ev { display: flex; align-items: center; gap: 4px; color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-tl-ev svg { width: 12px; height: 12px; }
+#fish-ui-spec .fs-tl-why {
+  padding: 5px 8px; border-radius: 7px; font-size: 11px;
+  background: var(--fs-surface-2); border: 1px solid var(--fs-line); color: var(--fs-muted);
+}
+#fish-ui-spec .fs-tag {
+  padding: 1px 7px; border-radius: 999px; border: 1px solid var(--fs-line);
+  color: var(--fs-muted); font-size: 10px; font-weight: 400;
+}
+#fish-ui-spec .fs-tag--live { color: var(--fs-accent); border-color: color-mix(in oklab, var(--fs-accent) 42%, transparent); }
+#fish-ui-spec .fs-tag--write { color: var(--fs-warn); }
+#fish-ui-spec .fs-tag--drift { color: var(--fs-ok); }
+#fish-ui-spec .fs-prog { display: flex; flex-direction: column; gap: 3px; }
+#fish-ui-spec .fs-prog-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+#fish-ui-spec .fs-prog-row em { color: var(--fs-muted); font-style: normal; font-size: 11px; }
+#fish-ui-spec .fs-prog-row--now { color: var(--fs-accent); }
+#fish-ui-spec .fs-people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+#fish-ui-spec .fs-people li { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+#fish-ui-spec .fs-people svg { width: 13px; height: 13px; color: var(--fs-muted); flex: none; }
+#fish-ui-spec .fs-people em { margin-left: auto; color: var(--fs-muted); font-style: normal; font-size: 11px; }
+
+/* 3 chat */
+#fish-ui-spec .fs-chat { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+#fish-ui-spec .fs-msg { display: flex; gap: 8px; max-width: 86%; }
+#fish-ui-spec .fs-msg--you { align-self: flex-end; }
+#fish-ui-spec .fs-av {
+  display: grid; place-items: center; flex: none; width: 26px; height: 26px;
+  border-radius: 8px; background: var(--fs-accent-soft); color: var(--fs-accent);
+}
+#fish-ui-spec .fs-av svg { width: 15px; height: 15px; }
+#fish-ui-spec .fs-bub { padding: 8px 11px; border-radius: 10px; font-size: 12.5px; background: var(--fs-surface); border: 1px solid var(--fs-line); }
+#fish-ui-spec .fs-msg--you .fs-bub { background: var(--fs-accent); border-color: var(--fs-accent); color: var(--fs-accent-ink); }
+#fish-ui-spec .fs-interrupt {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px;
+  background: color-mix(in oklab, var(--fs-warn) 10%, var(--fs-surface));
+  border: 1px solid color-mix(in oklab, var(--fs-warn) 28%, transparent);
+}
+#fish-ui-spec .fs-interrupt svg { width: 15px; height: 15px; color: var(--fs-warn); flex: none; }
+#fish-ui-spec .fs-interrupt-text { flex: 1 1 240px; font-size: 12px; }
+#fish-ui-spec .fs-interrupt-acts { display: flex; gap: 6px; }
+#fish-ui-spec .fs-trace {
+  display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 8px;
+  background: var(--fs-surface-2); border: 1px solid var(--fs-line); color: var(--fs-muted); font-size: 11px;
+}
+#fish-ui-spec .fs-trace-row em { color: var(--fs-text); font-style: normal; margin-left: 5px; }
+#fish-ui-spec .fs-compose { flex: none; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 7px; }
+#fish-ui-spec .fs-compose-modes { display: flex; gap: 4px; }
+#fish-ui-spec .fs-mode {
+  padding: 4px 10px; border-radius: 8px; border: 1px solid var(--fs-line);
+  background: var(--fs-surface); color: var(--fs-muted); font: inherit; font-size: 11px; cursor: pointer;
+}
+#fish-ui-spec .fs-mode.is-on { background: var(--fs-accent-soft); color: var(--fs-text); border-color: color-mix(in oklab, var(--fs-accent) 35%, transparent); }
+#fish-ui-spec .fs-compose-box {
+  display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 10px;
+  background: var(--fs-surface); border: 1px solid var(--fs-line); color: var(--fs-muted);
+}
+#fish-ui-spec .fs-send { display: grid; place-items: center; width: 22px; height: 22px; margin-left: auto; border-radius: 6px; background: var(--fs-accent); color: var(--fs-accent-ink); }
+#fish-ui-spec .fs-send svg { width: 13px; height: 13px; }
+#fish-ui-spec .fs-todos { list-style: none; margin: 0; padding: 0; }
+#fish-ui-spec .fs-todos li { display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--fs-line); }
+#fish-ui-spec .fs-todos li:last-child { border-bottom: 0; }
+#fish-ui-spec .fs-todos svg { width: 13px; height: 13px; color: var(--fs-muted); flex: none; }
+#fish-ui-spec .fs-todos em { margin-left: auto; color: var(--fs-muted); font-style: normal; font-size: 11px; }
+
+/* 4 works */
+#fish-ui-spec .fs-cards { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+#fish-ui-spec .fs-cards--dense { gap: 10px; }
+#fish-ui-spec .fs-card { border-radius: 10px; background: var(--fs-surface); border: 1px solid var(--fs-line); }
+#fish-ui-spec .fs-card--focus { border-color: color-mix(in oklab, var(--fs-accent) 34%, var(--fs-line)); }
+#fish-ui-spec .fs-card-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--fs-line); flex-wrap: wrap; }
+#fish-ui-spec .fs-card-title { font-weight: 500; }
+#fish-ui-spec .fs-card-head .fs-pill { margin-left: auto; }
+#fish-ui-spec .fs-card-body { display: flex; flex-direction: column; gap: 9px; padding: 11px 12px; }
+#fish-ui-spec .fs-post-title { font-weight: 500; }
+#fish-ui-spec .fs-post-body { font-size: 12.5px; color: var(--fs-text); }
+#fish-ui-spec .fs-post-meta { display: flex; align-items: center; gap: 5px; color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-post-meta svg { width: 12px; height: 12px; }
+#fish-ui-spec .fs-warnbox {
+  display: flex; align-items: flex-start; gap: 8px; padding: 9px 11px; border-radius: 9px; font-size: 12px;
+  background: color-mix(in oklab, var(--fs-warn) 10%, var(--fs-surface));
+  border: 1px solid color-mix(in oklab, var(--fs-warn) 28%, transparent);
+}
+#fish-ui-spec .fs-warnbox svg { width: 15px; height: 15px; color: var(--fs-warn); flex: none; margin-top: 1px; }
+#fish-ui-spec .fs-warnbox--act { flex-direction: row; }
+#fish-ui-spec .fs-warnbox-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+#fish-ui-spec .fs-acts { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+#fish-ui-spec .fs-feedback { display: flex; gap: 12px; }
+#fish-ui-spec .fs-fb { display: inline-flex; align-items: center; gap: 5px; color: var(--fs-muted); font-size: 12px; }
+#fish-ui-spec .fs-fb svg { width: 13px; height: 13px; }
+#fish-ui-spec .fs-perms, #fish-ui-spec .fs-health { list-style: none; margin: 0; padding: 0; }
+#fish-ui-spec .fs-perms li, #fish-ui-spec .fs-health li {
+  display: flex; align-items: center; gap: 6px; padding: 3px 0; color: var(--fs-muted); font-size: 12px;
+}
+#fish-ui-spec .fs-health--wide li { flex-wrap: wrap; }
+#fish-ui-spec .fs-health em { flex-basis: 100%; padding-left: 13px; color: var(--fs-muted); font-style: normal; font-size: 11px; }
+#fish-ui-spec .fs-perms svg, #fish-ui-spec .fs-health svg { width: 12px; height: 12px; flex: none; }
+
+/* 5 care */
+#fish-ui-spec .fs-seg { display: flex; gap: 3px; padding: 3px; border-radius: 9px; background: var(--fs-surface-2); border: 1px solid var(--fs-line); }
+#fish-ui-spec .fs-seg-item {
+  flex: 1; padding: 5px 8px; border: 0; border-radius: 7px; background: transparent;
+  color: var(--fs-muted); font: inherit; font-size: 12px; cursor: pointer;
+}
+#fish-ui-spec .fs-seg-item.is-on { background: var(--fs-surface); color: var(--fs-text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
+#fish-ui-spec .fs-seg-desc { font-size: 12px; color: var(--fs-muted); }
+#fish-ui-spec .fs-seg-desc b { color: var(--fs-text); }
+#fish-ui-spec .fs-grants { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+#fish-ui-spec .fs-grants li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--fs-line); flex-wrap: wrap; }
+#fish-ui-spec .fs-grants li:last-child { border-bottom: 0; }
+#fish-ui-spec .fs-grants svg { width: 14px; height: 14px; color: var(--fs-muted); flex: none; }
+#fish-ui-spec .fs-grant-name { flex: none; width: 44px; font-size: 12.5px; }
+#fish-ui-spec .fs-grant-scope { flex: 1; color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-sw { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--fs-line); color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-sw--on { color: var(--fs-ok); border-color: color-mix(in oklab, var(--fs-ok) 35%, transparent); }
+#fish-ui-spec .fs-bud { display: flex; align-items: center; gap: 10px; }
+/* `width:100%` inside this row overflowed the card by ~120px; the track must
+   flex against its siblings instead. */
+#fish-ui-spec .fs-bud .fs-meter--wide { flex: 1 1 auto; width: auto; min-width: 40px; }
+#fish-ui-spec .fs-bud-label { flex: none; width: 58px; color: var(--fs-muted); font-size: 11px; }
+#fish-ui-spec .fs-bud em { color: var(--fs-muted); font-style: normal; font-size: 11px; white-space: nowrap; }
+#fish-ui-spec .fs-snap { display: flex; gap: 8px; font-size: 12px; }
+#fish-ui-spec .fs-snap svg { width: 15px; height: 15px; color: var(--fs-muted); flex: none; margin-top: 2px; }
+
+/* 6 adopt */
+#fish-ui-spec .fs-frame--adopt { flex-direction: column; align-items: stretch; }
+#fish-ui-spec .fs-adopt { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+#fish-ui-spec .fs-steps {
+  list-style: none; margin: 0; padding: 12px; display: flex; gap: 4px; overflow: auto;
+  border-bottom: 1px solid var(--fs-line); background: var(--fs-surface-2);
+}
+#fish-ui-spec .fs-steps li { display: flex; align-items: center; gap: 7px; padding: 5px 10px; border-radius: 999px; color: var(--fs-muted); font-size: 11.5px; white-space: nowrap; }
+#fish-ui-spec .fs-steps li.is-done { color: var(--fs-text); }
+#fish-ui-spec .fs-steps li.is-on { background: var(--fs-accent-soft); color: var(--fs-text); }
+#fish-ui-spec .fs-step-i {
+  display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%;
+  border: 1px solid var(--fs-line); background: var(--fs-surface); font-size: 10px; flex: none;
+}
+#fish-ui-spec .fs-steps li.is-done .fs-step-i { background: var(--fs-ok); border-color: var(--fs-ok); color: #fff; }
+#fish-ui-spec .fs-steps li.is-on .fs-step-i { border-color: var(--fs-accent); color: var(--fs-accent); }
+#fish-ui-spec .fs-step-i svg { width: 10px; height: 10px; }
+#fish-ui-spec .fs-adopt-body { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+#fish-ui-spec .fs-adopt-foot {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none;
+  padding: 10px 12px; background: var(--fs-surface); border-top: 1px solid var(--fs-line);
+}
+
+@media (max-width: 860px) {
+  #fish-ui-spec .fs-frame { flex-direction: column; }
+  #fish-ui-spec .fs-nav { width: auto; border-right: 0; border-bottom: 1px solid var(--fs-line); }
+  #fish-ui-spec .fs-navlist { flex-direction: row; flex-wrap: wrap; }
+  #fish-ui-spec .fs-nav-foot { margin-top: 4px; }
+  #fish-ui-spec .fs-rail { width: auto; border-left: 0; border-top: 1px solid var(--fs-line); }
+  #fish-ui-spec .fs-tank { min-height: 210px; }
+  /* Narrow: the caption is absolutely positioned, so centering the glyph on the
+     full box put the fish underneath it. Lift the fish into the free space. */
+  #fish-ui-spec .fs-tank:not(.fs-tank--small) { align-content: start; padding-top: 22px; }
+  #fish-ui-spec .fs-cols { flex-direction: column; }
+}
+</style>
+
+<script>
+(function () {
+  var root = document.getElementById("fish-ui-spec");
+  if (!root) return;
+
+  function activate(group, item) {
+    Array.prototype.forEach.call(group.children, function (child) {
+      child.classList.toggle("is-on", child === item);
+      if (child.hasAttribute("aria-selected")) child.setAttribute("aria-selected", child === item ? "true" : "false");
+    });
+  }
+
+  root.addEventListener("click", function (event) {
+    var t = event.target;
+
+    var navItem = t.closest(".fs-navlist li");
+    if (navItem && root.contains(navItem)) {
+      Array.prototype.forEach.call(navItem.parentElement.children, function (li) {
+        li.classList.toggle("is-on", li === navItem);
+      });
+      return;
+    }
+
+    var filter = t.closest(".fs-filter");
+    if (filter) { activate(filter.parentElement, filter); return; }
+
+    var mode = t.closest(".fs-mode");
+    if (mode) { activate(mode.parentElement, mode); return; }
+
+    var seg = t.closest(".fs-seg-item");
+    if (seg) {
+      activate(seg.parentElement, seg);
+      var desc = seg.closest(".fs-card-body").querySelector(".fs-seg-desc");
+      var copy = {
+        "观察": "<b>观察</b>：可以在已订阅来源浏览、在沙盒里玩，但一切对外动作只生成草稿，不会发出去。",
+        "陪跑 · 默认": "<b>陪跑</b>：日常生活自动进行；公开发布逐条等你确认。私信、支付、账号设置、安装可执行插件都不在这个档位里。",
+        "托管": "<b>托管</b>：只有你逐项显式授权的账号、内容类型、频率和有效期才会自动发布，过期自动收回。"
+      };
+      desc.innerHTML = copy[seg.textContent.trim()] || desc.innerHTML;
+      return;
+    }
+
+    var choice = t.closest("[data-choice]");
+    if (choice) {
+      var box = choice.closest(".fs-interrupt");
+      var line = box.querySelector(".fs-choice");
+      var kind = choice.getAttribute("data-choice");
+      if (kind === "now") {
+        line.textContent = "已打断 · 它的进度已保存，第 38 层不会从头开始";
+        line.setAttribute("data-state", "warn");
+      } else {
+        line.textContent = "已排入队列 · 它做完这次活动后会主动回你";
+        line.setAttribute("data-state", "ok");
+      }
+      return;
+    }
+
+    var act = t.closest("[data-act]");
+    if (act) {
+      var card = act.closest(".fs-card-body");
+      var status = card.querySelector(".fs-choice");
+      var msgs = {
+        approve: ["已授权发布 · 进入发送队列，等平台回执", "ok"],
+        rewrite: ["已按建议改写，旧批准失效，需要你重新确认", "warn"],
+        later: ["已保留待确认 · 这不算它的延迟", ""]
+      };
+      var pick = msgs[act.getAttribute("data-act")];
+      if (pick && status) { status.textContent = pick[0]; status.setAttribute("data-state", pick[1]); }
+      return;
+    }
+
+    var pickBtn = t.closest("[data-pick]");
+    if (pickBtn) {
+      var wb = pickBtn.closest(".fs-warnbox");
+      var out = wb.querySelector(".fs-choice");
+      if (pickBtn.getAttribute("data-pick") === "manual") {
+        out.textContent = "已选择：自动生成草稿，发布由你手动完成。它不会假装已经发出去了。";
+        out.setAttribute("data-state", "ok");
+      } else {
+        out.textContent = "去「能力授权」里换渠道。在拿到发布权限之前，仍按上面的方式开始。";
+        out.setAttribute("data-state", "warn");
+      }
+      return;
+    }
+
+    var pause = t.closest("#fs-pause");
+    if (pause) {
+      pause.textContent = "已暂停 · 不再新增外部动作";
+      pause.disabled = true;
+    }
+  });
+
+  if (!globalThis.Tweak) return;
+
+  var state = { accent: "#4d6bfe", water: "deep" };
+  var waters = root.querySelectorAll(".fs-tank");
+  var render = function () {
+    root.style.setProperty("--fs-accent", state.accent);
+    Array.prototype.forEach.call(waters, function (el) { el.setAttribute("data-water", state.water); });
+  };
+  render();
+  var tweak = new Tweak({ container: root, onChange: render });
+  tweak.addColorPicker(state, "accent", { label: "主色", reference: "--fs-accent" });
+  tweak.addSelect(state, "water", {
+    label: "水色",
+    options: [{ label: "深水", value: "deep" }, { label: "浅水", value: "shallow" }]
+  });
+})();
+</script>
