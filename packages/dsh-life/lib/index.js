@@ -1,5 +1,12 @@
 import { LifeStore, resolveDshHome } from './store.js'
 import { ConfigSchema, ConfigDefaults } from './config.js'
+import {
+  dayKeyOf,
+  isQuietAt,
+  MIN_WAKE_DELAY_MS,
+  msUntilNextDayWake,
+  nextWakeDelayMs,
+} from './wake.js'
 
 /**
  * dsh-life — the digital-life layer for DeepSeek Harness.
@@ -43,6 +50,13 @@ const SECTION_ORDER = 450 // after the deployment persona, before tool guidance
 
 const IDENTITY_FIELDS_REQUIRING_KEEPER = ['name', 'species', 'seeds', 'coreCharacter']
 
+/**
+ * Title of the alarm this plugin owns in dsh's Host schedule table. dsh's
+ * `create` never de-duplicates, so "one alarm per life" is enforced by listing
+ * first and matching on this title (or the id we remembered in wake.json).
+ */
+const WAKE_TITLE = '自主唤醒'
+
 export function apply (root, config = {}) {
   const settings = { ...ConfigDefaults, ...(config || {}) }
   const store = new LifeStore({ lifeId: settings.lifeId })
@@ -57,9 +71,55 @@ export function apply (root, config = {}) {
 
   const disposers = []
 
+  // ---- 0. Optional schedule seam ------------------------------------------
+  // `schedule` is deliberately not in the module-level `inject`: a partial
+  // (headless) profile must still boot and keep its identity. This callback
+  // fires whenever the service becomes available; `getService()` also accepts
+  // a service that was already provided before the callback ran.
+  const wakeRuntime = {
+    service: null,
+    turns: new Set(),
+    loggedNoService: false,
+    chain: Promise.resolve(),
+    getService () {
+      if (this.service) return this.service
+      try {
+        const candidate = typeof root.get === 'function' ? root.get('schedule') : undefined
+        if (candidate && typeof candidate.create === 'function') this.service = candidate
+      } catch (err) {}
+      return this.service
+    },
+    warn (text) { warn(root, text) },
+    infoNoService () {
+      if (this.loggedNoService) return
+      this.loggedNoService = true
+      info(root, '这个 profile 没有 schedule 服务，自主唤醒不会开启')
+    },
+    scheduleArm (sessionId) {
+      this.chain = this.chain
+        .then(() => armWake(this, settings, store, sessionId))
+        .catch(() => {})
+    },
+  }
+
+  try {
+    root.inject(['schedule'], (ctx) => {
+      try {
+        if (ctx && ctx.schedule && typeof ctx.schedule.create === 'function') {
+          wakeRuntime.service = ctx.schedule
+        }
+      } catch (err) {
+        // Never warn during apply: a missing wake-up path is a degradation, not
+        // an activation failure (verify/smoke asserts a warning-free apply).
+      }
+    })
+  } catch (err) {
+    // A context that cannot inject at all (tests, partial profiles) is fine.
+  }
+
   // ---- 1. Model-facing life tools -----------------------------------------
   root.inject(['tools'], (ctx) => {
-    for (const definition of buildTools(store, settings)) {
+    for (const definition of buildTools(store, settings, wakeRuntime)) {
       try {
         disposers.push(ctx.tools.register(definition))
       } catch (err) {
@@ -77,9 +137,11 @@ export function apply (root, config = {}) {
         disposers.push(ctx.systemPrompt.section({
           name: SECTION_NAME,
           order: SECTION_ORDER,
-          text: () => {
+          text: (context) => {
             try {
-              return renderLifeContext(store.snapshot())
+              return renderLifeContext(store.snapshot(), {
+                woke: isWakeTurn(context, wakeRuntime.turns),
+              })
             } catch (err) {
               // A life-context failure must never fail a turn.
               return ''
@@ -94,29 +156,102 @@ export function apply (root, config = {}) {
 
   // ---- 3. Observe real events into the ledger -----------------------------
   // Kept deliberately cheap: this runs on every session event, so it records
-  // only durable turn boundaries and never inspects message content.
+  // only durable boundaries and never inspects message content.
   //
   // The event shape is dsh's durable SessionEvent — `{ type, seq, time, data }`
   // — not `{ kind }`; a wrong field name here fails silently, which is why the
   // e2e probe asserts that a real turn reaches the ledger.
+
+  // 3a. Learn that this turn is a wake-up BEFORE its prompt is assembled.
+  // dsh appends the schedule `user/message` during the step, i.e. after the
+  // system prompt for that step was already assembled, so the durable event
+  // alone cannot label the prompt of the very turn that woke the life.
+  // `agent/inbox/claimed` fires when the loop claims the message, before
+  // assembly (see docs/dsh-schedule-api.md §5 and dsh-agent-loop source).
+  try {
+    disposers.push(root.on('agent/inbox/claimed', (payload) => {
+      try {
+        const agent = payload && payload.agent
+        const message = payload && payload.message
+        const sessionId = agent && agent.session && typeof agent.session.id === 'string'
+          ? agent.session.id
+          : null
+        if (!sessionId || !message || typeof message !== 'object') return
+        const source = message.source
+        if (source && source.kind === 'schedule') wakeRuntime.turns.add(sessionId)
+        else wakeRuntime.turns.delete(sessionId)
+      } catch (err) {
+        // Agent dispatch is optional; the session-event path still records wakes.
+      }
+    }))
+  } catch (err) {
+    // No agent dispatch in this runtime: degrade, never fail.
+  }
+
+  // 3b. Durable record of what actually happened, plus re-arming.
   try {
     disposers.push(root.on('session/event', (session, event) => {
       try {
-        if (!event || typeof event !== 'object' || event.type !== 'turn/end') return
+        if (!event || typeof event !== 'object') return
+        const sessionId = session && typeof session.id === 'string' ? session.id : null
+
+        if (event.type === 'user/message') {
+          const message = event.data
+          if (!message || typeof message !== 'object') return
+          const source = message.source
+          // The keeper speaking is `kind: 'user'`; only a schedule delivery is a wake.
+          if (!source || source.kind !== 'schedule' || !sessionId) return
+          wakeRuntime.turns.add(sessionId)
+          const messageId = typeof message.id === 'string' ? message.id : null
+          const at = typeof event.time === 'number' ? event.time : Date.now()
+          // Idempotent by messageId: dsh does not guarantee exactly-once delivery.
+          const noted = store.noteWake({ sessionId, messageId, at })
+          if (noted.counted) {
+            store.appendLedger(
+              { kind: 'wake', detail: { messageId, sessionId } },
+              { cap: settings.maxLedgerEntries },
+            )
+          }
+          return
+        }
+
+        if (event.type !== 'turn/end') return
         const data = event.data && typeof event.data === 'object' ? event.data : {}
+        const woke = sessionId ? wakeRuntime.turns.delete(sessionId) : false
         store.appendLedger(
           {
             kind: 'turn',
             detail: {
-              sessionId: (session && session.id) || null,
+              sessionId,
               turn: typeof data.turn === 'number' ? data.turn : null,
               // Only the reason kind is recorded: the full reason can carry
               // provider error text, which does not belong in a life ledger.
               reason: data.reason && typeof data.reason === 'object' ? data.reason.kind || null : null,
+              woke,
             },
           },
           { cap: settings.maxLedgerEntries },
         )
+
+        if (!settings.wakeEnabled || !sessionId) return
+
+        // A life wakes in exactly one place. Bind the first non-subagent
+        // session it observes and never move the binding afterwards.
+        if (!isSubagentSession(session)) {
+          const wake = store.readWake()
+          if (!wake.sessionId) {
+            try { store.updateWake({ sessionId }) } catch (err) {}
+          }
+        }
+
+        // The composition may simply not carry `schedule` (headless profile).
+        // Say it once with info, never with warn.
+        if (!wakeRuntime.getService()) {
+          wakeRuntime.infoNoService()
+          return
+        }
+        // Re-arm after every turn: keeper turn and wake turn alike.
+        wakeRuntime.scheduleArm(sessionId)
       } catch (err) {
         // Observation must never break a session.
       }
@@ -138,7 +273,7 @@ export function apply (root, config = {}) {
 // Tools
 // ---------------------------------------------------------------------------
 
-function buildTools (store, settings) {
+function buildTools (store, settings, wakeRuntime) {
   const tools = []
 
   tools.push(tool({
@@ -275,6 +410,18 @@ function buildTools (store, settings) {
     },
   }))
 
+  // The twelfth tool: the life chooses its own next wake-up instead of only
+  // following the configured rhythm.
+  tools.push(tool({
+    name: 'life_wake',
+    description: 'Decide when you want to wake up next. Give either afterMinutes (how long from now) or at (an ISO 8601 instant). Use this when you want to come back sooner or later than the automatic rhythm; it replaces your pending alarm. The daily wake budget still applies, so a full budget is reported honestly instead of being bypassed.',
+    parameters: {
+      afterMinutes: { type: 'integer', description: 'Minutes from now until the next wake-up (at least 1)' },
+      at: { type: 'string', description: 'ISO 8601 instant for the next wake-up, for example 2026-10-27T08:30:00+08:00' },
+    },
+    execute: async (args, exec) => scheduleSelfWake(store, settings, wakeRuntime, args, exec),
+  }))
+
   return tools
 }
 
@@ -303,14 +450,16 @@ function tool (spec) {
       schema: spec.output || { type: 'object', additionalProperties: true },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
     },
-    async execute (args) {
+    async execute (args, exec) {
       const input = args && typeof args === 'object' ? args : {}
       for (const key of required) {
         if (input[key] === undefined || input[key] === null || input[key] === '') {
           throw new Error(`life/missing-required-argument:${key}`)
         }
       }
-      return spec.execute(input)
+      // `exec` carries the calling agent (needed by life_wake for its session
+      // id); every other tool simply ignores the second argument.
+      return spec.execute(input, exec)
     },
   }
 }
@@ -329,6 +478,261 @@ function toJsonSchema (parameters, requiredList) {
 }
 
 // ---------------------------------------------------------------------------
+// Wake-up scheduling
+//
+// dsh provides the durable Host timer, not the policy. Jitter, quiet hours and
+// the daily budget live here (see docs/dsh-schedule-api.md §7). Every failure
+// stays inside this plugin: an unreachable alarm must never reject a turn.
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-arm the single alarm this life owns after a turn ended.
+ *
+ * One life wakes in one session: a bound `wake.sessionId` wins, otherwise the
+ * session that just ended becomes the binding. dsh's `create` never
+ * de-duplicates, so the existing host task is listed first and matched on our
+ * remembered id or on {@link WAKE_TITLE}.
+ */
+async function armWake (runtime, settings, store, sessionIdHint) {
+  if (!settings.wakeEnabled) return
+  const service = runtime.getService()
+  if (!service) return
+  const wake = store.readWake()
+  if (wake.paused) return
+  const sessionId = wake.sessionId || sessionIdHint
+  if (!sessionId) return
+
+  try {
+    const tasks = await service.list({ sessionId })
+    const existing = Array.isArray(tasks) ? tasks.find((task) => isWakeTask(task, wake)) : null
+    if (existing) {
+      store.updateWake({
+        sessionId,
+        scheduleId: typeof existing.id === 'string' ? existing.id : wake.scheduleId,
+        nextAt: isoOf(existing.scheduledAt) || wake.nextAt,
+      })
+      return
+    }
+
+    const now = new Date()
+    const today = dayKeyOf(now)
+    const countToday = wake.dayKey === today ? wake.countToday : 0
+    const overBudget = countToday >= settings.wakeMaxPerDay
+    // A spent budget must not park the life forever: book the first wake after
+    // the quiet window ends, which will land on the next local day and reset
+    // the counter through noteWake().
+    const delayMs = overBudget
+      ? msUntilNextDayWake({
+        now,
+        quietEnd: settings.wakeQuietEnd,
+        jitterMinutes: settings.wakeJitterMinutes,
+      })
+      : nextWakeDelayMs({
+        now,
+        everyMinutes: settings.wakeEveryMinutes,
+        jitterMinutes: settings.wakeJitterMinutes,
+        quietStart: settings.wakeQuietStart,
+        quietEnd: settings.wakeQuietEnd,
+      })
+    const afterSeconds = Math.max(60, Math.round(delayMs / 1000))
+
+    const record = await service.create(sessionId, {
+      title: WAKE_TITLE,
+      prompt: settings.wakePrompt,
+      after_seconds: afterSeconds,
+    })
+    store.updateWake({
+      sessionId,
+      scheduleId: record && typeof record.id === 'string' ? record.id : null,
+      armedAt: now.toISOString(),
+      nextAt: isoOf(record && record.scheduledAt) || new Date(now.getTime() + afterSeconds * 1000).toISOString(),
+      paused: false,
+    })
+  } catch (err) {
+    if (errorCodeOf(err) === 'subagent_session') {
+      // A delegated child can neither receive reminders nor own this life.
+      // Forget the binding so the next real session can claim it.
+      try { store.updateWake({ sessionId: null, scheduleId: null, nextAt: null }) } catch (ignored) {}
+      return
+    }
+    runtime.warn(`could not arm wake-up: ${messageOf(err)}`)
+  }
+}
+
+/**
+ * `life_wake`: let the model choose when to come back.
+ *
+ * It replaces the pending alarm instead of adding a second one, and it cannot
+ * buy past the daily budget — a tired life is told to rest, not to schedule a
+ * seventh nap. Explicit requests honour quiet hours as well, because a
+ * do-not-disturb promise the model can trivially bypass is not a promise.
+ */
+async function scheduleSelfWake (store, settings, runtime, args, exec) {
+  if (!settings.wakeEnabled) {
+    throw new Error('life/wake-disabled: 自主唤醒已在配置里关闭（wakeEnabled: false），这次不会安排唤醒')
+  }
+  const service = runtime.getService()
+  if (!service) {
+    throw new Error('life/schedule-unavailable: 这个 profile 没有 schedule 服务，无法安排唤醒')
+  }
+  const sessionId = agentSessionId(exec)
+  if (!sessionId) {
+    throw new Error('life/wake-no-session: 拿不到当前会话 id，无法安排唤醒')
+  }
+  const wake = store.readWake()
+  if (wake.paused) {
+    throw new Error('life/wake-paused: 自主唤醒处于暂停状态，请先在 wake.json 里恢复')
+  }
+
+  const now = new Date()
+  const today = dayKeyOf(now)
+  const countToday = wake.dayKey === today ? wake.countToday : 0
+  if (countToday >= settings.wakeMaxPerDay) {
+    throw new Error(`life/wake-budget-exhausted: 今天已经醒够了（${countToday}/${settings.wakeMaxPerDay}），不再加闹钟；明天会自己醒`)
+  }
+
+  const requested = resolveRequestedDelay(args)
+  if (requested === null) {
+    throw new Error('life/wake-requires-timing: afterMinutes 与 at 必须给一个')
+  }
+  if (requested <= 0) {
+    throw new Error('life/wake-at-in-past: at 必须是未来时间')
+  }
+  if (requested < MIN_WAKE_DELAY_MS) {
+    throw new Error('life/wake-too-soon: 唤醒时间至少要在 60 秒之后')
+  }
+
+  let delayMs = requested
+  let shiftedForQuiet = false
+  const target = new Date(now.getTime() + delayMs)
+  // `settings` carries the prefixed config names; isQuietAt() takes the bare
+  // pair, so passing `settings` straight through would read undefined and
+  // silently disable quiet hours for a model-requested wake.
+  if (isQuietAt(target, { quietStart: settings.wakeQuietStart, quietEnd: settings.wakeQuietEnd })) {
+    // Move to the first quiet-end after the requested instant.
+    delayMs += msUntilNextDayWake({ now: target, quietEnd: settings.wakeQuietEnd, jitterMinutes: 0 })
+    shiftedForQuiet = true
+  }
+  delayMs = Math.max(MIN_WAKE_DELAY_MS, delayMs)
+  const afterSeconds = Math.max(60, Math.round(delayMs / 1000))
+
+  // Replace our previous alarm rather than stacking a second one.
+  try {
+    const tasks = await service.list({ sessionId })
+    for (const task of Array.isArray(tasks) ? tasks : []) {
+      if (!isWakeTask(task, wake)) continue
+      try { await service.delete({ sessionId, id: task.id }) } catch (err) {}
+    }
+  } catch (err) {
+    // Listing is best-effort: a stale duplicate is worse than none, but not
+    // worth failing the model's request over.
+    runtime.warn(`could not inspect existing wake-ups: ${messageOf(err)}`)
+  }
+
+  const record = await service.create(sessionId, {
+    title: WAKE_TITLE,
+    prompt: settings.wakePrompt,
+    after_seconds: afterSeconds,
+  })
+  const nextAt = isoOf(record && record.scheduledAt) || new Date(now.getTime() + afterSeconds * 1000).toISOString()
+  store.updateWake({
+    sessionId,
+    scheduleId: record && typeof record.id === 'string' ? record.id : null,
+    armedAt: now.toISOString(),
+    nextAt,
+  })
+
+  const minutes = Math.round(afterSeconds / 60)
+  return {
+    ok: true,
+    scheduled: true,
+    sessionId,
+    scheduleId: record && typeof record.id === 'string' ? record.id : null,
+    nextAt,
+    delaySeconds: afterSeconds,
+    shiftedForQuiet,
+    countToday,
+    maxPerDay: settings.wakeMaxPerDay,
+    message: shiftedForQuiet
+      ? `已安排：原定时间落在静默时段，已改到静默结束后，约 ${minutes} 分钟后醒来。`
+      : `已安排：约 ${minutes} 分钟后醒来。`,
+  }
+}
+
+/** Requested delay in ms from `afterMinutes` or `at`, or null when neither is usable. */
+function resolveRequestedDelay (args) {
+  const input = args && typeof args === 'object' ? args : {}
+  if (input.afterMinutes !== undefined && input.afterMinutes !== null && input.afterMinutes !== '') {
+    const afterMinutes = Number(input.afterMinutes)
+    if (!Number.isInteger(afterMinutes) || afterMinutes < 1) {
+      throw new Error('life/wake-invalid-after-minutes: afterMinutes 必须是 ≥1 的整数')
+    }
+    return afterMinutes * 60 * 1000
+  }
+  if (typeof input.at === 'string' && input.at.trim()) {
+    const parsed = Date.parse(input.at)
+    if (!Number.isFinite(parsed)) {
+      throw new Error('life/wake-invalid-at: at 不是合法的 ISO 8601 时间')
+    }
+    return parsed - Date.now()
+  }
+  return null
+}
+
+/** Is this Host task the autonomous wake-up alarm owned by this life? */
+function isWakeTask (task, wake) {
+  if (!task || typeof task !== 'object') return false
+  if (wake && typeof wake.scheduleId === 'string' && wake.scheduleId && task.id === wake.scheduleId) return true
+  return task.title === WAKE_TITLE
+}
+
+/**
+ * Whether the CURRENT prompt assembly belongs to a schedule-triggered turn.
+ *
+ * `AssembleContext` from dsh's system-prompt service actually carries the agent
+ * (`assembleContextFor` sets `{ agent, scope: agent, signal }`), so the per-turn
+ * decision uses the session id instead of a global boolean. When a caller does
+ * not pass a context at all, an empty wake set reads as "not a wake turn".
+ */
+function isWakeTurn (context, wakeTurns) {
+  if (!wakeTurns || wakeTurns.size === 0) return false
+  const agent = context && (context.agent || context.scope)
+  const sessionId = agent && agent.session && typeof agent.session.id === 'string'
+    ? agent.session.id
+    : null
+  if (sessionId) return wakeTurns.has(sessionId)
+  return wakeTurns.size > 0
+}
+
+/** Delegated child sessions can never receive a reminder (dsh refuses them). */
+function isSubagentSession (session) {
+  const header = session && session.header
+  if (!header || typeof header !== 'object') return false
+  if (header.origin === 'subagent') return true
+  const depth = header.delegationDepth
+  return Number.isInteger(depth) && depth > 0
+}
+
+function agentSessionId (exec) {
+  const agent = exec && exec.agent
+  const session = agent && agent.session
+  return session && typeof session.id === 'string' ? session.id : null
+}
+
+function errorCodeOf (err) {
+  if (!err || typeof err !== 'object') return null
+  if (typeof err.code === 'string') return err.code
+  if (err.data && typeof err.data.code === 'string') return err.data.code
+  return null
+}
+
+function isoOf (value) {
+  if (typeof value !== 'string' && typeof value !== 'number') return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+// ---------------------------------------------------------------------------
 // Model-facing rendering
 // ---------------------------------------------------------------------------
 
@@ -336,9 +740,14 @@ function toJsonSchema (parameters, requiredList) {
  * The per-turn life context. Bounded on purpose: this is injected on every
  * request, so it stays within a small fixed budget and never grows with the
  * length of the life.
+ *
+ * `woke` adds the two lines that only make sense on a self-triggered turn: a
+ * wake-up must not be mistaken for the keeper speaking, and it must not be
+ * turned into fabricated activity just to look alive.
  */
-function renderLifeContext (snapshot) {
+function renderLifeContext (snapshot, { woke = false } = {}) {
   const lines = []
+  if (woke) lines.push('（这一轮是你自己醒来的，没有人跟你说话。）')
   lines.push(`你是一个持续存在的个体。当前身份 v${snapshot.identityRevision}：${snapshot.name}（${snapshot.species}）。`)
   if (snapshot.seeds.length) {
     lines.push(`先天性格种子：${snapshot.seeds.join('、')}。这是起点，不是全部人设。`)
@@ -354,6 +763,9 @@ function renderLifeContext (snapshot) {
     lines.push(`你答应过的事：${items.join('；')}。`)
   }
   lines.push('规则：真实经历才算经历。宣称做过某事必须给出证据（存档、分数、截图、链接）；没有证据就如实说没做成。身份这类慢变量只有主人确认才能改。')
+  if (woke) {
+    lines.push('醒来后先读状态再决定：继续没做完的事，或明确休息。不要为了显得活着而编造经历。')
+  }
   return lines.join('\n')
 }
 

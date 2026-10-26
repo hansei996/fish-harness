@@ -10,12 +10,22 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { resolveDshBin } from './dsh-bin.mjs'
 
 // Windows: URL.pathname 会给出 /C:/... 这种带前导斜杠的形式，交给 import()/spawn 会报
 // ERR_UNSUPPORTED_ESM_URL_SCHEME。fileURLToPath 才是跨平台的正确做法。
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PLUGIN = path.join(REPO, 'packages', 'dsh-life')
-const DSH_BIN = process.env.DSH_BIN || '/tmp/dshprobe/node_modules/@deepseek-ai/dsh/lib/bin.js'
+
+// 用 pnpm 装出来的 dsh 是个 junction，直接 spawn 会让 dsh 解析不到自己的依赖；
+// 见 verify/dsh-bin.mjs 的说明。
+let DSH_BIN
+try {
+  DSH_BIN = resolveDshBin(process.env.DSH_BIN, [path.join(REPO, 'node_modules', '@deepseek-ai', 'dsh')])
+} catch (err) {
+  console.error(`\n${err.message}\n`)
+  process.exit(1)
+}
 const HOME = process.env.VERIFY_DSH_HOME || path.join(os.tmpdir(), 'dsh-life-verify-home')
 
 // Hermetic. The plugin resolves its data directory from DSH_HOME, so set it in
@@ -81,10 +91,10 @@ mod.apply(fakeCtx, { lifeId: 'registration' })
 const warns = events.filter((e) => e.kind === 'warn')
 const toolNames = events.filter((e) => e.kind === 'tool').map((e) => e.name)
 check('plugin applies with no warnings', warns.length === 0, warns.map((w) => w.m).join('; '))
-check('registers the full life tool surface', toolNames.length === 11, `${toolNames.length} tools`)
+check('registers the full life tool surface', toolNames.length === 12, `${toolNames.length} tools`)
 check('registers the plan-critical tools',
   ['life_whoami', 'life_start_activity', 'life_finish_activity', 'life_promise',
-    'life_settle_commitment', 'life_identity_update', 'life_ledger'].every((n) => toolNames.includes(n)))
+    'life_settle_commitment', 'life_identity_update', 'life_ledger', 'life_wake'].every((n) => toolNames.includes(n)))
 check('registers exactly one prompt section', sections.length === 1)
 const liveText = sections[0]?.text?.() || ''
 check('per-turn context carries identity, activity and the honesty rule',
@@ -176,6 +186,419 @@ capped.ensure({})
 for (let i = 0; i < 400; i++) capped.appendLedger({ kind: 'noise', detail: { i } }, { cap: 50 })
 check('the ledger cap keeps the file bounded', capped.readLedger({ limit: 10000 }).length <= 200,
   `${capped.readLedger({ limit: 10000 }).length} rows after 400 appends with cap 50`)
+
+// ---------------------------------------------------------------------------
+// 9. Autonomous wake-up: policy math, arming, accounting, and the life_wake tool
+//
+// This section is deterministic on purpose: a pinned local clock, a pinned
+// Math.random, and a recording fake `schedule` service. No assertion below
+// depends on the wall clock or on a real Host timer. Every time-related check
+// reads the fake service's recorded `after_seconds` and converts it back with
+// the same pinned clock, so a failure prints the exact second it saw.
+// ---------------------------------------------------------------------------
+const wake = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'wake.js')).href)
+const { ConfigDefaults } = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'config.js')).href)
+
+const MINUTE = 60 * 1000
+const RealDate = Date
+let clockNow = new RealDate(2026, 9, 26, 10, 0, 0, 0).getTime()
+
+class FixedDate extends RealDate {
+  constructor (...args) {
+    if (args.length === 0) super(clockNow)
+    else super(...args)
+  }
+
+  static now () { return clockNow }
+}
+
+setClock(10, 0)
+globalThis.Date = FixedDate
+// The wake policy samples Math.random; pinning it makes the jittered delay a
+// fixed number instead of a 70..110 minute band.
+Math.random = () => 0.5
+
+function setClock (hours, minutes = 0, day = 26) {
+  clockNow = new RealDate(2026, 9, day, hours, minutes, 0, 0).getTime()
+}
+// Instances must be built from the patched Date: wake.js checks
+// `value instanceof Date` against the global constructor, so a pre-patch
+// RealDate instance is not an instance of it and would silently read as "now".
+const at = (hours, minutes) => new FixedDate(2026, 9, 26, hours, minutes, 0, 0)
+const clockText = (value) => {
+  const date = new RealDate(value)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+const quietWindow = { quietStart: '23:00', quietEnd: '08:00' }
+
+const sessionOf = (id) => ({ id, header: { delegationDepth: 0 } })
+const scheduleMessage = (id) => ({ id, source: { kind: 'schedule' }, content: [{ type: 'text', text: 'wake' }] })
+const keeperMessage = (id) => ({ id, source: { kind: 'user' }, content: [{ type: 'text', text: 'hello' }] })
+
+/** A recording fake context: every schedule call keeps its arguments. */
+function wakeCtx ({ withSchedule = true, tasks = [] } = {}) {
+  const state = {
+    warnings: [],
+    infos: [],
+    tools: [],
+    sections: [],
+    handlers: new Map(),
+    calls: { list: [], create: [], delete: [] },
+    tasks: tasks.map((task) => ({ ...task })),
+    nextScheduleId: 1,
+  }
+  const schedule = {
+    async list (argument) {
+      state.calls.list.push({ sessionId: argument && argument.sessionId })
+      return state.tasks.map((task) => ({ ...task }))
+    },
+    async create (sessionId, request) {
+      const id = `schedule-${state.nextScheduleId++}`
+      const scheduledAt = new RealDate(clockNow + request.after_seconds * 1000).toISOString()
+      state.calls.create.push({ sessionId, id, ...request })
+      state.tasks.push({ id, title: request.title, scheduledAt })
+      return { id, sessionId, title: request.title, prompt: request.prompt, scheduledAt }
+    },
+    async delete (argument) {
+      state.calls.delete.push({ sessionId: argument.sessionId, id: argument.id })
+      state.tasks = state.tasks.filter((task) => task.id !== argument.id)
+      return { deleted: true }
+    },
+  }
+  const ctxFor = (deps) => {
+    const ctx = {
+      on: (name, handler) => {
+        if (!state.handlers.has(name)) state.handlers.set(name, [])
+        state.handlers.get(name).push(handler)
+        return () => {}
+      },
+    }
+    if (deps.includes('tools')) ctx.tools = { register: (definition) => { state.tools.push(definition); return () => {} } }
+    if (deps.includes('systemPrompt')) ctx.systemPrompt = { section: (section) => { state.sections.push(section); return () => {} } }
+    if (deps.includes('schedule') && withSchedule) ctx.schedule = schedule
+    return ctx
+  }
+  const root = {
+    logger: {
+      warn: (message) => state.warnings.push(String(message)),
+      info: (message) => state.infos.push(String(message)),
+    },
+    get: (name) => (name === 'schedule' && withSchedule ? schedule : undefined),
+    on: (name, handler) => {
+      if (!state.handlers.has(name)) state.handlers.set(name, [])
+      state.handlers.get(name).push(handler)
+      return () => {}
+    },
+    inject: (deps, callback) => {
+      if (deps.includes('schedule') && !withSchedule) return
+      callback(ctxFor(deps))
+    },
+    effect: () => () => {},
+  }
+  state.emit = (name, ...args) => {
+    for (const handler of state.handlers.get(name) || []) handler(...args)
+  }
+  state.root = root
+  return state
+}
+
+async function waitFor (predicate) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    if (predicate()) return true
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  return Boolean(predicate())
+}
+const toolOf = (state, name) => state.tools.find((definition) => definition.name === name)
+
+// ---- 9a. Pure policy math --------------------------------------------------
+const quietCases = [[22, 59, false], [23, 0, true], [0, 0, true], [7, 59, true], [8, 0, false], [12, 0, false]]
+const quietActual = quietCases.map(([hours, minutes]) => wake.isQuietAt(at(hours, minutes), quietWindow))
+const quietOk = quietActual.every((actual, index) => actual === quietCases[index][2])
+const noonWindow = { quietStart: '12:00', quietEnd: '14:00' }
+const noonOk = wake.isQuietAt(at(11, 59), noonWindow) === false &&
+  wake.isQuietAt(at(12, 0), noonWindow) === true &&
+  wake.isQuietAt(at(14, 0), noonWindow) === false
+const malformedOk = wake.isQuietAt(at(23, 30), { quietStart: 'oops', quietEnd: '08:00' }) === false &&
+  wake.isQuietAt(at(12, 0), { quietStart: '08:00', quietEnd: '08:00' }) === false
+// Field-name contract: the config object is prefixed (wakeQuietStart), the wake
+// math takes bare names (quietStart). Passing `settings` straight through reads
+// undefined and silently disables quiet hours — this is exactly the bug class
+// that made `life_wake` ignore the quiet window.
+const prefixedConfig = { wakeQuietStart: '23:00', wakeQuietEnd: '08:00' }
+const prefixedMaps = wake.isQuietAt(at(23, 30), prefixedConfig) === false &&
+  wake.isQuietAt(at(23, 30), { quietStart: prefixedConfig.wakeQuietStart, quietEnd: prefixedConfig.wakeQuietEnd }) === true
+check('isQuietAt: half-open quiet windows, and prefixed config names must be mapped to bare names',
+  quietOk && noonOk && malformedOk && prefixedMaps,
+  `23:00-08:00 at 22:59/23:00/00:00/07:59/08:00/12:00 => ${quietActual.join(',')}; prefixed object as-is never quiet (silent-failure shape)`)
+
+const delayAt = (random, everyMinutes = 90) => wake.nextWakeDelayMs({
+  now: at(10, 0), everyMinutes, jitterMinutes: 20, ...quietWindow, random: () => random,
+})
+const delayLow = delayAt(0)
+const delayMid = delayAt(0.5)
+const delayHigh = delayAt(0.999999)
+const inBand = delayLow === 70 * MINUTE && delayMid === 90 * MINUTE && Math.abs(delayHigh - 110 * MINUTE) <= 5
+const floorOk = wake.nextWakeDelayMs({
+  now: at(10, 0), everyMinutes: 0.2, jitterMinutes: 0, ...quietWindow, random: () => 0.5,
+}) === wake.MIN_WAKE_DELAY_MS
+const zeroJitterSizes = new Set([0, 0.25, 0.5, 0.99].map((random) => wake.nextWakeDelayMs({
+  now: at(10, 0), everyMinutes: 90, jitterMinutes: 0, ...quietWindow, random: () => random,
+}))).size
+check('nextWakeDelayMs: every ± jitter, injectable random, deterministic at jitter 0, never below 60s',
+  inBand && floorOk && zeroJitterSizes === 1,
+  `random 0/0.5/~1 => ${delayLow / MINUTE}/${delayMid / MINUTE}/${(delayHigh / MINUTE).toFixed(3)} min; floor=${wake.MIN_WAKE_DELAY_MS / 1000}s; jitter-0 outputs=${zeroJitterSizes}`)
+
+const quietPush = (now, everyMinutes, window = quietWindow) => wake.nextWakeDelayMs({
+  now, everyMinutes, jitterMinutes: 0, ...window, random: () => 0.5,
+})
+const wrapPush = quietPush(at(22, 50), 15)
+const crossPush = quietPush(at(23, 30), 15)
+const noonPush = quietPush(at(11, 50), 10, noonWindow)
+check('a target inside the quiet window is pushed to the first quiet-end after it',
+  wrapPush === 550 * MINUTE && crossPush === 510 * MINUTE && noonPush === 130 * MINUTE,
+  `22:50+15m => ${clockText(at(22, 50).getTime() + wrapPush)} (${wrapPush / MINUTE}m); ` +
+  `23:30+15m => ${clockText(at(23, 30).getTime() + crossPush)} (${crossPush / MINUTE}m); ` +
+  `11:50+10m into 12:00-14:00 => ${clockText(at(11, 50).getTime() + noonPush)} (${noonPush / MINUTE}m)`)
+
+let scanOk = true
+let scanDetail = '48 half-hour instants scanned; no target landed in 23:00-08:00'
+for (let step = 0; step < 48 && scanOk; step++) {
+  const now = new FixedDate(2026, 9, 26, 0, 0, 0, 0).getTime() + step * 30 * MINUTE
+  const delay = wake.nextWakeDelayMs({ now, everyMinutes: 15, jitterMinutes: 20, ...quietWindow, random: () => 0.5 })
+  const target = now + delay
+  if (!(delay >= wake.MIN_WAKE_DELAY_MS && target > now && !wake.isQuietAt(target, quietWindow))) {
+    scanOk = false
+    scanDetail = `step ${step}: now=${clockText(now)} delay=${delay / MINUTE}m target=${clockText(target)} quiet=${wake.isQuietAt(target, quietWindow)}`
+  }
+}
+const nextDayWake = (hours, minutes, jitter = 0, random = 0.5) => wake.msUntilNextDayWake({
+  now: at(hours, minutes), quietEnd: '08:00', jitterMinutes: jitter, random: () => random,
+})
+const tomorrow = nextDayWake(7, 0) === 60 * MINUTE &&
+  nextDayWake(8, 0) === 24 * 60 * MINUTE &&
+  nextDayWake(9, 0) === 23 * 60 * MINUTE &&
+  nextDayWake(22, 50, 20) === 560 * MINUTE &&
+  wake.msUntilNextDayWake({ now: at(7, 0), quietEnd: 'oops', jitterMinutes: 0, random: () => 0.5 }) === 60 * MINUTE
+check('wake targets never land in the quiet window; an exhausted day returns the next quiet-end',
+  scanOk && tomorrow,
+  `${scanOk ? scanDetail : scanDetail}; 07:00/08:00/09:00 => ${nextDayWake(7, 0) / MINUTE}/${nextDayWake(8, 0) / MINUTE}/${nextDayWake(9, 0) / MINUTE}m; 22:50+jitter => ${nextDayWake(22, 50, 20) / MINUTE}m; malformed quietEnd falls back to 08:00`)
+
+// ---- 9b. Arming: only after turn/end, exactly once -------------------------
+setClock(10, 0)
+const armState = wakeCtx()
+mod.apply(armState.root, { lifeId: 'wake-arm' })
+const armStore = new LifeStore({ lifeId: 'wake-arm' })
+const armBefore = { creates: armState.calls.create.length, nextAt: armStore.readWake().nextAt }
+armState.emit('session/event', sessionOf('arm-session'), { type: 'turn/end', time: clockNow, data: { turn: 1, reason: { kind: 'completed' } } })
+await waitFor(() => armState.calls.create.length > 0)
+const armCall = armState.calls.create[0] || {}
+const armWakeState = armStore.readWake()
+const armExpectedAt = new RealDate(clockNow + 5400 * 1000).toISOString()
+check('a turn/end arms exactly one alarm with the agreed title, prompt and a visible delay',
+  armBefore.creates === 0 && armBefore.nextAt === null &&
+  armState.calls.create.length === 1 &&
+  armCall.after_seconds === 5400 &&
+  armCall.title === '自主唤醒' &&
+  armCall.prompt === ConfigDefaults.wakePrompt &&
+  armCall.sessionId === 'arm-session' &&
+  armWakeState.scheduleId === 'schedule-1' &&
+  armWakeState.nextAt === armExpectedAt,
+  `before turn/end: creates=${armBefore.creates} nextAt=${armBefore.nextAt}; after: creates=${armState.calls.create.length}, ` +
+  `after_seconds=${armCall.after_seconds} (${(armCall.after_seconds || 0) / 60}m), title=${JSON.stringify(armCall.title)}, ` +
+  `prompt=${JSON.stringify(String(armCall.prompt || '').slice(0, 20))}..., nextAt=${armWakeState.nextAt}`)
+
+setClock(23, 30)
+const quietState = wakeCtx()
+mod.apply(quietState.root, { lifeId: 'wake-quiet' })
+quietState.emit('session/event', sessionOf('quiet-session'), { type: 'turn/end', time: clockNow, data: { turn: 1 } })
+await waitFor(() => quietState.calls.create.length > 0)
+const quietArmCall = quietState.calls.create[0] || {}
+const quietTarget = clockNow + (quietArmCall.after_seconds || 0) * 1000
+check('a turn/end inside the quiet window arms after the quiet end, not 90 minutes later',
+  quietArmCall.after_seconds === 31200 &&
+  !wake.isQuietAt(new FixedDate(quietTarget), quietWindow) &&
+  clockText(quietTarget) === '08:10',
+  `after_seconds=${quietArmCall.after_seconds} (${(quietArmCall.after_seconds || 0) / 60}m), target=${clockText(quietTarget)}, quiet=${wake.isQuietAt(new FixedDate(quietTarget), quietWindow)}`)
+
+const listsBeforeDedupe = quietState.calls.list.length
+quietState.emit('session/event', sessionOf('quiet-session'), { type: 'turn/end', time: clockNow, data: { turn: 2 } })
+await waitFor(() => quietState.calls.list.length > listsBeforeDedupe)
+check('a second turn/end does not create a second alarm while the Host still lists ours',
+  quietState.calls.create.length === 1 &&
+  quietState.calls.list.length > listsBeforeDedupe &&
+  quietState.calls.list[quietState.calls.list.length - 1].sessionId === 'quiet-session',
+  `create=${quietState.calls.create.length}, list=${quietState.calls.list.length}, last list sessionId=${quietState.calls.list[quietState.calls.list.length - 1]?.sessionId}`)
+
+// Proven by docs/wake-e2e.md: a delivered one-shot becomes inactive and
+// `schedule.list()` returns nothing, so the next turn must arm a fresh alarm
+// rather than believing the old one is still pending.
+quietState.tasks = []
+const createsBeforeRerArm = quietState.calls.create.length
+quietState.emit('session/event', sessionOf('quiet-session'), { type: 'turn/end', time: clockNow, data: { turn: 3 } })
+await waitFor(() => quietState.calls.create.length > createsBeforeRerArm)
+const quietStoreAfter = new LifeStore({ lifeId: 'wake-quiet' })
+check('after a one-shot is delivered (list is empty) the next turn/end arms a new alarm',
+  quietState.calls.create.length === createsBeforeRerArm + 1 && quietStoreAfter.readWake().scheduleId === 'schedule-2',
+  `create=${quietState.calls.create.length} (was ${createsBeforeRerArm}), remembered scheduleId=${quietStoreAfter.readWake().scheduleId}`)
+
+setClock(10, 0)
+const budgetState = wakeCtx()
+mod.apply(budgetState.root, { lifeId: 'wake-budget' })
+const budgetStore = new LifeStore({ lifeId: 'wake-budget' })
+budgetStore.updateWake({ dayKey: wake.dayKeyOf(new RealDate(clockNow)), countToday: ConfigDefaults.wakeMaxPerDay })
+budgetState.emit('session/event', sessionOf('budget-session'), { type: 'turn/end', time: clockNow, data: { turn: 1 } })
+await waitFor(() => budgetState.calls.create.length > 0)
+const budgetCall = budgetState.calls.create[0] || {}
+const budgetTarget = clockNow + (budgetCall.after_seconds || 0) * 1000
+check('an exhausted daily budget arms tomorrow\'s first wake instead of retrying in 90 minutes',
+  budgetCall.after_seconds === 79800 &&
+  budgetCall.after_seconds > 3600 &&
+  clockText(budgetTarget) === '08:10',
+  `after_seconds=${budgetCall.after_seconds} (${((budgetCall.after_seconds || 0) / 3600).toFixed(2)}h), target=${clockText(budgetTarget)}`)
+
+// ---- 9c. Wake accounting and the wake-specific prompt context --------------
+setClock(10, 0)
+const accountState = wakeCtx()
+mod.apply(accountState.root, { lifeId: 'wake-account' })
+const accountStore = new LifeStore({ lifeId: 'wake-account' })
+const accountSectionText = () =>
+  accountState.sections[0]?.text?.({ agent: { session: sessionOf('account-session') } }) || ''
+const wakesIn = () => accountStore.readLedger({ limit: 500 }).filter((entry) => entry.kind === 'wake')
+const turnsIn = () => accountStore.readLedger({ limit: 500 }).filter((entry) => entry.kind === 'turn')
+const beforeWakeText = accountSectionText()
+accountState.emit('session/event', sessionOf('account-session'), { type: 'user/message', time: clockNow, data: scheduleMessage('message-1') })
+const wakeState1 = accountStore.readWake()
+const wakeText = accountSectionText()
+accountState.emit('session/event', sessionOf('account-session'), { type: 'turn/end', time: clockNow, data: { turn: 1, reason: { kind: 'completed' } } })
+const firstTurn = turnsIn()[turnsIn().length - 1]
+const afterWakeText = accountSectionText()
+check('a schedule message records one wake, spends budget once, and labels its own turn and prompt',
+  beforeWakeText.includes('这一轮是你自己醒来的') === false &&
+  wakesIn().length === 1 &&
+  wakesIn()[0].detail?.messageId === 'message-1' &&
+  wakeState1.countToday === 1 &&
+  wakeState1.sessionId === 'account-session' &&
+  wakeText.includes('这一轮是你自己醒来的，没有人跟你说话。') &&
+  firstTurn?.detail?.woke === true &&
+  afterWakeText.includes('这一轮是你自己醒来的') === false,
+  `wake rows=${wakesIn().length}, countToday=${wakeState1.countToday}, woke=${firstTurn?.detail?.woke}, ` +
+  `prompt wake framing before/during/after=${beforeWakeText.includes('这一轮')}/${wakeText.includes('这一轮')}/${afterWakeText.includes('这一轮')}`)
+
+const wakeRowsBeforeDup = wakesIn().length
+const countBeforeDup = accountStore.readWake().countToday
+accountState.emit('session/event', sessionOf('account-session'), { type: 'user/message', time: clockNow, data: scheduleMessage('message-1') })
+const wakeRowsAfterDup = wakesIn().length
+const countAfterDup = accountStore.readWake().countToday
+accountState.emit('session/event', sessionOf('account-session'), { type: 'turn/end', time: clockNow, data: { turn: 2, reason: { kind: 'completed' } } })
+const duplicateWoke = turnsIn()[turnsIn().length - 1]?.detail?.woke
+check('a re-delivered messageId is recorded once and consumes one budget slot',
+  wakeRowsAfterDup === wakeRowsBeforeDup && countAfterDup === countBeforeDup && duplicateWoke === true,
+  `wake rows=${wakeRowsAfterDup} (before ${wakeRowsBeforeDup}), countToday=${countAfterDup} (before ${countBeforeDup}); the duplicate still labels its own turn woke=${duplicateWoke}`)
+
+accountState.emit('session/event', sessionOf('account-session'), { type: 'user/message', time: clockNow, data: keeperMessage('keeper-1') })
+const keeperWakeRows = wakesIn().length
+const keeperText = accountSectionText()
+accountState.emit('session/event', sessionOf('account-session'), { type: 'turn/end', time: clockNow, data: { turn: 3, reason: { kind: 'completed' } } })
+const keeperWoke = turnsIn()[turnsIn().length - 1]?.detail?.woke
+check('the keeper speaking is not a wake: no wake row, no budget spend, woke=false, no wake framing',
+  keeperWakeRows === 1 &&
+  accountStore.readWake().countToday === 1 &&
+  keeperText.includes('这一轮是你自己醒来的') === false &&
+  keeperWoke === false,
+  `wake rows=${keeperWakeRows}, countToday=${accountStore.readWake().countToday}, woke=${keeperWoke}, keeper prompt wake framing=${keeperText.includes('这一轮')}`)
+
+// ---- 9d. Degradation without the schedule service --------------------------
+setClock(10, 0)
+const degradedState = wakeCtx({ withSchedule: false })
+mod.apply(degradedState.root, { lifeId: 'wake-degraded' })
+const degradedShapeOk = degradedState.warnings.length === 0 &&
+  degradedState.tools.length === 12 &&
+  degradedState.sections.length === 1
+degradedState.emit('session/event', sessionOf('degraded-session'), { type: 'turn/end', time: clockNow, data: { turn: 1 } })
+degradedState.emit('session/event', sessionOf('degraded-session'), { type: 'turn/end', time: clockNow, data: { turn: 2 } })
+const noServiceInfos = degradedState.infos.filter((message) => message.includes('没有 schedule 服务'))
+check('without the schedule service the plugin still registers everything, warns zero times, and says it once with info',
+  degradedShapeOk && degradedState.warnings.length === 0 && noServiceInfos.length === 1,
+  `warnings=${degradedState.warnings.length}, tools=${degradedState.tools.length}, sections=${degradedState.sections.length}, no-service info x${noServiceInfos.length}`)
+
+// ---- 9e. The life_wake tool ------------------------------------------------
+setClock(10, 0)
+const toolState = wakeCtx({
+  tasks: [
+    { id: 'schedule-stale', title: '自主唤醒' },
+    { id: 'schedule-other', title: '主人的提醒' },
+  ],
+})
+mod.apply(toolState.root, { lifeId: 'wake-tool' })
+const lifeWake = toolOf(toolState, 'life_wake')
+const lifeWakeSchema = Object.keys(lifeWake?.parameters?.properties || {}).sort().join(',')
+let missingTimingError = ''
+try {
+  await lifeWake.execute({}, { agent: { session: sessionOf('tool-session') } })
+} catch (err) {
+  missingTimingError = String(err.message)
+}
+const toolStore = new LifeStore({ lifeId: 'wake-tool' })
+const normalWake = await lifeWake.execute({ afterMinutes: 45 }, { agent: { session: sessionOf('tool-session') } })
+const normalWakeCall = toolState.calls.create[toolState.calls.create.length - 1] || {}
+const deletedIds = toolState.calls.delete.map((call) => call.id)
+check('life_wake is registered, validates timing, honours afterMinutes, and replaces only our pending alarm',
+  Boolean(lifeWake) &&
+  lifeWakeSchema === 'afterMinutes,at' &&
+  missingTimingError.includes('life/wake-requires-timing') &&
+  normalWake.delaySeconds === 2700 &&
+  normalWake.shiftedForQuiet === false &&
+  normalWakeCall.after_seconds === 2700 &&
+  normalWakeCall.title === '自主唤醒' &&
+  String(normalWake.message).includes('45') &&
+  deletedIds.length === 1 &&
+  deletedIds[0] === 'schedule-stale' &&
+  toolStore.readWake().scheduleId === 'schedule-1',
+  `schema=${lifeWakeSchema}, missingTiming=${missingTimingError.split(':')[0]}, after_seconds=${normalWakeCall.after_seconds}, ` +
+  `deleted=${JSON.stringify(deletedIds)} (unrelated task kept=${toolState.tasks.some((task) => task.id === 'schedule-other')}), message=${normalWake.message}`)
+
+// The regression assertion for the fixed bug: `settings` uses prefixed field
+// names, so passing it straight to isQuietAt() read undefined and silently
+// disabled quiet hours. A 23:30 request for +5m must land at 08:00, not 23:35.
+setClock(23, 30)
+const shiftState = wakeCtx()
+mod.apply(shiftState.root, { lifeId: 'wake-shift' })
+const shiftWake = await toolOf(shiftState, 'life_wake').execute({ afterMinutes: 5 }, { agent: { session: sessionOf('shift-session') } })
+const shiftCall = shiftState.calls.create[0] || {}
+const shiftTarget = clockNow + (shiftCall.after_seconds || 0) * 1000
+check('life_wake requested inside the quiet window is shifted to the quiet end (catches the prefixed-field bug)',
+  shiftWake.shiftedForQuiet === true &&
+  shiftWake.delaySeconds === 30600 &&
+  shiftCall.after_seconds === 30600 &&
+  clockText(shiftTarget) === '08:00' &&
+  String(shiftWake.message).includes('静默'),
+  `shiftedForQuiet=${shiftWake.shiftedForQuiet}, after_seconds=${shiftCall.after_seconds} (${((shiftCall.after_seconds || 0) / 3600).toFixed(2)}h), ` +
+  `target=${clockText(shiftTarget)}, message=${shiftWake.message}`)
+
+const unavailableState = wakeCtx({ withSchedule: false })
+mod.apply(unavailableState.root, { lifeId: 'wake-tool-unavailable' })
+let unavailableError = ''
+try {
+  await toolOf(unavailableState, 'life_wake').execute({ afterMinutes: 5 }, { agent: { session: sessionOf('unavailable-session') } })
+} catch (err) {
+  unavailableError = String(err.message)
+}
+const spentBudgetState = wakeCtx()
+mod.apply(spentBudgetState.root, { lifeId: 'wake-tool-spent' })
+const spentBudgetStore = new LifeStore({ lifeId: 'wake-tool-spent' })
+spentBudgetStore.updateWake({ dayKey: wake.dayKeyOf(new RealDate(clockNow)), countToday: ConfigDefaults.wakeMaxPerDay })
+let spentBudgetError = ''
+try {
+  await toolOf(spentBudgetState, 'life_wake').execute({ afterMinutes: 10 }, { agent: { session: sessionOf('spent-session') } })
+} catch (err) {
+  spentBudgetError = String(err.message)
+}
+check('life_wake degrades with an explicit error when the service is absent or the budget is spent',
+  unavailableError.includes('life/schedule-unavailable') &&
+  spentBudgetError.includes('life/wake-budget-exhausted') &&
+  spentBudgetState.calls.create.length === 0,
+  `no-service=${unavailableError || 'no error'}; budget=${spentBudgetError || 'no error'}; budget creates=${spentBudgetState.calls.create.length}`)
 
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`)

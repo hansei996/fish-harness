@@ -1,0 +1,123 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# verify 只读仓库；不写 issue、不评论、不发布。
+permissions:
+  contents: read
+
+# 同一 ref 只保留最新一次运行。
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # e2e 会真启动 dsh 并调用 pnpm；e2e 给每个 dsh 子进程 300s，job 必须比整套更宽裕。
+    timeout-minutes: 45
+    strategy:
+      # 一个平台挂了也要看到另一个平台的结果。
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # dsh 的 plugin manager 用 execa 直接 spawn("pnpm")。
+      # Windows 上 corepack 给的是 pnpm.cmd shim，非 shell 的 spawn 找不到它；
+      # pnpm/action-setup 装的是独立可执行文件，两个平台都能被 execa 直接拉起。
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.28.5
+          run_install: false
+
+      # Node 24：dsh 0.2.1-rc.2 自带运行时就是 Node 24.21.0，本机两套 verify 均在它上面通过；
+      # 2026-10 时 24 是 Active LTS（22 已进维护期），依赖里最严的 engines 是 >=22.19。
+      # 仓库没有 lockfile，所以 setup-node 不开 cache（pnpm cache 需要 lockfile）。
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Show tool versions
+        run: |
+          node --version
+          pnpm --version
+
+      # 装在仓库外的 runner 临时目录，不改 checkout 里的 package.json，也不引入 node_modules。
+      # Windows: D:\a\_temp\dsh-install；Ubuntu: /home/runner/work/_temp/dsh-install。
+      - name: Prepare temp install dir
+        run: |
+          node -e "const fs=require('node:fs'),path=require('node:path');const dir=path.join(process.env.RUNNER_TEMP,'dsh-install');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'package.json'),JSON.stringify({name:'dsh-ci-probe',private:true},null,2));console.log('install dir: '+dir)"
+
+      # --ignore-scripts：pnpm 会拦下 koffi / node-pty / protobufjs 的 build script 并以
+      # ERR_PNPM_IGNORED_BUILDS 结束（Windows 上实测 exit 1，但包其实已装好）。dsh 发布包的
+      # lib/ 是预构建的，verify 只需要 lib/bin.js，所以用 --ignore-scripts 让退出码确定，
+      # 而不是「允许失败 + 猜产物有没有装好」。下一步断言 lib/bin.js 真的存在。
+      - name: Install dsh
+        working-directory: ${{ runner.temp }}/dsh-install
+        run: pnpm add --ignore-scripts "@deepseek-ai/dsh@0.2.1-rc.2"
+
+      # DSH_BIN 用 pnpm 的 junction 路径即可：verify/dsh-bin.mjs 会用 realpathSync.native
+      # 解析到 .pnpm 里的真实路径。直接 spawn junction 会让 dsh 找不到 dsh-app-boot。
+      - name: Check dsh install and export DSH_BIN
+        env:
+          DSH_INSTALL_BIN: ${{ runner.temp }}/dsh-install/node_modules/@deepseek-ai/dsh/lib/bin.js
+        run: |
+          node -e "const fs=require('node:fs'),path=require('node:path');const bin=process.env.DSH_INSTALL_BIN;if(!fs.existsSync(bin)){console.error('dsh entry point missing: '+bin);process.exit(1)};const pkg=JSON.parse(fs.readFileSync(path.join(path.dirname(path.dirname(bin)),'package.json'),'utf8'));fs.appendFileSync(process.env.GITHUB_ENV,'DSH_BIN='+bin+String.fromCharCode(10));console.log('dsh '+pkg.version);console.log('DSH_BIN='+bin);console.log('resolved='+fs.realpathSync.native(bin))"
+
+      # 证明装出来的 dsh 真的能启动，而不只是文件存在。先 realpath 再 spawn：
+      # junction 路径直跑时 dsh 解析不到自己的依赖（见上一步注释）。
+      - name: Check dsh boots
+        run: |
+          node -e "const fs=require('node:fs'),cp=require('node:child_process');const real=fs.realpathSync.native(process.env.DSH_BIN);console.log('resolved='+real);cp.execFileSync(process.execPath,[real,'--version'],{stdio:'inherit'})"
+
+      # bash 的 pipefail + tee：原始输出同时进 step 日志和 artifact。
+      # continue-on-error 是为了 smoke 失败时仍然跑 e2e（另一套的原始输出也要能看到），
+      # 最终由 Report and gate 统一决定 job 红不红。
+      - name: Verify — smoke (26 checks)
+        id: smoke
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node verify/smoke.mjs 2>&1 | tee verify-smoke.log
+
+      - name: Verify — e2e (15 checks)
+        id: e2e
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node verify/e2e-tools.mjs 2>&1 | tee verify-e2e.log
+
+      # 汇总 dsh / node 版本、两套结果与输出尾部：写 step summary + verify-report.md，
+      # 并作为 job 的最终闸门（两套都 success 才放行）。
+      - name: Report and gate
+        if: always()
+        env:
+          MATRIX_OS: ${{ matrix.os }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+        run: node .github/scripts/ci-report.mjs
+
+      - name: Upload verify logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-logs-${{ matrix.os }}
+          path: |
+            verify-smoke.log
+            verify-e2e.log
+            verify-report.md
+          if-no-files-found: ignore
+          retention-days: 7

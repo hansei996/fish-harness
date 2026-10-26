@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { dayKeyOf } from './wake.js'
 
 /**
  * Durable life-state store.
@@ -76,6 +77,25 @@ function readJsonl (file) {
 
 const LIFE_SCHEMA_VERSION = 1
 
+/**
+ * Default shape of wake.json. Every field is present so a caller never has to
+ * distinguish "absent" from "never happened", and a corrupt file degrades to
+ * exactly this instead of throwing.
+ */
+const DEFAULT_WAKE = {
+  sessionId: null,
+  scheduleId: null,
+  armedAt: null,
+  nextAt: null,
+  dayKey: null,
+  countToday: 0,
+  paused: false,
+  lastMessageIds: [],
+}
+
+/** At most this many delivered message ids are remembered for idempotency. */
+const WAKE_ID_HISTORY = 20
+
 export class LifeStore {
   /**
    * @param {object} options
@@ -93,6 +113,7 @@ export class LifeStore {
       commitments: path.join(this.dir, 'commitments.json'),
       activity: path.join(this.dir, 'activity.json'),
       ledger: path.join(this.dir, 'ledger.jsonl'),
+      wake: path.join(this.dir, 'wake.json'),
     }
   }
 
@@ -126,6 +147,13 @@ export class LifeStore {
     }
     if (!this.readActivity()) {
       writeJsonAtomic(this.files.activity, { schemaVersion: LIFE_SCHEMA_VERSION, current: null, next: null, updatedAt: nowIso() })
+    }
+    if (!this.readWakeFile()) {
+      writeJsonAtomic(this.files.wake, {
+        schemaVersion: LIFE_SCHEMA_VERSION,
+        ...DEFAULT_WAKE,
+        updatedAt: nowIso(),
+      })
     }
     return identity
   }
@@ -183,6 +211,84 @@ export class LifeStore {
 
   readActivity () {
     return readJson(this.files.activity) || { current: null, next: null }
+  }
+
+  /** Raw wake.json, or null when absent/corrupt (used only by ensure). */
+  readWakeFile () {
+    return readJson(this.files.wake)
+  }
+
+  /**
+   * Normalized wake state. A missing, truncated or type-corrupt file degrades
+   * field by field to {@link DEFAULT_WAKE} instead of throwing: a life must
+   * never die because its alarm ledger was half written.
+   */
+  readWake () {
+    const raw = this.readWakeFile()
+    const wake = { ...DEFAULT_WAKE, lastMessageIds: [] }
+    if (!raw || typeof raw !== 'object') return wake
+    if (typeof raw.sessionId === 'string' && raw.sessionId) wake.sessionId = raw.sessionId
+    if (typeof raw.scheduleId === 'string' && raw.scheduleId) wake.scheduleId = raw.scheduleId
+    if (typeof raw.armedAt === 'string') wake.armedAt = raw.armedAt
+    if (typeof raw.nextAt === 'string') wake.nextAt = raw.nextAt
+    if (typeof raw.dayKey === 'string') wake.dayKey = raw.dayKey
+    if (Number.isInteger(raw.countToday) && raw.countToday >= 0) wake.countToday = raw.countToday
+    if (raw.paused === true) wake.paused = true
+    if (Array.isArray(raw.lastMessageIds)) {
+      wake.lastMessageIds = raw.lastMessageIds
+        .filter((id) => typeof id === 'string' && id)
+        .slice(-WAKE_ID_HISTORY)
+    }
+    return wake
+  }
+
+  /** Merge a patch into wake.json and write it atomically. */
+  updateWake (patch = {}) {
+    const current = this.readWake()
+    const next = {
+      schemaVersion: LIFE_SCHEMA_VERSION,
+      ...current,
+      ...(patch && typeof patch === 'object' ? patch : {}),
+      updatedAt: nowIso(),
+    }
+    next.lastMessageIds = Array.isArray(next.lastMessageIds)
+      ? next.lastMessageIds.filter((id) => typeof id === 'string' && id).slice(-WAKE_ID_HISTORY)
+      : []
+    writeJsonAtomic(this.files.wake, next)
+    return next
+  }
+
+  /**
+   * Record one delivered wake-up message.
+   *
+   * dsh does not guarantee exactly-once delivery (docs/dsh-schedule-api.md
+   * §未知项 5), so this is idempotent by `messageId`: a re-delivered message
+   * does not consume a second daily slot. The counter resets on the local
+   * calendar day, not on a rolling 24h window, because the budget is a
+   * "per day" promise.
+   */
+  noteWake ({ sessionId = null, messageId = null, at = null } = {}) {
+    const moment = at === null || at === undefined ? new Date() : new Date(at)
+    const date = Number.isNaN(moment.getTime()) ? new Date() : moment
+    const dayKey = dayKeyOf(date)
+    const wake = this.readWake()
+    const known = typeof messageId === 'string' && wake.lastMessageIds.includes(messageId)
+    if (known) {
+      return {
+        counted: false,
+        countToday: wake.dayKey === dayKey ? wake.countToday : 0,
+        dayKey,
+      }
+    }
+    const sameDay = wake.dayKey === dayKey
+    const countToday = (sameDay ? wake.countToday : 0) + 1
+    const lastMessageIds = typeof messageId === 'string' && messageId
+      ? [...wake.lastMessageIds, messageId].slice(-WAKE_ID_HISTORY)
+      : wake.lastMessageIds
+    const patch = { dayKey, countToday, lastMessageIds }
+    if (typeof sessionId === 'string' && sessionId) patch.sessionId = sessionId
+    this.updateWake(patch)
+    return { counted: true, countToday, dayKey }
   }
 
   /**
@@ -387,6 +493,7 @@ export class LifeStore {
     const traits = this.readTraits() || { interests: [], skills: [] }
     const activity = this.readActivity()
     const open = this.openCommitments()
+    const wake = this.readWake()
     const interests = (traits.interests || [])
       .slice()
       .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
@@ -404,6 +511,9 @@ export class LifeStore {
       interests,
       skills,
       openCommitments: open.slice(0, 5).map((row) => ({ id: row.id, what: row.what, dueAt: row.dueAt })),
+      // Kept deliberately tiny: the snapshot is injected every turn.
+      nextWakeAt: wake.nextAt,
+      wakeCountToday: wake.dayKey === dayKeyOf(new Date()) ? wake.countToday : 0,
     }
   }
 }

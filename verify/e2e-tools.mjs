@@ -12,11 +12,22 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveDshBin } from './dsh-bin.mjs'
 
 // Windows: URL.pathname 会给出 /C:/... 这种带前导斜杠的形式，交给 import()/spawn 会报
 // ERR_UNSUPPORTED_ESM_URL_SCHEME。fileURLToPath 才是跨平台的正确做法。
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const DSH = process.env.DSH_BIN || '/tmp/dshprobe2/node_modules/@deepseek-ai/dsh/lib/bin.js'
+
+// 用 pnpm 装出来的 dsh 是个 junction，直接 spawn 会让 dsh 解析不到自己的依赖
+// （`dsh --version` 还能过，组合 profile 会 ERR_MODULE_NOT_FOUND）；
+// 见 verify/dsh-bin.mjs 的说明。
+let DSH
+try {
+  DSH = resolveDshBin(process.env.DSH_BIN, [path.join(REPO, 'node_modules', '@deepseek-ai', 'dsh')])
+} catch (err) {
+  console.error(`\n${err.message}\n`)
+  process.exit(1)
+}
 const HOME = process.env.E2E_DSH_HOME || path.join(os.tmpdir(), 'dsh-life-e2e-home')
 const PLUGIN = path.join(REPO, 'packages', 'dsh-life')
 
@@ -74,6 +85,26 @@ check('dsh boots the e2e profile without an activation warning for dsh-life',
   !/dsh-life.*did not activate|did not activate.*dsh-life/i.test(transcript),
   transcript.split('\n').filter((l) => /life/i.test(l)).slice(0, 2).join(' | ') || 'no life-related output')
 
+// 4b. Degradation, from the transcript side: this profile has no `schedule`
+// service, so dsh-life must not report a warning or an error. The only
+// diagnosis it is allowed to make is the single `info` line ("no schedule
+// service, autonomous wake-up stays off").
+//
+// Honest scope note: the headless app installs no cordis logger exporter, so
+// `logger.info`/`logger.warn` output is not printed here at all. The real
+// warn-freedom evidence is the recording fake context in verify/smoke.mjs
+// (zero warnings while the plugin still registers 12 tools); this check only
+// guards that no in-band `[dsh-life]` diagnostic leaks into the boot output and
+// that the plugin's event path still ran (proven by the ledger `turn` below).
+const lifeDiagnostics = transcript.split('\n').filter((line) => line.includes('[dsh-life]'))
+const alarmingDiagnostics = lifeDiagnostics.filter((line) =>
+  /\bwarn\b|\berror\b|could not|failed to/i.test(line))
+check('headless boot emits no dsh-life warn/error diagnostic',
+  alarmingDiagnostics.length === 0,
+  lifeDiagnostics.length
+    ? `${lifeDiagnostics.length} [dsh-life] line(s), alarming=${alarmingDiagnostics.length}`
+    : 'no alarming [dsh-life] line (headless prints no logger output; warn-freedom is proven in smoke)')
+
 // 5. Verify the life files the plugin wrote are real, on disk, and obey the
 //    product invariants the plan states.
 const lifeDir = path.join(HOME, 'life', 'default')
@@ -94,7 +125,7 @@ if (fs.existsSync(probeOut)) {
   const lifeSection = (captured.sections || []).find((s) => /life/.test(s.name || ''))
   check('the life context reached the assembled system prompt', Boolean(lifeSection), lifeSection ? lifeSection.name : 'not found')
   const lifeTools = (captured.tools || []).filter((t) => /^life_/.test(t.name || ''))
-  check('all life tools are visible to the model', lifeTools.length === 11, `${lifeTools.length} tools`)
+  check('all life tools are visible to the model', lifeTools.length === 12, `${lifeTools.length} tools`)
   check('tool schemas reach the model with descriptions',
     lifeTools.every((t) => typeof t.description === 'string' && t.description.length > 20))
 } else {
@@ -105,6 +136,19 @@ if (fs.existsSync(probeOut)) {
 await run(['--profile', 'e2e', 'say pong again'])
 const identity2 = JSON.parse(fs.readFileSync(path.join(lifeDir, 'identity.json'), 'utf8'))
 check('a second boot preserves the existing life', identity2.bornAt === identity.bornAt && identity2.revision === identity.revision)
+
+// 8. The claimed capability lives in the profile users actually run: the
+// shipped web template must compose the Host's `schedule` service. This only
+// dumps the composed config (it does not boot the web server), which is enough
+// to prove the service is in the tree instead of merely asserted in a doc.
+//
+// It is the last command on purpose: `--from-default-profile` replaces this
+// profile's layer, and nothing after this reads the e2e profile again.
+const webDump = await run(['--profile', 'e2e', '--from-default-profile', 'web', '--dump-config'])
+const scheduleEntry = /- id: schedule\s*\n\s+name: ['"]@deepseek-ai\/dsh-schedule['"]/.test(webDump.out)
+check('the shipped web template composes the schedule service the life layer needs',
+  webDump.code === 0 && scheduleEntry,
+  `exit=${webDump.code}; ${scheduleEntry ? "found 'id: schedule' -> '@deepseek-ai/dsh-schedule'" : 'schedule entry not found in dump-config'}`)
 
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
