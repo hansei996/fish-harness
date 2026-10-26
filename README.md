@@ -247,9 +247,11 @@ DSH_BIN=<dsh bin> node verify/pack-install.mjs # 9 项：打出来的包能不�
 node verify/live/wake-live.mjs                # 可选：真实 web profile 的一次真实唤醒（约 1–2 min；会先验安装是否健康）
 ```
 
-`e2e` 那套**不是 mock**：它用 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装进去，真启动，然后断言运行系统的实际产出 —— 磁盘上的身份、账本里的真实 `turn/end`、**装配后**的系统提示词里的生命层 section、以及 12 个工具 schema 全部对模型可见。
+`e2e` 那套**不是 mock**：它用 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装进去，真启动，然后断言运行系统的实际产出 —— 磁盘上的身份、账本里的真实 `turn/end`、**装配后**的系统提示词里的生命层 section、以及 13 个工具 schema 全部对模型可见。
 
-`verify/live/` 那条是**可选的**（默认不进 CI）：三个连续进程证明「布防进程退出 → 到期时 Host 不在 → 下一个进程补投 → 再一个进程从磁盘读回同一个 `messageId`」。它需要 preset-free overlay 绕开 dsh 的 preset audit bug，代价写在 [`verify/live/README.md`](verify/live/README.md) 里。
+`pack-install` 那套查的是**发布路径**：`pnpm pack` 出来的 tarball 清单是否完整（从 `package.json` 的 `files` 推导，漏了就报出文件名），以及它装进一个全新 profile 后能不能真的激活、真的写出 `identity.json`。
+
+`verify/live/` 那条是**可选的**（默认不进 CI）：三个连续进程证明「布防进程退出 → 到期时 Host 不在 → 下一个进程补投 → 再一个进程从磁盘读回同一个 `messageId`」，跑在**未改动的 shipped `standard` preset** 上。它开跑前先体检安装：一个装坏的 dsh 会 `exit 2` 并说明「这是安装问题，不是对唤醒路径的判定」，而不是伪装成产品 bug。
 
 一路上它抓出三个只有真跑才会暴露的 bug：
 
@@ -258,6 +260,11 @@ node verify/live/wake-live.mjs                # 可选：真实 web profile 的�
 3. `DSH_BIN` 指向 pnpm 的 junction 时，dsh 解析不到自己的依赖（`dsh --version` 还照样过）；JS 版 `fs.realpathSync` 在 Windows **不解析 junction**，只有 `.native` 会。见 [`verify/dsh-bin.mjs`](verify/dsh-bin.mjs)。
 
 三个都是 mock 测不出来的。这就是为什么 e2e 必须真启动。
+
+同类的还有两个，是被**模拟长期运行**和**发布路径**抓出来的：
+
+4. 策略层一度会「整天不醒」：`every=24h±4h` 时目标被静默段推到后天，那个日历日就整个消失了（34 小时空窗）。soak 用固定时钟 + 固定随机数跑 8 组参数、367 次唤醒才量出来。
+5. README 的第一行安装命令是红的：`dsh plugin add dsh-life` → `ERR_PNPM_FETCH_404`，因为这个包从没发布到 npm。任何人照做都会在第一分钟卡住 —— 这类问题单测永远测不到，只有把「陌生人的第一步」当成一条断言才会。
 
 ---
 
