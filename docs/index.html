@@ -115,7 +115,7 @@
   .demo figcaption .sp { margin-left: auto; }
 
   /* ---------- sections ---------- */
-  section { padding: 62px 0; border-top: 1px solid var(--line); }
+  section { padding: 62px 0; border-top: 1px solid var(--line); scroll-margin-top: 74px; }
   section > .wrap > h2 {
     font-size: clamp(22px, 3.2vw, 29px); letter-spacing: -0.015em;
     margin: 0 0 8px; font-weight: 620;
@@ -207,6 +207,7 @@
     <span class="links">
       <a href="#why">为什么</a>
       <a href="#how">怎么活</a>
+      <a href="#cold">第一天</a>
       <a href="#feel">活人感</a>
       <a href="#status">进度</a>
       <a href="https://github.com/hansei996/fish-harness">GitHub</a>
@@ -235,14 +236,14 @@
          ~3x smaller than the GIF, so it stays crisp instead of blurring. -->
     <video class="demo-video" autoplay muted loop playsinline preload="metadata"
            poster="assets/scene-activity.png"
-           aria-label="五幕演示：它现在在做什么、生活账本与因果链、一条动态发到八个平台、两条状态轴、桌宠形态">
+           aria-label="六幕演示：第一天什么都没有、它现在在做什么、生活账本与因果链、一条动态发到八个平台、两条状态轴、桌宠形态">
       <source src="assets/demo.mp4" type="video/mp4">
       <!-- Fallback for a browser without MP4 support: the first frame, not a
            duplicate copy of the whole GIF. The GIF lives in showcase/ for the README. -->
       <img src="assets/scene-activity.png" alt="它现在在做什么（静态首帧）">
     </video>
     <figcaption>
-      <span>25 秒 · 五幕 · 动画由 PAGX 逐帧生成，不是录屏</span>
+      <span>31 秒 · 六幕 · 动画由 PAGX 逐帧生成，不是录屏</span>
       <span class="sp">
         <a href="assets/demo.mp4">下载 MP4</a> ·
         <a href="https://github.com/hansei996/fish-harness/blob/main/showcase/demo.gif">GIF</a>
@@ -338,6 +339,51 @@
         <h3>行为有因果</h3>
         <p>昨天在第 38 层连挂两次 → 今天换了打法重来。今天的活动能追到昨天的事件，
            而不是每天随机起一个。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="cold">
+  <div class="wrap">
+    <h2>第一天：最要命的那一段</h2>
+    <p class="sub">我们卖的是「累积」，可它在第 1 分钟时什么都不积累。这一段之前没写，现在补上。</p>
+
+    <p>
+      整个产品的价值是「它后来经历了一些事」。<strong>但第二天之所以有东西看，是因为第一天积累了东西 —— 而第一天，它什么都没有。</strong> 这张表是它真实的样子，不是包装：
+    </p>
+
+    <div class="status">
+      <div class="srow"><span class="name">第 1 分钟<span>一个身份，三个性格种子</span></span><span class="pill todo">一张空白的出生档案</span></div>
+      <div class="srow"><span class="name">第 1 小时<span>一条刚出生的账本</span></span><span class="pill todo">可能只有「出生」这一条</span></div>
+      <div class="srow"><span class="name">第 1 天<span>第一次活动、第一个兴趣的雏形</span></span><span class="pill part">决定去留的时刻</span></div>
+      <div class="srow"><span class="name">第 3 天<span>能看出偏好、有未完成的事</span></span><span class="pill done">开始像个活的了</span></div>
+      <div class="srow"><span class="name">第 7 天<span>行为有因果、承诺能兑现</span></span><span class="pill done">它在过日子</span></div>
+    </div>
+
+    <p class="quote">
+      <strong>产品的成败不在第 7 天看起来多好，而在第 1 天结束后用户有没有走。</strong>
+    </p>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <h3>第一天不追求「惊艳」</h3>
+        <p>追求 wow 会让它第一天很热闹、之后滑落 —— 而用户记住的是<strong>落差</strong>。
+           第一天平平、第三天开始有味道，是更好的曲线。</p>
+      </div>
+      <div class="card">
+        <h3>留一个明天想做的事</h3>
+        <p>第一天不必「完成任务」。<strong>留下一个明天要继续的事，比今天做完更有价值</strong>
+           —— 那才是第二天的钩子。</p>
+      </div>
+      <div class="card">
+        <h3>第一天就允许安静</h3>
+        <p>没有值得发的就不发。第一天就流水账，是最快的劝退方式。</p>
+      </div>
+      <div class="card">
+        <h3>体检失败是机会，不是故障</h3>
+        <p>拿不到发布接口就诚实告知「用自动草稿 + 你手动发布开始」，不卡死流程，也不假装全自动。
+           这是用户第一次判断「这家值不值得信任」。</p>
       </div>
     </div>
   </div>

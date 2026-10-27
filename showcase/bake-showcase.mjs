@@ -282,6 +282,97 @@ function s3 (t) {
 </pagx>`
 }
 
+// ---------------- scene 0: day one, and how empty it honestly is ----------------
+// The product's promise is accumulation, but at t=0 there is nothing to show.
+// This scene states that plainly instead of hiding it behind a busy first day.
+function s0 (t) {
+  const inP = eo(seg(t, 0, 0.6))
+  const C = { x: 40, y: 72, w: 720, h: 336 }
+  const L = C.x + 30
+  const R = C.x + 356
+
+  // the ledger starts with exactly one line: it was born
+  const born = eo(seg(t, 0.7, 0.5))
+  const first = eo(seg(t, 2.1, 0.6))       // first thing it ever did
+  const empty = eo(seg(t, 1.5, 0.5))       // the "and that's it" beat
+
+  const bob = Math.sin(t * 2 * Math.PI / 3.2) * 4
+  const figA = eo(seg(t, 0.35, 0.7))
+
+  // the expectation line types in at the end
+  const tip = eo(seg(t, 3.2, 0.7))
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="${W}" height="${H}">
+  <Resources>
+    <Image id="avatar" source="data:image/png;base64,${AV}"/>
+  </Resources>
+  <Layer name="bg" width="100%" height="100%"><Rectangle width="100%" height="100%"/><Fill color="#EEF3FB"/></Layer>
+  ${header(inP)}
+  <Layer id="card0" left="${C.x}" top="${C.y}" alpha="${inP}" width="${C.w}" height="${C.h}">
+    <Rectangle width="${C.w}" height="${C.h}" roundness="24"/><Fill color="#FFFFFF"/>
+    <Stroke color="#E4EAF5" width="1.5"/>
+    <DropShadowStyle offsetY="10" blurX="30" blurY="30" color="#1B2C6116"/>
+  </Layer>
+
+  <!-- left: it exists, but has no history yet -->
+  <Layer left="${C.x + 42}" top="${C.y + 76 + bob}" alpha="${figA}" width="180" height="180">
+    <Rectangle width="180" height="180"/><Fill><ImagePattern image="@avatar"/></Fill>
+  </Layer>
+  <Layer left="${C.x + 42}" top="${C.y + 282}" alpha="${figA}" width="200" height="24">
+    <TextBox textAlign="start" width="200" height="24"><Text text="刚出生" fontFamily="STHeiti" fontSize="13"/><Fill color="#8A95AD"/></TextBox>
+  </Layer>
+
+  <!-- right: the ledger, and how little is in it -->
+  <Layer left="${R}" top="${C.y + 34}" alpha="${inP}" width="330" height="28">
+    <TextBox textAlign="start" width="330" height="28"><Text text="第 1 天" fontFamily="STHeiti" fontStyle="Bold" fontSize="20"/><Fill color="#1B2C61"/></TextBox>
+  </Layer>
+  <Layer left="${R + 74}" top="${C.y + 38}" alpha="${inP}" width="240" height="22">
+    <TextBox textAlign="start" width="240" height="22"><Text text="它什么都没有" fontFamily="STHeiti" fontSize="13"/><Fill color="#8A95AD"/></TextBox>
+  </Layer>
+
+  <!-- entry 1: born -->
+  <Layer left="${R}" top="${C.y + 82}" alpha="${born}">
+    <Layer left="0" top="0" width="46" height="20">
+      <TextBox textAlign="start" width="46" height="20"><Text text="09:14" fontFamily="STHeiti" fontSize="12"/><Fill color="#8A95AD"/></TextBox>
+    </Layer>
+    <Layer left="50" top="0" width="76" height="20">
+      <TextBox textAlign="start" width="76" height="20"><Text text="born" fontFamily="STHeiti" fontSize="12"/><Fill color="#4F6FC0"/></TextBox>
+    </Layer>
+    <Layer left="130" top="0" width="180" height="20">
+      <TextBox textAlign="start" width="180" height="20"><Text text="大肥鱼出生了" fontFamily="STHeiti" fontSize="12.5"/><Fill color="#1B2C61"/></TextBox>
+    </Layer>
+  </Layer>
+
+  <!-- entry 2: the first thing it ever did -->
+  <Layer left="${R}" top="${C.y + 128}" alpha="${first}">
+    <Layer left="0" top="0" width="46" height="20">
+      <TextBox textAlign="start" width="46" height="20"><Text text="09:40" fontFamily="STHeiti" fontSize="12"/><Fill color="#8A95AD"/></TextBox>
+    </Layer>
+    <Layer left="50" top="0" width="104" height="20">
+      <TextBox textAlign="start" width="104" height="20"><Text text="interest" fontFamily="STHeiti" fontSize="12"/><Fill color="#15803D"/></TextBox>
+    </Layer>
+    <Layer left="130" top="0" width="220" height="20">
+      <TextBox textAlign="start" width="220" height="20"><Text text="看了会儿游戏更新" fontFamily="STHeiti" fontSize="12.5"/><Fill color="#1B2C61"/></TextBox>
+    </Layer>
+  </Layer>
+
+  <!-- the honest beat: that is genuinely all there is -->
+  <Layer left="${R}" top="${C.y + 176}" alpha="${empty}" width="330" height="48">
+    <TextBox textAlign="start" width="330" height="48"><Text text="今天只有这两条。它还没有偏好、没有承诺、没有技能。" fontFamily="STHeiti" fontSize="12.5"/><Fill color="#8A95AD"/></TextBox>
+  </Layer>
+
+  <!-- the hook: what is owed tomorrow matters more than what happened today -->
+  <Layer left="${R}" top="${C.y + 234}" alpha="${first}" width="330" height="26">
+    <TextBox textAlign="start" width="330" height="26"><Text text="留下的钩子：明天想试试第 5 层" fontFamily="STHeiti" fontSize="13"/><Fill color="#4F6FC0"/></TextBox>
+  </Layer>
+
+  <Layer left="${L}" top="${C.y + C.h - 30}" alpha="${tip}" width="660" height="24">
+    <TextBox textAlign="start" width="660" height="24"><Text text="第一天不该追求惊艳 · 安静是正常的 · 留个明天想做的事" fontFamily="STHeiti" fontSize="13"/><Fill color="#4F6FC0"/></TextBox>
+  </Layer>
+</pagx>`
+}
+
 // ---------------- scene 4: the kept ledger and its causal chain ----------------
 function s4 (t) {
   const inP = eo(seg(t, 0, 0.6))
@@ -494,6 +585,7 @@ function s5 (t) {
 }
 
 const SCENES = [
+  { name: 'dayone', dur: 5.5, fn: s0 },     // 第 1 天：它什么都没有
   { name: 'activity', dur: 5.5, fn: s1 },   // 它现在在做什么
   { name: 'ledger', dur: 5.5, fn: s4 },     // 账本与因果链
   { name: 'publish', dur: 5.0, fn: s2 },    // 一条动态发到八个平台
