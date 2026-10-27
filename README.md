@@ -379,8 +379,6 @@ wake.json          唤醒绑定 · 下一个闹钟 · 当天预算 · 已投递 
 
 每次写都是**原子**的（tmp + rename）。读的时候容忍文件缺失或损坏 —— 一个截断的 JSON 不该弄死一条命。
 
----
-
 ## 验证
 
 七套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。合计 **186 项**。
