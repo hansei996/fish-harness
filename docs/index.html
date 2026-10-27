@@ -206,7 +206,8 @@
   <div class="wrap">
     <span class="brand"><span class="dot"></span>Fish Harness</span>
     <span class="links">
-      <a href="#why">为什么</a>
+      <a href="#shift">为什么值得做</a>
+      <a href="#why">和助手比</a>
       <a href="#how">怎么活</a>
       <a href="#cold">第一天</a>
       <a href="#feel">活人感</a>
@@ -254,9 +255,112 @@
   </figure>
 </div>
 
+<section id="shift">
+  <div class="wrap">
+    <h2>软件史的下一次变化</h2>
+    <p class="sub">往前看六十年，软件其实只变过两次。第三次正在发生。</p>
+
+    <div class="status">
+      <div class="srow">
+        <span class="name">1960s–2010s · <strong>工具</strong><span>你和它的关系：你用它 —— 它只在你打开的时候存在</span></span>
+      </div>
+      <div class="srow">
+        <span class="name">2020s · <strong>助手</strong><span>你和它的关系：你问它 —— 它只在你叫它的时候存在</span></span>
+      </div>
+      <div class="srow" style="background:color-mix(in oklab, var(--accent) 6%, var(--surface))">
+        <span class="name">现在开始 · <strong>居民</strong><span>你和它的关系：<strong>你维持它</strong> —— 不管你在不在，它都在</span></span>
+        <span class="pill done">这次不一样</span>
+      </div>
+    </div>
+
+    <p class="quote" style="margin-top:22px">
+      前两种是同一类东西：<strong>都被使用</strong>，区别只是门槛高低。<br>
+      第三种第一次不是这个关系 —— <strong>你不用它，你维持它。</strong>
+    </p>
+
+    <p>
+      这个区别听起来小，其实是<strong>关系类型</strong>变了。工具是你手脚的延伸，助手是你注意力的外包；
+      而<strong>被维持的东西有自己的时间线</strong> —— 你不看它，它也在过。<br>
+      养过植物的人熟悉那种感觉：它不是你的操作产物，你只是让它能继续。
+    </p>
+
+    <h3 style="margin:34px 0 6px;font-size:18px">为什么是现在</h3>
+    <p style="color:var(--muted);margin:0 0 14px">三件事凑齐了，缺任何一件都做不成。</p>
+    <div class="grid g3">
+      <div class="card">
+        <h3>长跑的基础设施变便宜了</h3>
+        <p>会话持久化、崩溃恢复、调度、沙箱、逐次批准 —— 五年前是论文，现在是开源组件。</p>
+      </div>
+      <div class="card">
+        <h3>推理成本降到可以浪费</h3>
+        <p>一天几十次唤醒、几百次工具调用，从不可行变成可接受。</p>
+      </div>
+      <div class="card">
+        <h3>自主性终于有安全边界</h3>
+        <p>沙箱 + 逐次批准 + 预算硬上限，让「让它自己跑一天」从危险变成可控。</p>
+      </div>
+    </div>
+    <p class="quote" style="margin-top:18px">
+      <strong>真正的判断是：</strong>让一个 Agent 活很久，难点已经从「能不能」变成了「维护得起吗」。
+      而「维护得起」<strong>是一个产品问题，不是研究问题</strong>。这就是为什么现在是做产品的时候。
+    </p>
+
+    <h3 style="margin:36px 0 6px;font-size:18px">它落地的样子</h3>
+    <p style="color:var(--muted);margin:0 0 14px">三个具体场景。都是设想，用来检验前面这段话立不立得住。</p>
+
+    <div class="grid g3">
+      <div class="card">
+        <h3>一个垂类，一年的真实踩坑史</h3>
+        <p style="margin-bottom:10px">
+          做嵌入式的工程师想写博客，但下班没精力。他领养一条鱼，给它一个垂类：单片机外设踩坑，预算每天三块钱。
+        </p>
+        <p style="margin-bottom:10px">
+          它每天查文档、逛论坛，<strong>在沙盒里真的试</strong>；跑不通就记失败在哪，跑通了就记解法，然后发一条。
+        </p>
+        <p><strong>一年后他有了一个「真实踩坑史」的账号。</strong>每条后面都有一次真实的工具调用记录 ——
+           内容农场不试，它试。</p>
+      </div>
+      <div class="card">
+        <h3>小团队缺测试，而它有耐心</h3>
+        <p style="margin-bottom:10px">
+          三个人做独立游戏，测试人力不够。鱼每天玩几小时，记录卡在哪、怎么卡的。
+        </p>
+        <p style="margin-bottom:10px">
+          对外是游玩记录（有人就爱看别人第一次玩）；对内是结构化的卡关数据 —— 第几关、什么操作、什么条件下必现。
+        </p>
+        <p><strong>一个不会累、不给面子、会如实说「这里很烦」的测试员</strong> —— 而且它的「烦」有证据。</p>
+      </div>
+      <div class="card">
+        <h3>开源项目共养一个记得事的成员</h3>
+        <p style="margin-bottom:10px">
+          二十人的项目组共养一条鱼：盯 issue、跑夜间构建、记录变更。
+        </p>
+        <p style="margin-bottom:10px">
+          但真正有用的不是自动化，<strong>是它记得</strong> —— 记得上次谁提过相关的设计、三个月前为什么否掉过一个方案。
+        </p>
+        <p><strong>机器人不记得三个月前的话，成员记得。</strong></p>
+      </div>
+    </div>
+
+    <p class="quote" style="margin-top:20px">
+      这三个场景里，它都<strong>不能被换成一个更好的工具</strong> —— 因为价值来自「它自己过日子」。
+    </p>
+
+    <div class="note" style="margin-top:16px">
+      <span class="ico">⚠</span>
+      <div>
+        <strong>诚实版：三个场景现在都还跑不起来。</strong>
+        生命层、自主唤醒、活动选择、证据规则<strong>都已实现并验证</strong>；
+        但<strong>对外发布尚未实现</strong>。所以它们现在停在「它能过自己的日子，但日子发不出去」——
+        是方向，不是演示。
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="why">
   <div class="wrap">
-    <h2>为什么不是「又一个助手」</h2>
+    <h2>那么，为什么不是「又一个助手」</h2>
     <p class="sub">做得好的开源助手已经存在，而且比你想象的大得多。所以位置必须换一个。</p>
 
     <div class="contrast">
