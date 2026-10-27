@@ -21,10 +21,6 @@ export function resolveDshHome () {
   return process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 }
 
-function nowIso () {
-  return new Date().toISOString()
-}
-
 export function newId (prefix) {
   const hex = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
   return `${prefix}-${hex}`
@@ -96,15 +92,35 @@ const DEFAULT_WAKE = {
 /** At most this many delivered message ids are remembered for idempotency. */
 const WAKE_ID_HISTORY = 20
 
+/**
+ * Whether a started activity is the step that was recorded as "next".
+ *
+ * Deliberately loose (substring either way, case-folded): the chooser wraps the
+ * recorded step in its own phrasing — `接着做「X」`, `再试一次「X」` — so an exact
+ * match would never fire and the hand-off would never be cleared.
+ */
+function sameStep (recorded, started) {
+  const a = String(recorded || '').trim().toLowerCase()
+  const b = String(started || '').trim().toLowerCase()
+  if (!a || !b) return false
+  return a === b || a.includes(b) || b.includes(a)
+}
+
 export class LifeStore {
   /**
    * @param {object} options
    * @param {string} [options.home] - override for tests
    * @param {string} options.lifeId - stable identity of this life
+   * @param {() => Date|string|number} [options.clock] - injectable time source
    */
   constructor (options = {}) {
     this.home = options.home || resolveDshHome()
     this.lifeId = options.lifeId || 'default'
+    // Injectable clock. wake.js and choose.js already take one ("for
+    // deterministic tests"); the store was the one place that hard-coded
+    // `new Date()`, which made a multi-day life impossible to simulate without
+    // sleeping for real days. Production passes nothing and gets the wall clock.
+    this.clock = typeof options.clock === 'function' ? options.clock : () => new Date()
     this.dir = path.join(this.home, 'life', this.lifeId)
     this.files = {
       identity: path.join(this.dir, 'identity.json'),
@@ -127,32 +143,32 @@ export class LifeStore {
         lifeId: this.lifeId,
         name: name || '大肥鱼',
         species: species || 'whale',
-        bornAt: nowIso(),
+        bornAt: this.nowIso(),
         /** Slow variable: only a keeper decision changes this. */
         revision: 1,
         seeds: Array.isArray(seeds) && seeds.length ? seeds.slice(0, 5) : ['聪明但懒', '傲娇', '爱吃白饭'],
-        updatedAt: nowIso(),
+        updatedAt: this.nowIso(),
       }
       writeJsonAtomic(this.files.identity, identity)
       this.appendLedger({ kind: 'born', detail: { name: identity.name, species: identity.species } })
     }
     if (!this.readTraits()) {
-      writeJsonAtomic(this.files.traits, { schemaVersion: LIFE_SCHEMA_VERSION, interests: [], skills: [], habits: [], updatedAt: nowIso() })
+      writeJsonAtomic(this.files.traits, { schemaVersion: LIFE_SCHEMA_VERSION, interests: [], skills: [], habits: [], updatedAt: this.nowIso() })
     }
     if (!this.readRelations()) {
-      writeJsonAtomic(this.files.relations, { schemaVersion: LIFE_SCHEMA_VERSION, people: [], updatedAt: nowIso() })
+      writeJsonAtomic(this.files.relations, { schemaVersion: LIFE_SCHEMA_VERSION, people: [], updatedAt: this.nowIso() })
     }
     if (!this.readCommitments()) {
-      writeJsonAtomic(this.files.commitments, { schemaVersion: LIFE_SCHEMA_VERSION, items: [], updatedAt: nowIso() })
+      writeJsonAtomic(this.files.commitments, { schemaVersion: LIFE_SCHEMA_VERSION, items: [], updatedAt: this.nowIso() })
     }
     if (!this.readActivity()) {
-      writeJsonAtomic(this.files.activity, { schemaVersion: LIFE_SCHEMA_VERSION, current: null, next: null, updatedAt: nowIso() })
+      writeJsonAtomic(this.files.activity, { schemaVersion: LIFE_SCHEMA_VERSION, current: null, next: null, updatedAt: this.nowIso() })
     }
     if (!this.readWakeFile()) {
       writeJsonAtomic(this.files.wake, {
         schemaVersion: LIFE_SCHEMA_VERSION,
         ...DEFAULT_WAKE,
-        updatedAt: nowIso(),
+        updatedAt: this.nowIso(),
       })
     }
     return identity
@@ -161,6 +177,13 @@ export class LifeStore {
   readIdentity () {
     const value = readJson(this.files.identity)
     return value && value.lifeId ? value : null
+  }
+
+  /** Current instant from the (injectable) clock, as an ISO string. */
+  nowIso () {
+    const value = this.clock()
+    const date = value instanceof Date ? value : new Date(value)
+    return (Number.isNaN(date.getTime()) ? new Date() : date).toISOString()
   }
 
   /**
@@ -180,7 +203,7 @@ export class LifeStore {
       if (Object.keys(allowed).length === 0) {
         throw new Error('life/identity-requires-keeper-confirmation')
       }
-      const next = { ...identity, ...allowed, updatedAt: nowIso() }
+      const next = { ...identity, ...allowed, updatedAt: this.nowIso() }
       writeJsonAtomic(this.files.identity, next)
       return next
     }
@@ -190,7 +213,7 @@ export class LifeStore {
       lifeId: identity.lifeId,
       bornAt: identity.bornAt,
       revision: (identity.revision || 1) + 1,
-      updatedAt: nowIso(),
+      updatedAt: this.nowIso(),
     }
     writeJsonAtomic(this.files.identity, next)
     this.appendLedger({ kind: 'identity-change', detail: { revision: next.revision, patch } })
@@ -249,7 +272,7 @@ export class LifeStore {
       schemaVersion: LIFE_SCHEMA_VERSION,
       ...current,
       ...(patch && typeof patch === 'object' ? patch : {}),
-      updatedAt: nowIso(),
+      updatedAt: this.nowIso(),
     }
     next.lastMessageIds = Array.isArray(next.lastMessageIds)
       ? next.lastMessageIds.filter((id) => typeof id === 'string' && id).slice(-WAKE_ID_HISTORY)
@@ -268,7 +291,7 @@ export class LifeStore {
    * "per day" promise.
    */
   noteWake ({ sessionId = null, messageId = null, at = null } = {}) {
-    const moment = at === null || at === undefined ? new Date() : new Date(at)
+    const moment = at === null || at === undefined ? this.clock() : new Date(at)
     const date = Number.isNaN(moment.getTime()) ? new Date() : moment
     const dayKey = dayKeyOf(date)
     const wake = this.readWake()
@@ -306,7 +329,7 @@ export class LifeStore {
       existing.source = source
       existing.note = note || existing.note
       existing.observations = (existing.observations || 1) + 1
-      existing.updatedAt = nowIso()
+      existing.updatedAt = this.nowIso()
     } else {
       traits.interests.push({
         topic,
@@ -314,11 +337,11 @@ export class LifeStore {
         source,
         note,
         observations: 1,
-        firstSeenAt: nowIso(),
-        updatedAt: nowIso(),
+        firstSeenAt: this.nowIso(),
+        updatedAt: this.nowIso(),
       })
     }
-    traits.updatedAt = nowIso()
+    traits.updatedAt = this.nowIso()
     writeJsonAtomic(this.files.traits, traits)
     this.appendLedger({ kind: 'interest', detail: { topic, confidence: bounded, source } })
     return existing || traits.interests[traits.interests.length - 1]
@@ -333,11 +356,11 @@ export class LifeStore {
       existing.stage = stage
       existing.evidence = evidence || existing.evidence
       existing.updates = (existing.updates || 1) + 1
-      existing.updatedAt = nowIso()
+      existing.updatedAt = this.nowIso()
     } else {
-      traits.skills.push({ name, evidence, stage, updates: 1, firstSeenAt: nowIso(), updatedAt: nowIso() })
+      traits.skills.push({ name, evidence, stage, updates: 1, firstSeenAt: this.nowIso(), updatedAt: this.nowIso() })
     }
-    traits.updatedAt = nowIso()
+    traits.updatedAt = this.nowIso()
     writeJsonAtomic(this.files.traits, traits)
     this.appendLedger({ kind: 'skill', detail: { name, stage } })
     return existing || traits.skills[traits.skills.length - 1]
@@ -355,11 +378,11 @@ export class LifeStore {
     if (existing) {
       existing.note = note || existing.note
       existing.interactions = (existing.interactions || 0) + 1
-      existing.updatedAt = nowIso()
+      existing.updatedAt = this.nowIso()
     } else {
-      relations.people.push({ name, kind, note, interactions: 1, firstSeenAt: nowIso(), updatedAt: nowIso() })
+      relations.people.push({ name, kind, note, interactions: 1, firstSeenAt: this.nowIso(), updatedAt: this.nowIso() })
     }
-    relations.updatedAt = nowIso()
+    relations.updatedAt = this.nowIso()
     writeJsonAtomic(this.files.relations, relations)
     this.appendLedger({ kind: 'encounter', detail: { name, kind } })
     return existing || relations.people[relations.people.length - 1]
@@ -375,7 +398,7 @@ export class LifeStore {
       to,
       dueAt,
       status: 'open',
-      createdAt: nowIso(),
+      createdAt: this.nowIso(),
     }
     commitments.items.push(item)
     // Keep the file bounded; a life can run for years.
@@ -384,7 +407,7 @@ export class LifeStore {
         commitments.items.filter((row) => row.status !== 'open').slice(-50),
       )
     }
-    commitments.updatedAt = nowIso()
+    commitments.updatedAt = this.nowIso()
     writeJsonAtomic(this.files.commitments, commitments)
     this.appendLedger({ kind: 'commitment', detail: { id: item.id, what, dueAt } })
     return item
@@ -398,8 +421,8 @@ export class LifeStore {
     if (item.status !== 'open') throw new Error('life/commitment-already-settled')
     item.status = status
     item.evidence = evidence
-    item.settledAt = nowIso()
-    commitments.updatedAt = nowIso()
+    item.settledAt = this.nowIso()
+    commitments.updatedAt = this.nowIso()
     writeJsonAtomic(this.files.commitments, commitments)
     this.appendLedger({ kind: 'commitment-settled', detail: { id, status, evidence } })
     return item
@@ -418,33 +441,57 @@ export class LifeStore {
     if (!what || typeof what !== 'string') throw new Error('life/invalid-activity')
     const activity = this.readActivity()
     if (activity.current) throw new Error('life/activity-already-running')
-    const next = {
+    const started = {
       id: newId('act'),
       what,
       why,
       evidence: Array.isArray(evidence) ? evidence : [],
-      startedAt: nowIso(),
+      startedAt: this.nowIso(),
     }
-    activity.current = next
-    activity.updatedAt = nowIso()
+    activity.current = started
+    // A recorded next step survives doing something else in between, and is
+    // cleared only when it is actually taken. Clearing it on *any* start looked
+    // tidy and was wrong: one wake-up that chose to rest destroyed the hand-off
+    // for good, which is the exact opposite of "留下一个明天要继续的事"
+    // (docs/PRODUCT.md §4.2). It is unfinished business, so it keeps being
+    // proposed — that is what unfinished business means.
+    if (activity.next && sameStep(activity.next.what, what)) activity.next = null
+    activity.updatedAt = this.nowIso()
     writeJsonAtomic(this.files.activity, activity)
-    this.appendLedger({ kind: 'activity-start', detail: { id: next.id, what, why } })
-    return next
+    this.appendLedger({ kind: 'activity-start', detail: { id: started.id, what, why } })
+    return started
   }
 
-  finishActivity ({ outcome = 'done', evidence = [], note = '' } = {}) {
+  /**
+   * Finish the running activity.
+   *
+   * `next` is the one thing that makes tomorrow different from today: a
+   * recorded step to pick up. `choose.js` has a whole branch for it
+   * (`unfinishedFrom` → `接着做「X」`, worth 0.75) and `unfinishedScore` scores
+   * it above a finished activity — but until now **nothing ever wrote it**, so
+   * that branch was dead code and "留下一个明天要继续的事" (PRODUCT.md §4.2)
+   * could not actually happen. A seven-day run is what exposed it: a single-day
+   * demo never shows whether there is a tomorrow.
+   */
+  finishActivity ({ outcome = 'done', evidence = [], note = '', next = null } = {}) {
     const activity = this.readActivity()
     if (!activity.current) throw new Error('life/no-activity-running')
     const finished = {
       ...activity.current,
       outcome,
       note,
+      next,
       evidence: [...(activity.current.evidence || []), ...(Array.isArray(evidence) ? evidence : [])],
-      endedAt: nowIso(),
+      endedAt: this.nowIso(),
     }
     activity.current = null
     activity.lastFinished = finished
-    activity.updatedAt = nowIso()
+    // The recorded next step is the hand-off to the next wake. A failed attempt
+    // keeps whatever it wrote; an explicit `next` always wins.
+    activity.next = next && typeof next === 'object' && typeof next.what === 'string' && next.what.trim()
+      ? { what: next.what.trim(), why: typeof next.why === 'string' ? next.why : '', at: this.nowIso() }
+      : null
+    activity.updatedAt = this.nowIso()
     writeJsonAtomic(this.files.activity, activity)
     // Evidence belongs in the ledger too: it is the append-only record the day
     // report and any later reconciliation read. It used to be written only to
@@ -471,7 +518,7 @@ export class LifeStore {
    * the file has grown well past the cap and then collapses by half.
    */
   appendLedger (entry, { cap = 0 } = {}) {
-    const row = { at: nowIso(), lifeId: this.lifeId, ...entry }
+    const row = { at: this.nowIso(), lifeId: this.lifeId, ...entry }
     delete row.cap
     appendJsonl(this.files.ledger, row)
     if (cap > 0) {
@@ -521,12 +568,16 @@ export class LifeStore {
       seeds: identity ? identity.seeds : [],
       currentActivity: activity.current ? activity.current.what : null,
       currentActivityWhy: activity.current ? activity.current.why : null,
+      // The hand-off from last time. Without it in the snapshot the life wakes
+      // up, reads its own state, and cannot see the step it left itself — which
+      // is exactly the "记得昨天" the whole product is about.
+      nextStep: activity.next && activity.next.what ? activity.next.what : null,
       interests,
       skills,
       openCommitments: open.slice(0, 5).map((row) => ({ id: row.id, what: row.what, dueAt: row.dueAt })),
       // Kept deliberately tiny: the snapshot is injected every turn.
       nextWakeAt: wake.nextAt,
-      wakeCountToday: wake.dayKey === dayKeyOf(new Date()) ? wake.countToday : 0,
+      wakeCountToday: wake.dayKey === dayKeyOf(this.clock()) ? wake.countToday : 0,
     }
   }
 }

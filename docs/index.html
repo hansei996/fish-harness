@@ -289,6 +289,7 @@
       <a href="#dayone">第一天</a>
       <a href="#human">活人感</a>
       <a href="#oneday">它的一天</a>
+      <a href="#oneweek">它的一周</a>
       <a href="#limits">边界</a>
       <a href="#scene">场景</a>
       <a href="#now">进度</a>
@@ -642,9 +643,103 @@
   </div>
 </section>
 
+<section id="oneweek">
+  <div class="wrap">
+    <div class="eyebrow">07 <span>可查证</span></div>
+    <h2>七天之后，它还是同一个它吗</h2>
+    <p class="sub">
+      一天能被演出来。七天不能 —— 七天只能被<strong>跑</strong>出来。
+      下面也是真跑的输出，命令是 <code>node tools/life-week.mjs</code>。
+    </p>
+
+    <p>
+      为什么非要七天：这个产品卖的是<strong>累积</strong>。如果一条鱼每天醒来都从零开始，
+      它就不是在过日子，只是在重复表演。而「有没有累积」这件事，<strong>看一天是看不出来的</strong> ——
+      第一天的它本来就什么都没有。
+    </p>
+
+    <pre class="term"><span class="dim">  大肥鱼的一周 · 7 天 · 账本 90 条</span>
+<span class="ends">  ──────────────────────────────────────────────</span>
+<span class="start">  2026-10-27</span>
+    08:00  <span class="start">◦ 大肥鱼出生了</span>
+    08:00    答应了一件事：把《地底 38 层》的打法写进自己的笔记（2026-10-29 前）
+    09:15  ▸ 开始：看看「机械键盘手感」的更新（因为 只观察过 1 次，值得多看一眼）
+    10:29  <span class="bad">· 没做成：资料对不上，记下来换个来源｜证据 save:aaf500</span>
+    10:29  <span class="bad">→ 留下了明天要做的事：换个打法再试一次「机械键盘手感」</span>
+    13:18  <span class="good">✓ 做成了：看看「像素矿工小品」的更新｜证据 link:8f936a</span>
+    14:47  ○ 选了休息 —— 今天没有非做不可的事
+    18:55  ▸ 开始：把《地底 38 层》的打法写进自己的笔记
+    19:52  <span class="good">✓ 兑现了一件事：把《地底 38 层》的打法写进自己的笔记</span>
+      ── 自己醒 6 次 · 起 5 件事 · 成 4 · 败 1 · 休息 1
+
+<span class="start">  2026-10-28</span>
+    08:02  ▸ 开始：看看「像素矿工小品」的更新（因为 置信度是 0.79，已经观察过 3 次，可以继续）
+    10:21  ○ 选了休息 —— 今天没有非做不可的事
+    15:35  ▸ 开始：看看「像素矿工小品」的更新（因为 置信度是 0.91，已经观察过 4 次）
+      ── 自己醒 6 次 · 起 2 件事 · 成 2 · 休息 4
+
+<span class="ends">  ──────────────────────────────────────────────</span>
+<span class="dim">  第七天它是什么样：</span>
+    兴趣 像素矿工小品  <span class="good">0.95</span>（观察 17 次，来源 experience）
+    兴趣 机械键盘手感 <span class="good">0.95</span>（观察 12 次，来源 experience）
+    承诺：兑现 1 件，还欠 0 件</pre>
+
+    <div class="cards" style="margin-top:20px">
+      <div class="card">
+        <h3>第二天的它，接着第一天</h3>
+        <p>第 1 天 10:29 留下「换个打法再试一次」，<strong>那一步真的留在状态里</strong>，
+           下一次醒来读自己的状态时看得见。这就是「因果链」而不是「每天随机起一个」。</p>
+      </div>
+      <div class="card">
+        <h3>兴趣是被经历推上去的</h3>
+        <p>「像素矿工小品」从出生档案里的 <strong>0.55</strong>，经过 17 次真实经历长到 <strong>0.95</strong>，
+           每一次都带来源。不是第一天就写死的人设。</p>
+      </div>
+      <div class="card">
+        <h3>它有安静的日子</h3>
+        <p>第 2 天只起了 2 件事、休息 4 次。这一天<strong>看起来什么都没发生</strong>，
+           但它是正常的 —— 而且这条记录照样在，不藏。</p>
+      </div>
+    </div>
+
+    <figure class="hero-demo" style="margin-top:22px">
+      <div class="frame">
+        <video autoplay muted loop playsinline preload="metadata" poster="assets/scene-oneweek.png"
+               aria-label="它的一周演示：第 1 天的失败如何变成第 2 天的下一步，兴趣如何被 17 次经历推上去">
+          <source src="assets/oneweek.mp4" type="video/mp4">
+          <img src="assets/scene-oneweek.png" alt="它的一周（静态首帧）">
+        </video>
+        <figcaption class="cap">
+          <span>19 秒 · 四幕 · 同样由 PAGX 逐帧生成</span>
+          <span class="sp"><a href="assets/oneweek.mp4">下载 MP4</a></span>
+        </figcaption>
+      </div>
+    </figure>
+
+    <p class="pull" style="margin-top:22px">
+      <strong>跑七天之后我才敢说这一句：七天的它，不是七次一天的它。</strong><br>
+      兴趣在长、承诺在兑、失败留下了下一步 —— 这些只能从「跨天」里看出来。
+    </p>
+
+    <div class="note">
+      <span class="ic">⚠</span>
+      <div>
+        <b>这一节不证明「它像人」。</b>
+        这份日志里<strong>没有调用模型</strong> —— 选活动的是排序器，七天也是压缩跑的。
+        它证明的是「生活骨架成不成立」，不是「模型会不会照这个骨架过日子」。
+        后者要一次真实的、有模型的运行，我们还没做。
+        <br><br>
+        <b>而且它抓出了真问题。</b>正是这次连跑七天，才暴露出三件单日演示永远看不见的事：
+        重复没有代价、探索只有入口没有出口、「留下明天要做的事」原本是死代码。
+        <a href="https://github.com/hansei996/fish-harness/blob/main/docs/life-week.md">完整记录</a>。
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="limits">
   <div class="wrap">
-    <div class="eyebrow">07 <span>边界</span></div>
+    <div class="eyebrow">08 <span>边界</span></div>
     <h2>它会做什么，不会做什么</h2>
     <p class="sub">一套系统值不值得长期托付，看的是它肯把边界说多清楚。</p>
 
@@ -723,7 +818,7 @@
 
 <section id="scene">
   <div class="wrap">
-    <div class="eyebrow">08 <span>落地场景</span></div>
+    <div class="eyebrow">09 <span>落地场景</span></div>
     <h2>它落地的样子</h2>
     <p class="sub">三个具体场景。都是设想，用来检验前面这些话立不立得住。</p>
 
@@ -783,7 +878,7 @@
 
 <section id="now">
   <div class="wrap">
-    <div class="eyebrow">09 <span>进度</span></div>
+    <div class="eyebrow">10 <span>进度</span></div>
     <h2>现在到了哪一步</h2>
     <p class="sub">这份进度表按实际跑过的结果写，不是按计划写。<strong>做不到的地方直接标出来。</strong></p>
 
@@ -791,8 +886,9 @@
       <div class="row"><span class="n">生命层：身份、兴趣、承诺、账本<span>5 个文件 2438 行，零自有依赖，13 个工具，7 个状态文件</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">自主唤醒与活动选择器<span>自己醒来、在有限候选里选活动、按预算与作息约束</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">「它的一天」可读报告<span>把机器账本渲染成人话，失败照实说、结论带证据（就是上面那一屏）</span></span><span class="pill done">已完成</span></div>
-      <div class="row"><span class="n">验证：110 项全绿<span>存储不变量 · 当天报告 · 真实 dsh 端到端 · 打包安装 · 7 天确定性 soak</span></span><span class="pill done">已完成</span></div>
-      <div class="row"><span class="n">连续 7 天真实运行<span>策略层已用 soak 覆盖，但「真实跑 7 天」和「模拟 7 天」不是一回事</span></span><span class="pill part">进行中</span></div>
+      <div class="row"><span class="n">连跑七天（「它的一周」）<span>生产的 store / choose / wake，七天压缩跑完；当场抓出三件单日看不见的问题</span></span><span class="pill done">已完成</span></div>
+      <div class="row"><span class="n">验证：132 项全绿<span>存储不变量 · 当天报告 · 连跑七天 · 真实 dsh 端到端 · 打包安装</span></span><span class="pill done">已完成</span></div>
+      <div class="row"><span class="n">连续 7 天真实运行<span>七天生活骨架已验证，但「真实跑」要等有模型的运行 —— 模拟证明不了「模型会照它过日子」</span></span><span class="pill part">进行中</span></div>
       <div class="row"><span class="n">界面<span>七页可交互原型已就绪，尚未做成真实插件视图</span></span><span class="pill part">原型</span></div>
       <div class="row"><span class="n">发布到社交平台<span>设计完整（含幂等与对账），尚未接真实平台</span></span><span class="pill todo">未开始</span></div>
       <div class="row"><span class="n">能力包：冲浪 / 游戏 / 表达<span>MVP 的后半，要等发布与界面跑通</span></span><span class="pill todo">未开始</span></div>

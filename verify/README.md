@@ -1,11 +1,12 @@
 # 怎么跑 verify（含 Windows）
 
-四套验证：`smoke` 与 `day-report` 只依赖本地文件；`e2e` 与 `pack` 需要**真的 dsh**，不是 mock：
+五套验证：`smoke`、`day-report`、`life-week` 只依赖本地文件；`e2e` 与 `pack` 需要**真的 dsh**，不是 mock：
 
 | 套件 | 查什么 | 本机实测 |
 |---|---|---|
-| `verify/smoke.mjs` | 26 项存储不变量/装载 + 16 项自主唤醒 + 10 项 7 天模拟 soak + 9 项活动选择器（固定时钟与随机数，不需要真 dsh） | 62/62 通过 |
+| `verify/smoke.mjs` | 存储不变量/装载 + 自主唤醒 + 10 项 7 天模拟 soak + 活动选择器（固定时钟与随机数，不需要真 dsh） | 68/68 通过 |
 | `verify/day-report.mjs` | 22 项「它的一天」报告工具：翻译对不对、该省的是否省了、缺数据崩不崩（不需要真 dsh） | 22/22 通过 |
+| `verify/life-week.mjs` | 16 项「连跑七天」：每天都有活动或明确休息、不超预算、时间不倒流、失败留下下一步、承诺兑现、同种子同结果（不需要真 dsh） | 16/16 通过 |
 | `verify/e2e-tools.mjs` | 17 项端到端：真 dsh 装载插件、13 个工具可见、身份/账本落盘、无 schedule 时降级、web 模板确实带 schedule | 17/17 通过 |
 | `verify/pack-install.mjs` | 9 项发布路径：`pnpm pack` 的 tarball 文件清单、装进全新 profile 能否激活 | 9/9 通过 |
 
@@ -44,8 +45,9 @@ export DSH_BIN=$(pwd)/node_modules/@deepseek-ai/dsh/lib/bin.js
 ```sh
 export DSH_BIN=<dsh bin>   # e2e / pack 需要；smoke 与 day-report 不需要
 npm run verify              # smoke + day-report + e2e 一起（跳过 pack）
-node verify/smoke.mjs       # 62 项
+node verify/smoke.mjs       # 68 项
 node verify/day-report.mjs  # 22 项
+node verify/life-week.mjs   # 16 项
 node verify/e2e-tools.mjs   # 17 项
 node verify/pack-install.mjs # 9 项
 ```

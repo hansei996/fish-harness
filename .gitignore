@@ -20,3 +20,4 @@ tmp/
 # baked animation frames (regenerate with showcase/bake-*.mjs)
 showcase/frames/
 showcase/frames-scen/
+showcase/frames-week/

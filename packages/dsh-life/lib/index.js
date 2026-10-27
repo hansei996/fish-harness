@@ -307,9 +307,24 @@ function buildTools (store, settings, wakeRuntime) {
       outcome: { type: 'string', enum: ['done', 'failed', 'abandoned'], required: true, description: 'How it actually ended' },
       evidence: { type: 'array', items: { type: 'string' }, description: 'Concrete evidence: save file, score, screenshot path, URL' },
       note: { type: 'string', description: 'What you learned or what went wrong' },
+      next: {
+        type: 'object',
+        description: 'What you intend to do next, if anything — the hand-off to your next wake-up. This is what makes tomorrow continuous instead of a fresh start. Ends the activity either way.',
+        properties: {
+          what: { type: 'string', description: 'The next concrete step, e.g. 换成 SPI 再试一次' },
+          why: { type: 'string', description: 'Why this is the right next step' },
+        },
+      },
     },
     required: ['outcome'],
-    execute: async (args) => store.finishActivity(args),
+    execute: async (args) => {
+      // A failed attempt that leaves no next step is a dead end the life cannot
+      // resume; the whole point of recording a failure is the retry it implies.
+      const next = args.next || (args.outcome === 'failed'
+        ? { what: `换个打法再试一次「${store.readActivity().current?.what || '刚失败的那件事'}」`, why: '上次没成，原因记在 note 里' }
+        : null)
+      return store.finishActivity({ ...args, next })
+    },
   }))
 
   tools.push(tool({
@@ -771,7 +786,34 @@ function chooserInputs (store, settings) {
     skills: traits.skills,
     activity: store.readActivity(),
     wakeBudget: { countToday, maxPerDay: settings.wakeMaxPerDay },
+    doneToday: doneTodayCounts(store, today),
   }
+}
+
+/**
+ * How many times each `what` already concluded today, so the chooser can price
+ * repetition (see `repeatPenalty` in choose.js).
+ *
+ * The ledger is the right source: it is the append-only record of what actually
+ * happened, it is already read on every wake, and it cannot disagree with the
+ * rest of the system the way a second counter could. A `failed` attempt counts
+ * too — retrying something that failed is the *productive* case, which is why
+ * `repeatPenalty` never touches `continue`; but re-*doing* the same finished
+ * thing six times in one afternoon is the treadmill the product forbids.
+ */
+function doneTodayCounts (store, today) {
+  const counts = new Map()
+  const rows = store.readLedger({ limit: 400, kind: 'activity-end' })
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    const detail = row.detail && typeof row.detail === 'object' ? row.detail : {}
+    if (detail.outcome !== 'done') continue
+    if (dayKeyOf(row.at) !== today) continue
+    const what = typeof detail.what === 'string' ? detail.what : ''
+    if (!what) continue
+    counts.set(what, (counts.get(what) || 0) + 1)
+  }
+  return counts
 }
 
 /** Bounded shortlist appended to a wake-turn prompt only. */

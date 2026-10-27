@@ -117,6 +117,34 @@ export function explorationBonusOf (interest) {
 }
 
 /**
+ * How much of an already well-worn interest's pull is left (1 .. floor).
+ *
+ * `explorationBonusOf` is the entry side of exploration — it favours something
+ * looked at once or twice. This is the exit side, and it was missing: with only
+ * the entry side, a topic observed 18 times at confidence 0.95 still scored
+ * 0.522 and out-ranked everything, so a seven-day run spent 30 of 31 wake-ups
+ * on two topics it already knew and never once went looking for a third
+ * (tools/life-week.mjs). `PLAN.md §6.2` asks for 「适度探索」; a bonus with no
+ * matching decay is not exploration, it is a ratchet.
+ *
+ * It decays the *interest* term only, not confidence itself: the life still
+ * loves what it loves (the record keeps 0.95, the day report still shows it),
+ * it just stops being the only thing worth doing. The floor keeps a
+ * long-cherished topic above zero — this is a taper, not a punishment.
+ */
+export function familiarityFatigueOf (interest) {
+  const observations = Number.isInteger(interest && interest.observations)
+    ? interest.observations
+    : 0
+  // Nothing decays before the entry bonus is even gone; the two must not
+  // overlap or a twice-seen topic would be penalised for being new.
+  if (observations <= 6) return 1
+  // 7th observation onward, but never below 0.55: a well-known topic is still
+  // the most likely thing to do, just not the only thing.
+  return Math.max(0.55, 1 - (observations - 6) * 0.06)
+}
+
+/**
  * Interest match in 0..1: confidence decayed by staleness, plus a small
  * exploration bonus. Freshness has a floor (0.45) because a long-loved topic
  * does not become worthless just because it was not touched for a month.
@@ -127,7 +155,9 @@ export function interestScore (interest, now = Date.now()) {
   const updated = Date.parse(interest && interest.updatedAt)
   const ageDays = Number.isFinite(updated) ? Math.max(0, (at - updated) / DAY_MS) : 45
   const freshness = Math.max(0.45, 1 - (ageDays / 45) * 0.55)
-  return clamp01(confidence * freshness + explorationBonusOf(interest))
+  // Familiarity tapers the pull of something already worn smooth, so a life
+  // keeps some appetite for what it has not met yet. See familiarityFatigueOf.
+  return clamp01(confidence * freshness * familiarityFatigueOf(interest) + explorationBonusOf(interest))
 }
 
 /**
@@ -181,6 +211,8 @@ export function switchCost (current, candidate) {
  * @param {Array|{skills:Array}} [input.skills]
  * @param {object} [input.activity] - `{ current, next, lastFinished }`
  * @param {{countToday?:number,maxPerDay?:number,remaining?:number}} [input.wakeBudget]
+ * @param {Map<string,number>|Record<string,number>} [input.doneToday] - how many
+ *   times each `what` already happened today; see {@link repeatPenalty}
  * @returns {{candidates:Array,rest:object,notes:string[]}} sorted strongest first,
  *   always containing the rest candidate; `notes` explains global context.
  */
@@ -191,9 +223,11 @@ export function rankCandidates ({
   skills,
   activity,
   wakeBudget,
+  doneToday,
 } = {}) {
   const at = toMillis(now)
   const budget = wakeBudgetOf(wakeBudget)
+  const repeats = repeatCountsOf(doneToday)
   const current = activity && typeof activity === 'object' && activity.current
     ? activity.current
     : null
@@ -201,7 +235,7 @@ export function rankCandidates ({
   const raw = []
 
   const make = (spec) => {
-    const candidate = buildCandidate(spec, current, budget)
+    const candidate = buildCandidate(spec, current, budget, repeats.get(spec.what) || 0)
     if (candidate) raw.push(candidate)
   }
 
@@ -384,11 +418,16 @@ export function renderWakeCandidates ({
 // Internals
 // ---------------------------------------------------------------------------
 
-function buildCandidate (spec, current, budget) {
+function buildCandidate (spec, current, budget, repeatsToday = 0) {
   const kind = spec.kind
   if (!spec.what || typeof spec.what !== 'string' || !spec.what.trim()) return null
   const risk = clamp01(spec.raw.risk ?? RISK_BASE[kind] ?? 0)
-  const cost = clamp01((COST_BASE[kind] ?? 0.2) + budgetPenalty(kind, budget.remaining))
+  // Repetition is folded into `cost`, not into a new term: the formula in
+  // docs/PLAN.md §6.2 already has a cost slot, and adding an eighth term would
+  // silently invalidate every documented score. Same idea as `budgetPenalty` —
+  // it prices the wake, it does not veto the choice.
+  const cost = clamp01(
+    (COST_BASE[kind] ?? 0.2) + budgetPenalty(kind, budget.remaining) + repeatPenalty(kind, repeatsToday))
   const switchRaw = switchCost(current, { what: spec.what, kind })
   const parts = {
     commitment: r3(clamp01(spec.raw.commitment ?? 0) * CHOOSER_WEIGHTS.commitment),
@@ -533,6 +572,41 @@ function normalizeEvidence (evidence) {
     ? evidence.filter((item) => item !== undefined && item !== null && String(item).trim())
     : []
   return list.length ? list.map(String) : ['无证据，只是想法']
+}
+
+function repeatPenalty (kind, timesToday) {
+  // A life that spends every wake on the same `what` looks busy and is not
+  // living: docs/PRODUCT.md §12.3 rules out repetition, and §11.1 asks for
+  // gaps rather than a treadmill. Without this, the chooser has a positive
+  // feedback loop — finishing an activity refreshes `updatedAt`, which restores
+  // freshness, which ranks it first again. It never crashes and never loses a
+  // day, so only a multi-day run exposes it (see tools/life-week.mjs).
+  //
+  // Rest and cheap continuation are exempt for the same reason they are exempt
+  // from `budgetPenalty`: finishing what is already open is not "repeating".
+  if (kind === 'continue' || kind === 'rest') return 0
+  const times = Number(timesToday)
+  if (!Number.isFinite(times) || times <= 0) return 0
+  // 1st repeat: mild. 2nd: strong. 3rd+: strong and capped, so this stays a
+  // nudge and can never push a legitimate commitment below rest on its own.
+  return Math.min(0.45, 0.15 + (times - 1) * 0.15)
+}
+
+/** Normalize `doneToday` (Map or plain object) into a Map of counts. */
+function repeatCountsOf (input) {
+  const out = new Map()
+  if (input instanceof Map) {
+    for (const [what, times] of input) {
+      if (typeof what === 'string' && what) out.set(what, Number(times) || 0)
+    }
+    return out
+  }
+  if (input && typeof input === 'object') {
+    for (const [what, times] of Object.entries(input)) {
+      if (what) out.set(what, Number(times) || 0)
+    }
+  }
+  return out
 }
 
 function budgetPenalty (kind, remaining) {

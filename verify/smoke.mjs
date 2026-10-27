@@ -147,6 +147,54 @@ check('the finished activity keeps its outcome and evidence',
     `outcome=${d.outcome} what=${d.what} evidence=${JSON.stringify(d.evidence)}`)
 }
 
+// "留下一个明天要继续的事" (docs/PRODUCT.md §4.2) was unreachable code: choose.js
+// has a whole branch for `activity.next` (`unfinishedFrom` -> 接着做「X」, worth
+// 0.75) and `unfinishedScore` ranks it above a finished activity, but nothing in
+// the store or the tools ever *wrote* it. A seven-day run is what exposed it —
+// a single day never shows whether there is a tomorrow.
+//
+// This asserts the whole loop, because writing the field is only half of it:
+// write it -> it is visible in the snapshot the model reads -> the chooser
+// proposes it -> starting something else clears it (a stale hand-off would
+// otherwise be proposed forever).
+{
+  store.startActivity({ what: '试 SPI 时序', why: 'I2C 那条路走不通' })
+  const withNext = store.finishActivity({
+    outcome: 'failed',
+    evidence: ['save:spi-1'],
+    note: '读错了时序表',
+    next: { what: '换成 SPI 再试一次', why: '换个方向而不是重跑' },
+  })
+  const written = store.readActivity().next
+  const snapshotNext = store.snapshot().nextStep
+  // `choose` is imported further down (the chooser section owns it), so the
+  // "the chooser proposes it" half of the loop is asserted there instead.
+  check('a recorded next step is written and visible in the snapshot the model reads',
+    withNext.next && withNext.next.what === '换成 SPI 再试一次' &&
+    written && written.what === '换成 SPI 再试一次' && written.why === '换个方向而不是重跑' &&
+    snapshotNext === '换成 SPI 再试一次',
+    `next=${JSON.stringify(written)}; snapshot=${JSON.stringify(snapshotNext)}`)
+
+  // Unfinished business must survive doing something else in between. The first
+  // version cleared `next` on *any* start, so one wake-up that chose to rest
+  // destroyed the hand-off for good — the exact opposite of §4.2. It is cleared
+  // only when the recorded step is actually taken.
+  store.startActivity({ what: '先看看别的东西', why: '今天想做点别的' })
+  const survived = store.readActivity().next
+  check('a recorded next step survives doing something else in between',
+    survived && survived.what === '换成 SPI 再试一次',
+    `next=${JSON.stringify(survived)}`)
+  store.finishActivity({ outcome: 'done', evidence: ['note:1'] })
+
+  // ...and is cleared once it is actually carried out. Loose matching on
+  // purpose: the chooser re-phrases the step as 接着做「X」/ 再试一次「X」.
+  store.startActivity({ what: '接着做「换成 SPI 再试一次」', why: '履行留的这一步' })
+  check('taking the recorded next step clears it, so it stops being proposed',
+    store.readActivity().next === null,
+    `next=${JSON.stringify(store.readActivity().next)}`)
+  store.finishActivity({ outcome: 'done', evidence: ['note:2'] })
+}
+
 // The causal chain the plan calls for: a failure becomes the next attempt.
 store.startActivity({ what: '再练一次第 38 层', why: '换了打法' })
 const second = store.finishActivity({ outcome: 'done', evidence: ['save:38-cleared'] })
@@ -1048,6 +1096,24 @@ check('chooser interest: confident+fresh beats low/stale; 1-2 observations get a
   `ancient=${ancientHigh.toFixed(3)}, bonus(obs2)=+${exploreBonus2}/bonus(obs3)=+${exploreBonus3}, ` +
   `1-obs=${oneObservation.toFixed(3)} vs 9-obs=${manyObservations.toFixed(3)}`)
 
+// The exit side of exploration. `exploreBonus` rewards a topic seen once or
+// twice; without a matching taper, a well-worn topic keeps out-ranking
+// everything, and a seven-day run spends every wake-up on the two things it
+// already knows (tools/life-week.mjs measured 30 of 31). PLAN.md §6.2 asks for
+// 「适度探索」, so this is not a nice-to-have.
+{
+  const worn = (observations) => interestScore({ topic: 't', confidence: 0.95, observations, updatedAt: freshIso })
+  const seven = worn(7)
+  const eighteen = worn(18)
+  const forty = worn(40)
+  check('chooser familiarity taper: a well-worn topic loses pull as it is repeated, but never falls below a floor',
+    seven < interestScore({ topic: 't', confidence: 0.95, observations: 6, updatedAt: freshIso }) &&
+    eighteen < seven && forty <= eighteen &&
+    forty > 0.3,
+    `obs6=${interestScore({ topic: 't', confidence: 0.95, observations: 6, updatedAt: freshIso }).toFixed(3)}, ` +
+    `obs7=${seven.toFixed(3)}, obs18=${eighteen.toFixed(3)}, obs40=${forty.toFixed(3)}`)
+}
+
 const unfinished = choose.unfinishedScore
 const unfinishedFailed = unfinished({ lastFinished: { what: 'x', outcome: 'failed' } })
 const unfinishedNext = unfinished({ next: { what: 'y' } })
@@ -1066,6 +1132,55 @@ const switchIdle = choose.switchCost(null, { what: '任何事', kind: 'interest'
 check('chooser switch cost: leaving a running activity costs, continuing it or resting does not',
   switchAway === 1 && continueSame === 0 && sameWhatNoKind === 0 && switchToRest === 0 && switchIdle === 0,
   `away=${switchAway}, continue=${continueSame}, sameWhat=${sameWhatNoKind}, rest=${switchToRest}, idle=${switchIdle}`)
+
+// The other half of the §4.2 loop: the recorded next step must actually be
+// *proposed*. Writing the field without this would be indistinguishable from
+// the dead code this replaced.
+{
+  const nextRanked = choose.rankCandidates({
+    now: chooserNow,
+    commitments: [],
+    interests: [],
+    skills: [],
+    activity: { current: null, next: { what: '换成 SPI 再试一次', why: 'I2C 那条路走不通' } },
+    wakeBudget: { countToday: 0, maxPerDay: 6 },
+  })
+  const nextCandidate = nextRanked.candidates.find((candidate) => candidate.kind === 'next')
+  const nextInShortlist = choose.shortlistCandidates(nextRanked.candidates, 3)
+    .some((candidate) => candidate.kind === 'next')
+  check('chooser proposes the recorded next step, and it reaches the bounded shortlist',
+    Boolean(nextCandidate) && nextCandidate.what.includes('换成 SPI 再试一次') &&
+    nextCandidate.parts.unfinished > 0 && nextInShortlist,
+    `what=${JSON.stringify(nextCandidate && nextCandidate.what)}; ` +
+    `unfinished part=${nextCandidate && nextCandidate.parts.unfinished}; score=${nextCandidate && nextCandidate.score}; in shortlist=${nextInShortlist}`)
+}
+
+// Repetition must be priced. Without this the chooser has a positive feedback
+// loop: finishing an activity refreshes `updatedAt`, freshness returns to 1, and
+// the same `what` ranks first again — so a whole day's wakes go to one activity.
+// It never crashes and never loses a day, which is exactly why only a multi-day
+// run finds it (tools/life-week.mjs). This guard exists because the penalty can
+// be deleted and every other assertion still passes.
+{
+  const repeatBase = {
+    now: chooserNow,
+    commitments: [],
+    skills: [],
+    interests: [{ topic: '挖矿类小品', confidence: 0.8, observations: 3, updatedAt: freshIso }],
+    activity: { current: null },
+    wakeBudget: { countToday: 2, maxPerDay: 6 },
+  }
+  const untouched = choose.rankCandidates({ ...repeatBase, doneToday: {} })
+    .candidates.find((c) => c.kind === 'interest')
+  const thrice = choose.rankCandidates({ ...repeatBase, doneToday: { '看看「挖矿类小品」的更新': 3 } })
+    .candidates.find((c) => c.kind === 'interest')
+  const restScore = choose.rankCandidates(repeatBase).rest.score
+  check('chooser prices repetition: doing the same thing again today scores strictly lower, and rest becomes preferable',
+    untouched && thrice && thrice.parts.cost > untouched.parts.cost &&
+    thrice.score < untouched.score && thrice.score < restScore,
+    `untouched=${untouched && untouched.score} thrice=${thrice && thrice.score} ` +
+    `(cost ${untouched && untouched.parts.cost} -> ${thrice && thrice.parts.cost}); rest=${restScore}`)
+}
 
 // ---- 10b. Ranking: order, parts/score agreement, rest, budget --------------
 const chooserState = {

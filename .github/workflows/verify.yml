@@ -101,6 +101,15 @@ jobs:
         run: |
           node verify/day-report.mjs 2>&1 | tee verify-day-report.log
 
+      # life-week 同样不需要 dsh：它把七天压缩跑完，用的是生产的 store/choose/wake。
+      # 它是「连续七天」这个说法的证据（PRODUCT.md §6 阶段 A），所以必须每平台都跑 ——
+      # 跨平台差异（路径、时区）正是它最容易出事的地方。
+      - name: Verify — life week
+        id: lifeweek
+        continue-on-error: true
+        run: |
+          node verify/life-week.mjs 2>&1 | tee verify-life-week.log
+
       # 打包检查放在 e2e 前面：它先跑 pnpm pack 与文件清单，漏文件这类问题在几秒内
       # 就有结论，不必等慢的 e2e。三套都跑（continue-on-error），总时长不变。
       - name: Verify — pack
@@ -119,14 +128,15 @@ jobs:
           set -euo pipefail
           node verify/e2e-tools.mjs 2>&1 | tee verify-e2e.log
 
-      # 汇总 dsh / node 版本、四套结果与输出尾部：写 step summary + verify-report.md，
-      # 并作为 job 的最终闸门（四套都 success 才放行）。
+      # 汇总 dsh / node 版本、五套结果与输出尾部：写 step summary + verify-report.md，
+      # 并作为 job 的最终闸门（五套都 success 才放行）。
       - name: Report and gate
         if: always()
         env:
           MATRIX_OS: ${{ matrix.os }}
           SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
           DAYREPORT_OUTCOME: ${{ steps.dayreport.outcome }}
+          LIFEWEEK_OUTCOME: ${{ steps.lifeweek.outcome }}
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           PACK_OUTCOME: ${{ steps.pack.outcome }}
         run: node .github/scripts/ci-report.mjs
@@ -139,6 +149,7 @@ jobs:
           path: |
             verify-smoke.log
             verify-day-report.log
+            verify-life-week.log
             verify-e2e.log
             verify-pack.log
             verify-report.md

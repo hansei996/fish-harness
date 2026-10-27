@@ -19,18 +19,19 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | 路径 | 是什么 |
 | --- | --- |
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
-| [`tools/`](tools/) | 运维脚本：把机器账本渲染成人能读的「它的一天」 |
-| [`verify/`](verify/) | 62 项存储/策略/soak 不变量 + 22 项当天报告工具 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
+| [`tools/`](tools/) | 两个工具：`day-report` 把账本渲染成人能读的「它的一天」；`life-week` 把七天压缩跑完，产出「它的一周」 |
+| [`verify/`](verify/) | 68 项存储/策略/soak 不变量 + 22 项当天报告工具 + 16 项七天连续运行 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
 | [`docs/PRODUCT.md`](docs/PRODUCT.md) | **产品规划**：市场位置、竞争分析、分阶段对外策略 |
 | [`docs/STORY.md`](docs/STORY.md) | **叙事**：软件史的下一次变化、三个落地场景、不声称什么 |
 | [`docs/index.html`](docs/index.html) | **对外页面**：单页静态站点，GitHub Pages 直接从 `docs/` 发布 |
 | [`docs/dsh-schedule-api.md`](docs/dsh-schedule-api.md) | dsh `schedule` 的可落地 API 结论（带 `包名/文件:行号` 证据） |
+| [`docs/life-week.md`](docs/life-week.md) | 一份真实跑出来的七天日志，以及它**没**证明什么 |
 | [`docs/wake-verification.md`](docs/wake-verification.md) | 自主唤醒验了什么、**没验什么** |
 | [`docs/wake-e2e.md`](docs/wake-e2e.md) | 真实 web profile 下一次真实唤醒的实测记录 |
 | [`docs/ci.md`](docs/ci.md) | CI 的固定项与理由 |
-| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍四套 verify（smoke / day-report / e2e / pack） |
+| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍五套 verify（smoke / day-report / life-week / e2e / pack） |
 
 ---
 
@@ -64,7 +65,7 @@ dsh 已经开源并且自带：会话持久化与崩溃恢复、持久目标（`
 
 ## Showcase
 
-两个视频，**都由 PAGX 逐帧烘焙生成**（不是录屏）。
+三个视频，**都由 PAGX 逐帧烘焙生成**（不是录屏）。
 
 ### 一、产品本身：六幕
 
@@ -97,6 +98,22 @@ dsh 已经开源并且自带：会话持久化与崩溃恢复、持久目标（`
 
 > ⚠️ **三个场景是设想，不是演示已有功能。** 生命层、自主唤醒、活动选择、证据规则都已实现并验证；
 > 但**对外发布尚未实现**。所以画面里它「发了内容」的部分，目前停在草稿。
+
+### 三、它的一周：七天之后，它还是同一个它吗
+
+![oneweek](showcase/oneweek.gif)
+
+> 19 秒、四幕。高画质版本：[`showcase/oneweek.mp4`](showcase/oneweek.mp4)
+
+| 幕 | 它讲什么 |
+| --- | --- |
+| **第 1 天 · 一次失败** | 10:29 没做成，留下证据；失败没有变成空白，而是变成一条留给明天的事 |
+| **第 2 天 · 它接着昨天** | 醒来先读自己的状态：昨天的下一步、昨天长上去的兴趣。**这条不在提示词里，在磁盘上** |
+| **7 天 · 兴趣长这样** | 0.55（来自主人）→ 0.67 → 0.91 → 0.95（观察 17 次）。不是第一天写死的人设 |
+| **诚实的一页** | 它证明了什么、**没有**证明什么 —— 这份日志里没有调用模型 |
+
+> 前三幕说的「累积」是单日演示永远讲不了的：**一天能被演出来，七天只能被跑出来。**
+> 画面里的每个数字都来自 `node tools/life-week.mjs` 的真实输出，完整记录见 [`docs/life-week.md`](docs/life-week.md)。
 
 ### 动画是怎么做的
 
@@ -298,17 +315,20 @@ wake.json          唤醒绑定 · 下一个闹钟 · 当天预算 · 已投递 
 
 ## 验证
 
-四套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。
+五套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。
 
 ```sh
-node verify/smoke.mjs       # 62 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性，不 spawn dsh，约 5s）
+node verify/smoke.mjs       # 68 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性，不 spawn dsh，约 5s）
 node verify/day-report.mjs  # 22 项：当天报告工具（不 spawn dsh，约 0.2s）
+node verify/life-week.mjs   # 16 项：连跑七天（不 spawn dsh，约 0.5s）
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs   # 17 项：真实 dsh 端到端
 DSH_BIN=<dsh bin> node verify/pack-install.mjs # 9 项：打出来的包能不能装进 profile 并激活（约 20s）
 node verify/live/wake-live.mjs                # 可选：真实 web profile 的一次真实唤醒（约 1–2 min；会先验安装是否健康）
 ```
 
-`npm run verify` 一次跑前三套（不需要 dsh 的 smoke + day-report，加需要 dsh 的 e2e）。
+`npm run verify` 一次跑前四套（不需要 dsh 的三套，加需要 dsh 的 e2e）。
+
+`life-week` 那套是**这一轮新增的，也是它抓出了最多东西的一套**：它把七天压缩跑完，用的是生产的 store / choose / wake，只把时钟换成可注入的。**单日演示永远看不见的东西全在这里露出来** —— 重复没有代价、探索只有入口没有出口、「留下一个明天要继续的事」是死代码（详见 [`docs/life-week.md`](docs/life-week.md) 与 [`docs/PLAN.md`](docs/PLAN.md) §6.2）。
 
 `e2e` 那套**不是 mock**：它用 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装进去，真启动，然后断言运行系统的实际产出 —— 磁盘上的身份、账本里的真实 `turn/end`、**装配后**的系统提示词里的生命层 section、以及 13 个工具 schema 全部对模型可见。
 
@@ -329,6 +349,16 @@ node verify/live/wake-live.mjs                # 可选：真实 web profile 的�
 4. 策略层一度会「整天不醒」：`every=24h±4h` 时目标被静默段推到后天，那个日历日就整个消失了（34 小时空窗）。soak 用固定时钟 + 固定随机数跑 8 组参数、367 次唤醒才量出来。
 5. README 的第一行安装命令是红的：`dsh plugin add dsh-life` → `ERR_PNPM_FETCH_404`，因为这个包从没发布到 npm。任何人照做都会在第一分钟卡住 —— 这类问题单测永远测不到，只有把「陌生人的第一步」当成一条断言才会。
 6. `finishActivity` 把 `evidence` 写进了 `activity.json`，**却漏写进了 `ledger.jsonl`**。账本是唯一可回放、有顺序的长期记录，漏了证据等于「对外可信」这个卖点在最底层就是假的 —— 而人眼几乎不可能从一长串 JSONL 里看出少了一个字段。修复后补了一条回归断言（先把 bug 临时改回去，确认它**真的会 FAIL**，再改回来），见 [`verify/smoke.mjs`](verify/smoke.mjs)。
+
+**再往下一类，只有「连跑几天」才看得见。** 这一轮把七天压缩跑完（`tools/life-week.mjs`），抓出的东西性质不同：程序一直运行正常，**只是它过的日子和文档里承诺的日子不是一回事**。三个都是产品级缺陷，不是崩溃：
+
+7. **重复没有代价。** 做完一件事会刷新 `updatedAt` → freshness 回满 → 下一轮它还是排第一。于是**一整天 6 次唤醒可以全花在同一件事上**，而日志看起来「很勤快」。产品自己写着不能是重复（`PRODUCT.md §12.3`）。修法是把重复并进**既有的「成本」项**（不新增第八项，否则所有文档里的分数都失效）。
+8. **探索只有入口没有出口。** `explorationBonusOf` 奖励「只见过一两次」的新兴趣，但一个已观察 18 次、置信度 0.95 的兴趣仍然拿满分，永远压过没见过的 —— 七天 31 次唤醒里 30 次给了两个已知兴趣，**一次都没探索第三个**。`PLAN.md §6.2` 写的是「适度探索」，而只有奖励没有递减不是探索，是棘轮。
+9. **「留下一个明天要继续的事」是死代码。** `choose.js` 有专门分支读 `activity.next`（值 0.75，比「刚做完」的 0.15 高得多），但**全仓库没有任何一处写它** —— store 不写，13 个工具里也没有。于是 README 第一屏那句「留了句『明天换成 SPI 试试』」在代码里落不了地。
+
+第 9 条修到一半还发现一个**我自己引入的**问题：交接写下来了，但七天里**一次都没被履行** —— 它得 0.349 分，而「休息」是固定的 0.35。**这个我故意没改**：排序器给的是候选，选不选由模型判断，按一个没有模型的模拟器去调生产权重，等于把产品拟合到测试工具上。它被记在 [`docs/PLAN.md`](docs/PLAN.md) §6.2 里，等有模型的真实运行来回答。
+
+> 这就是「连跑七天」这类验证唯一能提供、而单元测试永远给不了的东西：**它测的不是代码对不对，是日子真不真。**
 
 ---
 
