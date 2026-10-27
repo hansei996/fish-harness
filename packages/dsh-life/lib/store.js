@@ -2,6 +2,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { dayKeyOf } from './wake.js'
+import {
+  DEFAULT_OUTBOX_LIMIT,
+  normalizeOutboxItems,
+  pruneOutboxWithStats,
+  upsertOutboxItem,
+} from './outbox.js'
 
 /**
  * Durable life-state store.
@@ -130,6 +136,7 @@ export class LifeStore {
       activity: path.join(this.dir, 'activity.json'),
       ledger: path.join(this.dir, 'ledger.jsonl'),
       wake: path.join(this.dir, 'wake.json'),
+      outbox: path.join(this.dir, 'outbox.json'),
     }
   }
 
@@ -168,6 +175,13 @@ export class LifeStore {
       writeJsonAtomic(this.files.wake, {
         schemaVersion: LIFE_SCHEMA_VERSION,
         ...DEFAULT_WAKE,
+        updatedAt: this.nowIso(),
+      })
+    }
+    if (!this.readOutboxFile()) {
+      writeJsonAtomic(this.files.outbox, {
+        schemaVersion: LIFE_SCHEMA_VERSION,
+        items: [],
         updatedAt: this.nowIso(),
       })
     }
@@ -312,6 +326,116 @@ export class LifeStore {
     if (typeof sessionId === 'string' && sessionId) patch.sessionId = sessionId
     this.updateWake(patch)
     return { counted: true, countToday, dayKey }
+  }
+
+  // -------------------------------------------------------------------------
+  // Publish outbox
+  //
+  // One JSON file per life, written with the same tmp+rename as every other
+  // state file. Reading normalizes a `sending` record to `unconfirmed`: after a
+  // crash that state means "may have been sent", and nothing here may ever turn
+  // that into an automatic retry.
+  // -------------------------------------------------------------------------
+
+  /** Raw outbox.json, or null when absent/corrupt (used only by ensure). */
+  readOutboxFile () {
+    return readJson(this.files.outbox)
+  }
+
+  /**
+   * Normalized outbox. Corrupt or truncated files degrade to `{ items: [] }`;
+   * individual malformed items are dropped instead of poisoning the list.
+   */
+  readOutbox () {
+    const raw = this.readOutboxFile()
+    const items = normalizeOutboxItems(raw && Array.isArray(raw.items) ? raw.items : [], {
+      now: this.clock(),
+    })
+    return {
+      schemaVersion: LIFE_SCHEMA_VERSION,
+      items,
+      updatedAt: raw && typeof raw.updatedAt === 'string' ? raw.updatedAt : null,
+    }
+  }
+
+  /**
+   * Replace the whole outbox atomically.
+   *
+   * `max` is the budget for **proposed + settled** rows (`draft`/`checked` and
+   * `confirmed`/`failed`). Committed rows (`approved`/`sending`/`unconfirmed`)
+   * describe an external side effect that may already exist, so they are never
+   * pruned and do not consume the budget; the file may therefore exceed `max`.
+   * Drop counts are written as `lastPruned` and returned so "my draft
+   * disappeared" can be answered without guessing.
+   */
+  writeOutbox (outbox, { max = DEFAULT_OUTBOX_LIMIT } = {}) {
+    // Deliberately no `sending → unconfirmed` normalization on write: `sending`
+    // must reach the disk *before* the transport call so a crash leaves a
+    // durable "maybe sent". Normalization is a read-side recovery rule.
+    const items = Array.isArray(outbox && outbox.items)
+      ? outbox.items.filter((item) => item && typeof item === 'object')
+      : []
+    const pruned = pruneOutboxWithStats(items, max)
+    const value = {
+      schemaVersion: LIFE_SCHEMA_VERSION,
+      items: pruned.items,
+      updatedAt: this.nowIso(),
+    }
+    if (pruned.dropped.proposed > 0 || pruned.dropped.settled > 0) {
+      value.lastPruned = {
+        at: value.updatedAt,
+        proposed: pruned.dropped.proposed,
+        settled: pruned.dropped.settled,
+      }
+    }
+    writeJsonAtomic(this.files.outbox, value)
+    return { ...value, dropped: pruned.dropped }
+  }
+
+  /**
+   * Merge a patch into one item and write the file once.
+   *
+   * One write per state change is what makes "don't remember what was sent" a
+   * non-failure: the caller writes `sending` before the side effect, so a crash
+   * leaves a durable "maybe sent" record rather than nothing.
+   */
+  updateOutboxItem (id, patch, { max = DEFAULT_OUTBOX_LIMIT } = {}) {
+    const outbox = this.readOutbox()
+    const index = outbox.items.findIndex((item) => item.contentId === id || item.id === id)
+    if (index < 0) throw new Error('life/publish-record-not-found')
+    const next = {
+      ...outbox.items[index],
+      ...(patch && typeof patch === 'object' ? patch : {}),
+      updatedAt: this.nowIso(),
+    }
+    const items = outbox.items.slice()
+    items[index] = next
+    this.writeOutbox({ items }, { max })
+    return next
+  }
+
+  /**
+   * Insert a record, enforcing one record per idempotency key. Returns the
+   * effective record and whether an existing one already owned the key.
+   */
+  appendOutboxItem (record, { max = DEFAULT_OUTBOX_LIMIT } = {}) {
+    const outbox = this.readOutbox()
+    const result = upsertOutboxItem(outbox.items, record, { max })
+    if (!result.duplicate) {
+      const saved = this.writeOutbox({ items: result.items }, { max })
+      return { record: result.record, duplicate: false, dropped: saved.dropped }
+    }
+    return { record: result.record, duplicate: true, dropped: { proposed: 0, settled: 0 } }
+  }
+
+  findOutboxByIdempotencyKey (key) {
+    if (typeof key !== 'string' || !key) return null
+    return this.readOutbox().items.find((item) => item.idempotencyKey === key) || null
+  }
+
+  findOutboxItem (id) {
+    if (typeof id !== 'string' || !id) return null
+    return this.readOutbox().items.find((item) => item.contentId === id || item.id === id) || null
   }
 
   /**

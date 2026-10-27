@@ -91,3 +91,13 @@ node verify/pack-install.mjs   # 需要 pnpm 在 PATH；约 20-40s
 一个不少、把 tarball 装进全新 profile 再 boot 一次（无凭据只要求 `identity.json` 落盘，90s 超时算失败）。
 `PACK_DSH_HOME` 可覆盖临时 HOME；失败会保留 tarball 与 HOME 并打印路径。
 它**不在** `npm run verify` 里：根 `package.json` 不在本轮写范围，而且它比前两套慢（要真装 + 真 boot）。
+
+## 第四套：发布线（`verify/publish.mjs`）
+
+```sh
+node verify/publish.mjs   # 约 1s；不启动 dsh、不联网、不需要凭据
+```
+
+假 approval（四种 outcome）+ 假 transport + 假 `fetch`：跑 outbox 状态机、标识硬闸、`life_publish`
+接线与 Telegram 载荷/脱敏。进程内把 `globalThis.fetch` 换成会抛错的 stub，并断言全程 **0 次真实请求**。
+`PUBLISH_DSH_HOME` 可覆盖临时 HOME；它也不在 `npm run verify` 里（理由同上）。

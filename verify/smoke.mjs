@@ -92,7 +92,7 @@ mod.apply(fakeCtx, { lifeId: 'registration' })
 const warns = events.filter((e) => e.kind === 'warn')
 const toolNames = events.filter((e) => e.kind === 'tool').map((e) => e.name)
 check('plugin applies with no warnings', warns.length === 0, warns.map((w) => w.m).join('; '))
-check('registers the full life tool surface', toolNames.length === 13, `${toolNames.length} tools`)
+check('registers the full life tool surface', toolNames.length === 17, `${toolNames.length} tools`)
 check('registers the plan-critical tools',
   ['life_whoami', 'life_start_activity', 'life_finish_activity', 'life_promise',
     'life_settle_commitment', 'life_identity_update', 'life_ledger', 'life_wake'].every((n) => toolNames.includes(n)))
@@ -577,7 +577,7 @@ setClock(10, 0)
 const degradedState = wakeCtx({ withSchedule: false })
 mod.apply(degradedState.root, { lifeId: 'wake-degraded' })
 const degradedShapeOk = degradedState.warnings.length === 0 &&
-  degradedState.tools.length === 13 &&
+  degradedState.tools.length === 17 &&
   degradedState.sections.length === 1
 degradedState.emit('session/event', sessionOf('degraded-session'), { type: 'turn/end', time: clockNow, data: { turn: 1 } })
 degradedState.emit('session/event', sessionOf('degraded-session'), { type: 'turn/end', time: clockNow, data: { turn: 2 } })

@@ -34,7 +34,30 @@ const DEFAULTS = {
   // life to decide without a ranked shortlist, which is honest degradation.
   chooserEnabled: true,
   chooserTopN: 3,
+  // Publish line (docs/PLAN.md §7.3). Off by default: with no configured
+  // channel there must be no outward action at all. Credentials never live
+  // here — they belong to the runtime that injects the transport.
+  publisherEnabled: false,
+  publisherChannels: [],
+  publisherProviderCode: 'dsh-life',
+  publisherMaxOutbox: 200,
 }
+
+/** Channel kinds this build knows how to describe. Credentials are separate. */
+export const PUBLISH_CHANNEL_KINDS = Object.freeze(['telegram', 'file'])
+
+/** Any config key that looks like a credential is rejected outright. */
+const CREDENTIAL_KEY = /(token|secret|password|credential|api[-_]?key|access[-_]?key|private[-_]?key)/i
+
+/**
+ * The one permitted exception: `tokenEnv` holds the *name* of an environment
+ * variable, never the secret itself. Everything else that looks like a token
+ * key (including `token`) is still refused.
+ */
+const CREDENTIAL_KEY_ALLOWLIST = new Set(['tokenEnv'])
+
+/** Environment variable names only: uppercase, digits, underscore. */
+const TOKEN_ENV_PATTERN = /^[A-Z][A-Z0-9_]{2,63}$/
 
 const CLOCK_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
 
@@ -46,6 +69,27 @@ function issue (path, message) {
   return { path: [path], message }
 }
 
+/**
+ * Collect credential-looking key paths anywhere in the raw config.
+ *
+ * A publish chain that accepts `token:` in YAML would leak a secret into the
+ * life directory and every backup of it, so this is refused even before the
+ * field is understood by anything.
+ */
+function credentialKeyPaths (value, prefix = '', out = [], depth = 0) {
+  if (depth > 4 || value === null || typeof value !== 'object') return out
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => credentialKeyPaths(item, `${prefix}[${index}]`, out, depth + 1))
+    return out
+  }
+  for (const [key, item] of Object.entries(value)) {
+    const path = prefix ? `${prefix}.${key}` : key
+    if (CREDENTIAL_KEY.test(key) && !CREDENTIAL_KEY_ALLOWLIST.has(key)) out.push(path)
+    else credentialKeyPaths(item, path, out, depth + 1)
+  }
+  return out
+}
+
 function validate (input) {
   const issues = []
   const raw = input === undefined || input === null ? {} : input
@@ -55,6 +99,10 @@ function validate (input) {
   }
 
   const out = { ...DEFAULTS }
+
+  for (const path of credentialKeyPaths(raw)) {
+    issues.push(issue(path, 'credentials must not be stored in plugin config; inject them from the runtime instead'))
+  }
 
   if ('lifeId' in raw) {
     const value = raw.lifeId
@@ -93,7 +141,7 @@ function validate (input) {
     }
   }
 
-  for (const key of ['injectContext', 'autoCreate', 'wakeEnabled', 'chooserEnabled']) {
+  for (const key of ['injectContext', 'autoCreate', 'wakeEnabled', 'chooserEnabled', 'publisherEnabled']) {
     if (!(key in raw)) continue
     if (typeof raw[key] !== 'boolean') {
       issues.push(issue(key, `${key} must be a boolean`))
@@ -119,6 +167,7 @@ function validate (input) {
     ['wakeJitterMinutes', 0, 240],
     ['wakeMaxPerDay', 1, 48],
     ['chooserTopN', 1, 5],
+    ['publisherMaxOutbox', 10, 2000],
   ]) {
     if (!(key in raw)) continue
     const value = raw[key]
@@ -154,6 +203,69 @@ function validate (input) {
       issues.push(issue('wakePrompt', 'wakePrompt must be at most 1000 characters'))
     } else {
       out.wakePrompt = value
+    }
+  }
+
+  if ('publisherProviderCode' in raw) {
+    const value = raw.publisherProviderCode
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_.-]{1,64}$/.test(value)) {
+      issues.push(issue('publisherProviderCode', 'publisherProviderCode must be 1-64 letters, digits, dot, hyphen or underscore'))
+    } else {
+      out.publisherProviderCode = value
+    }
+  }
+
+  if ('publisherChannels' in raw) {
+    const value = raw.publisherChannels
+    if (!Array.isArray(value)) {
+      issues.push(issue('publisherChannels', 'publisherChannels must be an array'))
+    } else if (value.length > 10) {
+      issues.push(issue('publisherChannels', 'at most 10 publisher channels'))
+    } else {
+      const channels = []
+      const seen = new Set()
+      value.forEach((item, index) => {
+        const prefix = `publisherChannels[${index}]`
+        if (!isPlainObject(item)) {
+          issues.push(issue(prefix, 'each publisher channel must be an object { id, kind, account }'))
+          return
+        }
+        const allowedKeys = ['id', 'kind', 'account', 'tokenEnv']
+        const extra = Object.keys(item).filter((key) => !allowedKeys.includes(key))
+        for (const key of extra) {
+          issues.push(issue(`${prefix}.${key}`, 'publisher channel may only contain id, kind, account, tokenEnv; credentials belong to the runtime'))
+        }
+        const id = typeof item.id === 'string' ? item.id.trim() : ''
+        if (!/^[A-Za-z0-9_.-]{1,64}$/.test(id)) {
+          issues.push(issue(`${prefix}.id`, 'channel id must be 1-64 letters, digits, dot, hyphen or underscore'))
+        } else if (seen.has(id)) {
+          issues.push(issue(`${prefix}.id`, 'channel id must be unique'))
+        } else {
+          seen.add(id)
+        }
+        if (!PUBLISH_CHANNEL_KINDS.includes(item.kind)) {
+          issues.push(issue(`${prefix}.kind`, `channel kind must be one of: ${PUBLISH_CHANNEL_KINDS.join(', ')}`))
+        }
+        if (typeof item.account !== 'string' || !item.account.trim()) {
+          issues.push(issue(`${prefix}.account`, 'channel account must be a non-empty string'))
+        } else if (item.account.length > 120) {
+          issues.push(issue(`${prefix}.account`, 'channel account must be at most 120 characters'))
+        }
+        if (item.tokenEnv !== undefined) {
+          // A variable *name*, never a value: this is what keeps secrets out of
+          // profiles, backups and the model context.
+          if (typeof item.tokenEnv !== 'string' || !TOKEN_ENV_PATTERN.test(item.tokenEnv)) {
+            issues.push(issue(`${prefix}.tokenEnv`, 'tokenEnv must be an environment variable name like TELEGRAM_BOT_TOKEN'))
+          }
+        }
+        channels.push({
+          id,
+          kind: item.kind,
+          account: typeof item.account === 'string' ? item.account.trim() : '',
+          ...(item.tokenEnv === undefined ? {} : { tokenEnv: item.tokenEnv }),
+        })
+      })
+      out.publisherChannels = channels
     }
   }
 

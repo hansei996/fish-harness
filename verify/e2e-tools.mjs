@@ -125,7 +125,7 @@ if (fs.existsSync(probeOut)) {
   const lifeSection = (captured.sections || []).find((s) => /life/.test(s.name || ''))
   check('the life context reached the assembled system prompt', Boolean(lifeSection), lifeSection ? lifeSection.name : 'not found')
   const lifeTools = (captured.tools || []).filter((t) => /^life_/.test(t.name || ''))
-  check('all life tools are visible to the model', lifeTools.length === 13, `${lifeTools.length} tools`)
+  check('all life tools are visible to the model', lifeTools.length === 17, `${lifeTools.length} tools`)
   check('tool schemas reach the model with descriptions',
     lifeTools.every((t) => typeof t.description === 'string' && t.description.length > 20))
 } else {

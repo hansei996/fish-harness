@@ -1,6 +1,17 @@
-import { LifeStore, resolveDshHome } from './store.js'
+import { LifeStore, newId, resolveDshHome } from './store.js'
+import { installLifeUi } from './ui.js'
 import { ConfigSchema, ConfigDefaults } from './config.js'
 import { CHOOSER_WEIGHTS, rankCandidates, renderWakeCandidates, shortlistCandidates } from './choose.js'
+import {
+  approve,
+  createDraft,
+  markChecked,
+  noteApproval,
+  outboxCounts,
+  reconcile,
+  sendAttempt,
+} from './outbox.js'
+import { createTelegramTransport } from './telegram.js'
 import {
   dayKeyOf,
   isQuietAt,
@@ -72,6 +83,11 @@ export function apply (root, config = {}) {
 
   const disposers = []
 
+  // ---- 0. Read-only UI seam ------------------------------------------------
+  // Registers `/life/state.json` only when the profile carries a `webServer`
+  // (headless/SDK profiles have none: nothing is registered, nothing is logged).
+  installLifeUi(root, store, settings)
+
   // ---- 0. Optional schedule seam ------------------------------------------
   // `schedule` is deliberately not in the module-level `inject`: a partial
   // (headless) profile must still boot and keep its identity. This callback
@@ -118,9 +134,34 @@ export function apply (root, config = {}) {
     // A context that cannot inject at all (tests, partial profiles) is fine.
   }
 
+  // The publish line is record-and-state-machine only in this round: the
+  // transport that would actually talk to a platform is injected by the
+  // runtime (or a test double), never built here and never read from config.
+  const publisherRuntime = {
+    transport: resolveTransport(root, config),
+    approval: null,
+  }
+
+  // Approval is optional for the same reason schedule is: a partial profile
+  // must still load. Without it `life_publish` fails closed — it never treats a
+  // missing answerer as consent.
+  try {
+    root.inject(['approval'], (ctx) => {
+      try {
+        if (ctx && ctx.approval && typeof ctx.approval.request === 'function') {
+          publisherRuntime.approval = ctx.approval
+        }
+      } catch (err) {
+        // Never warn during apply: a missing approval channel is a degradation.
+      }
+    })
+  } catch (err) {
+    // A context that cannot inject at all (tests, partial profiles) is fine.
+  }
+
   // ---- 1. Model-facing life tools -----------------------------------------
   root.inject(['tools'], (ctx) => {
-    for (const definition of buildTools(store, settings, wakeRuntime)) {
+    for (const definition of buildTools(store, settings, wakeRuntime, publisherRuntime)) {
       try {
         disposers.push(ctx.tools.register(definition))
       } catch (err) {
@@ -278,7 +319,7 @@ export function apply (root, config = {}) {
 // Tools
 // ---------------------------------------------------------------------------
 
-function buildTools (store, settings, wakeRuntime) {
+function buildTools (store, settings, wakeRuntime, publisherRuntime) {
   const tools = []
 
   tools.push(tool({
@@ -452,6 +493,56 @@ function buildTools (store, settings, wakeRuntime) {
       topN: { type: 'integer', description: 'How many activity candidates to return (1-5); defaults to chooserTopN. The rest candidate is always included.' },
     },
     execute: async (args) => readCandidates(store, settings, args),
+  }))
+
+  // ---- Publish line: records only, no send tool --------------------------
+  // Approval (who may say "send") is a separate seam that is not wired yet, so
+  // these tools stop at "waiting for the keeper". A tool must never be able to
+  // turn its own draft into `approved`, and none of them can reach `confirmed`
+  // without a receipt from an injected transport.
+  tools.push(tool({
+    name: 'life_draft_post',
+    description: 'Draft a post from something that actually happened. Every evidence reference must already exist in your life ledger (an activity-end id, an activity-end evidence string, or a ledger entry time); a draft about something you did not do is refused. This only records a draft: nothing is approved, nothing is sent, and there is no tool that can turn this draft into an approval.',
+    parameters: {
+      text: { type: 'string', required: true, description: 'The post body, in your own voice; the platform label is added later by the queue, do not add your own' },
+      evidence: { type: 'array', items: { type: 'string' }, required: true, description: 'Ledger-backed references: activity-end ids/evidence or ledger entry times' },
+      channel: { type: 'string', description: 'Configured channel id (or kind); defaults to the only configured channel' },
+      account: { type: 'string', description: 'Account for that channel; defaults to the configured account' },
+    },
+    required: ['text', 'evidence'],
+    execute: async (args) => draftPost(store, settings, args),
+  }))
+
+  tools.push(tool({
+    name: 'life_publish_queue',
+    description: 'Move a draft to "checked": add the mandatory AI-generation label with its content id and record the version that a keeper approval would have to cover. It stops there and returns waiting-for-owner. This tool can never approve content, and approval/sending are deliberately not registered in this build.',
+    parameters: {
+      id: { type: 'string', required: true, description: 'contentId returned by life_draft_post' },
+    },
+    required: ['id'],
+    execute: async (args) => queuePost(store, settings, args),
+  }))
+
+  tools.push(tool({
+    name: 'life_publish_status',
+    description: 'Read the publish outbox, or reconcile an unconfirmed delivery explicitly. After sending starts, a missing receipt means "may have been published": the record stays unconfirmed and is never retried automatically. With reconcile=true it asks the configured transport whether the content exists (found -> confirmed with platformId; explicitly not found -> back to approved; unknown -> stays unconfirmed for a human).',
+    parameters: {
+      id: { type: 'string', description: 'contentId to inspect; omit for a bounded summary' },
+      reconcile: { type: 'boolean', description: 'Attempt one reconciliation against the injected transport (never sends)' },
+    },
+    execute: async (args) => publishStatus(store, settings, publisherRuntime, args),
+  }))
+
+  // The seventeenth tool: the only path from `checked` to `sending`. It asks
+  // dsh's approval seam and honours exactly one answer: `allowed-once`.
+  tools.push(tool({
+    name: 'life_publish',
+    description: 'Publish one checked draft after the keeper explicitly approves this exact content. It asks dsh for approval and only "allowed-once" is consent; rejected, cancelled and unavailable all mean nothing is sent. Approval is not bound to content by dsh, so the content version is re-checked after approval and a changed draft is refused. A send without a platform id becomes unconfirmed and is never retried automatically — reconcile it instead.',
+    parameters: {
+      id: { type: 'string', required: true, description: 'contentId of a checked draft from life_publish_queue' },
+    },
+    required: ['id'],
+    execute: async (args, exec) => publishNow(store, settings, publisherRuntime, args, exec),
   }))
 
   return tools
@@ -851,6 +942,586 @@ function readCandidates (store, settings, args) {
     candidates: shortlistCandidates(ranked.candidates, topN),
     rest: ranked.rest,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Publish line wiring
+//
+// This round deliberately stops at records + a state machine. There is no
+// `life_publish_send` tool: approval (who is allowed to say "send") is a dsh
+// `approval` seam that is not researched/wired yet, and a tool that could
+// approve its own content would make every invariant in outbox.js decorative.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the injected transport.
+ *
+ * Credentials and network clients never live in plugin config (the config
+ * validator rejects credential-like keys). Tests and future runtime adapters
+ * inject the transport one of three ways, in priority order:
+ *   1. `config.transport` when `apply()` is called directly;
+ *   2. a `lifeTransport` service on the context;
+ *   3. `root.lifeTransport` on a recording test context.
+ */
+function resolveTransport (root, config) {
+  try {
+    if (config && typeof config === 'object' && config.transport &&
+        typeof config.transport === 'object') {
+      return config.transport
+    }
+  } catch (err) {}
+  try {
+    if (typeof root.get === 'function') {
+      const injected = root.get('lifeTransport')
+      if (injected && typeof injected === 'object') return injected
+    }
+  } catch (err) {}
+  try {
+    if (root && root.lifeTransport && typeof root.lifeTransport === 'object') return root.lifeTransport
+  } catch (err) {}
+  return null
+}
+
+function ensurePublisherEnabled (settings) {
+  if (!settings.publisherEnabled) {
+    throw new Error('life/publisher-disabled: 发布线未开启（publisherEnabled: false）；没有配置渠道时不做任何对外动作')
+  }
+}
+
+/** Resolve `{ channel, kind, account }` from config and the caller's arguments. */
+function resolvePublishChannel (settings, channelArg, accountArg) {
+  const channels = Array.isArray(settings.publisherChannels) ? settings.publisherChannels : []
+  if (channels.length === 0) throw new Error('life/publish-no-channels: 没有配置发布渠道（publisherChannels）')
+  let chosen = null
+  const wanted = typeof channelArg === 'string' ? channelArg.trim() : ''
+  if (wanted) {
+    chosen = channels.find((item) => item.id === wanted || item.kind === wanted) || null
+    if (!chosen) throw new Error(`life/publish-unknown-channel: ${wanted}`)
+  } else if (channels.length === 1) {
+    chosen = channels[0]
+  } else {
+    throw new Error('life/publish-channel-required: 配置了多个渠道，请指定 channel')
+  }
+  const account = typeof accountArg === 'string' && accountArg.trim()
+    ? accountArg.trim()
+    : chosen.account
+  if (account !== chosen.account) {
+    throw new Error('life/publish-account-mismatch: 账号不在该渠道的授权范围里')
+  }
+  return { channel: chosen.id, kind: chosen.kind, account }
+}
+
+/**
+ * Every reference a draft may cite. `activity-end` records carry the evidence
+ * that proves the experience; other ledger entries are addressable by their
+ * timestamp, which is the only stable id the append-only log actually has.
+ */
+function ledgerEvidenceIndex (store) {
+  const allowed = new Set()
+  for (const row of store.readLedger({ limit: 5000 })) {
+    if (!row || typeof row !== 'object') continue
+    if (typeof row.at === 'string' && row.at) {
+      allowed.add(row.at)
+      allowed.add(`ledger:${row.at}`)
+    }
+    if (row.kind !== 'activity-end') continue
+    const detail = row.detail && typeof row.detail === 'object' ? row.detail : {}
+    if (typeof detail.id === 'string' && detail.id) allowed.add(detail.id)
+    if (Array.isArray(detail.evidence)) {
+      for (const entry of detail.evidence) {
+        if (typeof entry === 'string' && entry.trim()) allowed.add(entry.trim())
+      }
+    }
+  }
+  return allowed
+}
+
+/**
+ * "Don't write about what you did not do." A draft must cite evidence that
+ * already exists in the durable ledger; a plausible-sounding reference is not
+ * enough, so this is a refusal rather than a warning.
+ */
+function requireLedgerEvidence (store, evidence) {
+  if (!Array.isArray(evidence) || evidence.length === 0) {
+    throw new Error('life/publish-evidence-required: 必须引用真实经历（账本里的 activity-end id/证据或条目时间）')
+  }
+  const allowed = ledgerEvidenceIndex(store)
+  const normalized = []
+  for (const entry of evidence) {
+    if (typeof entry !== 'string' || !entry.trim()) {
+      throw new Error('life/publish-evidence-required: 证据引用必须是非空字符串')
+    }
+    const reference = entry.trim()
+    if (!allowed.has(reference)) {
+      throw new Error(`life/publish-evidence-not-found: ${reference}`)
+    }
+    normalized.push(reference)
+  }
+  return [...new Set(normalized)]
+}
+
+function labelOptionsFor (settings) {
+  return {
+    identityName: settings.name,
+    providerCode: settings.publisherProviderCode,
+  }
+}
+
+/** `life_draft_post`: record a draft and nothing else. */
+function draftPost (store, settings, args) {
+  ensurePublisherEnabled(settings)
+  const input = args && typeof args === 'object' ? args : {}
+  const text = typeof input.text === 'string' ? input.text.trim() : ''
+  if (!text) throw new Error('life/publish-text-required')
+  if (text.length > 4000) throw new Error('life/publish-text-too-long: 正文最多 4000 字')
+  const evidence = requireLedgerEvidence(store, input.evidence)
+  const target = resolvePublishChannel(settings, input.channel, input.account)
+  const record = createDraft({
+    contentId: newId('post'),
+    text,
+    evidence,
+    channel: target.channel,
+    account: target.account,
+    labelOptions: labelOptionsFor(settings),
+  })
+  const stored = store.appendOutboxItem(record, { max: settings.publisherMaxOutbox })
+  const pruned = stored.dropped && (stored.dropped.proposed > 0 || stored.dropped.settled > 0)
+    ? stored.dropped
+    : null
+  return {
+    ok: true,
+    id: stored.record.contentId,
+    contentId: stored.record.contentId,
+    contentVersion: stored.record.contentVersion,
+    status: stored.record.status,
+    channel: stored.record.channel,
+    account: stored.record.account,
+    evidence: stored.record.evidence,
+    duplicate: stored.duplicate,
+    ...(pruned ? { pruned } : {}),
+    waitingForOwner: false,
+    message: pruned
+      ? `草稿已记录；outbox 超出保留预算，清掉了 ${pruned.proposed} 条最老的提案、${pruned.settled} 条最老的已结算记录（待批准/发送中/待对账的记录永不删除）。下一步 life_publish_queue。`
+      : '草稿已记录，尚未批准、尚未发送。下一步 life_publish_queue 做标识检查；批准与发送需要主人确认。',
+  }
+}
+
+/** `life_publish_queue`: label + version the content, then stop and wait. */
+function queuePost (store, settings, args) {
+  ensurePublisherEnabled(settings)
+  const input = args && typeof args === 'object' ? args : {}
+  const id = typeof input.id === 'string' ? input.id.trim() : ''
+  if (!id) throw new Error('life/publish-id-required')
+  const existing = store.findOutboxItem(id)
+  if (!existing) throw new Error('life/publish-record-not-found')
+
+  if (existing.status !== 'draft' && existing.status !== 'checked') {
+    return {
+      ok: true,
+      id: existing.contentId,
+      status: existing.status,
+      advanced: false,
+      waitingForOwner: existing.status === 'approved',
+      message: queueStatusMessage(existing.status),
+    }
+  }
+
+  const checked = markChecked(existing, {
+    now: new Date(),
+    labelOptions: labelOptionsFor(settings),
+  })
+  const saved = store.updateOutboxItem(existing.contentId, checked, {
+    max: settings.publisherMaxOutbox,
+  })
+  return {
+    ok: true,
+    id: saved.contentId,
+    status: saved.status,
+    advanced: existing.status !== 'checked',
+    contentVersion: saved.contentVersion,
+    labeledText: saved.labeledText,
+    metadata: saved.metadata,
+    waitingForOwner: true,
+    // The one sentence the model must not misread as permission:
+    message: '标识检查已通过，等待主人确认。本轮没有工具能把它变成 approved，也不会发送。',
+  }
+}
+
+function queueStatusMessage (status) {
+  if (status === 'approved') return '已获主人批准，等待发送渠道接入（本轮没有发送工具）'
+  if (status === 'sending') return '正在发送或上次发送中断；按 unconfirmed 处理，先对账，不要重发'
+  if (status === 'unconfirmed') return '发送结果未知：必须显式对账或人工确认，禁止重发'
+  if (status === 'confirmed') return '已确认发布，保存了平台对象 ID'
+  if (status === 'failed') return '已确认失败；若要重试需重新走批准'
+  return `当前状态：${status}`
+}
+
+/** Compact one record for the status list (keeps the file bounded in output). */
+function compactOutboxItem (item) {
+  if (!item || typeof item !== 'object') return null
+  return {
+    id: item.contentId,
+    status: item.status,
+    channel: item.channel,
+    account: item.account,
+    contentVersion: item.contentVersion,
+    platformId: item.platformId || null,
+    updatedAt: item.updatedAt || null,
+  }
+}
+
+async function publishStatus (store, settings, runtime, args) {
+  const input = args && typeof args === 'object' ? args : {}
+  const id = typeof input.id === 'string' ? input.id.trim() : ''
+  const wantReconcile = input.reconcile === true
+  const outbox = store.readOutbox()
+  const counts = outboxCounts(outbox.items)
+  const configured = Boolean(runtime.transport)
+  const persist = async (record) => {
+    store.updateOutboxItem(record.contentId, record, { max: settings.publisherMaxOutbox })
+  }
+
+  if (id) {
+    const item = outbox.items.find((entry) => entry.contentId === id || entry.id === id)
+    if (!item) throw new Error('life/publish-record-not-found')
+    if (!wantReconcile) {
+      return { ok: true, configured, counts, item }
+    }
+    if (!configured) {
+      return {
+        ok: false,
+        configured: false,
+        outcome: 'no-transport',
+        counts,
+        item,
+        message: '未配置渠道（没有注入 transport），无法查询平台；保持 unconfirmed，需要人工确认',
+      }
+    }
+    const result = await reconcile(item, {
+      transport: runtime.transport,
+      now: new Date(),
+      persist,
+      labelOptions: labelOptionsFor(settings),
+    })
+    return {
+      ok: result.ok,
+      configured,
+      outcome: result.outcome,
+      counts: outboxCounts(store.readOutbox().items),
+      item: result.record,
+      ...(result.message ? { message: result.message } : {}),
+    }
+  }
+
+  const sorted = outbox.items
+    .slice()
+    .sort((a, b) => Date.parse(b.updatedAt || 0) - Date.parse(a.updatedAt || 0))
+  if (!wantReconcile) {
+    return {
+      ok: true,
+      configured,
+      counts,
+      total: outbox.items.length,
+      items: sorted.slice(0, 20).map(compactOutboxItem).filter(Boolean),
+      waitedForReconcile: outbox.items
+        .filter((entry) => entry.status === 'unconfirmed')
+        .slice(0, 20)
+        .map(compactOutboxItem),
+    }
+  }
+
+  const pending = outbox.items.filter((entry) => entry.status === 'unconfirmed').slice(0, 20)
+  if (!configured) {
+    return {
+      ok: false,
+      configured: false,
+      outcome: 'no-transport',
+      counts,
+      reconciled: 0,
+      results: [],
+      items: pending.map(compactOutboxItem),
+      message: '未配置渠道（没有注入 transport），无法查询平台；unconfirmed 记录保持不动，需要人工确认',
+    }
+  }
+  const results = []
+  for (const entry of pending) {
+    const result = await reconcile(entry, {
+      transport: runtime.transport,
+      now: new Date(),
+      persist,
+      labelOptions: labelOptionsFor(settings),
+    })
+    results.push({
+      id: entry.contentId,
+      outcome: result.outcome,
+      status: result.record.status,
+      platformId: result.record.platformId || null,
+      ...(result.message ? { message: result.message } : {}),
+    })
+  }
+  return {
+    ok: true,
+    configured,
+    counts: outboxCounts(store.readOutbox().items),
+    reconciled: results.length,
+    results,
+  }
+}
+
+/**
+ * `life_publish`: ask dsh for consent, then send exactly once.
+ *
+ * Order is the whole point:
+ *   1. only a `checked` record is eligible (a draft is labelled + checked first);
+ *   2. a real approval is requested from dsh — a missing answerer is *not*
+ *      consent, and no fallback approval path exists;
+ *   3. only `allowed-once` continues; the other three outcomes stop here;
+ *   4. the record is re-read and the label/version is recomputed after approval
+ *      (dsh approvals carry no content digest, so this is the TOCTOU guard);
+ *   5. `sendAttempt` writes `sending` before the side effect and maps every
+ *      non-receipt outcome to `unconfirmed` (never an automatic retry);
+ *   6. the ledger gets a `publish` entry with the digest/length, never the body.
+ */
+async function publishNow (store, settings, runtime, args, exec) {
+  ensurePublisherEnabled(settings)
+  const input = args && typeof args === 'object' ? args : {}
+  const id = typeof input.id === 'string' ? input.id.trim() : ''
+  if (!id) throw new Error('life/publish-id-required')
+  const agent = exec && exec.agent
+  if (!agent) throw new Error('life/publish-agent-required: 没有 agent，不能向主人请求批准')
+  if (!runtime.approval || typeof runtime.approval.request !== 'function') {
+    throw new Error('life/publish-no-approval-channel: 这个 profile 没有批准通道（approval 服务未挂载），不能发布')
+  }
+
+  const max = settings.publisherMaxOutbox
+  let item = store.findOutboxItem(id)
+  if (!item) throw new Error('life/publish-record-not-found')
+  if (item.status === 'draft') {
+    item = store.updateOutboxItem(item.contentId, markChecked(item, {
+      now: new Date(),
+      labelOptions: labelOptionsFor(settings),
+    }), { max })
+  }
+  if (item.status !== 'checked') {
+    return {
+      ok: false,
+      outcome: 'invalid-state',
+      id: item.contentId,
+      status: item.status,
+      message: queueStatusMessage(item.status),
+    }
+  }
+
+  // Resolve the transport before asking for consent: a channel that cannot
+  // send should not make the keeper approve something for nothing.
+  const resolved = transportForItem(settings, runtime, item)
+  if (!resolved) {
+    return {
+      ok: false,
+      outcome: 'no-transport',
+      id: item.contentId,
+      status: item.status,
+      message: '这个渠道没有可用的发送能力（未注入 transport，也不是带 tokenEnv 的 telegram 渠道）；没有请求批准',
+    }
+  }
+  if (resolved.tokenEnv && !envConfigured(resolved.tokenEnv)) {
+    // Nothing could have been sent without a token, so this is not the
+    // "unconfirmed" case; say it plainly and leave the record checked.
+    return {
+      ok: false,
+      outcome: 'credential-unconfigured',
+      id: item.contentId,
+      status: item.status,
+      message: `渠道凭据环境变量 ${resolved.tokenEnv} 未设置；没有请求批准，也没有发送`,
+    }
+  }
+
+  const approvedVersion = item.contentVersion
+  const approvedChannel = item.channel
+  const approvedAccount = item.account
+  const reason = approvalReasonFor(item)
+  let outcome
+  try {
+    outcome = await runtime.approval.request({
+      agent,
+      toolName: 'life_publish',
+      ...(exec.callId ? { callId: exec.callId } : {}),
+      reason,
+      ...(exec.signal ? { signal: exec.signal } : {}),
+    })
+  } catch (err) {
+    await recordApprovalOutcome(store, settings, item, 'error', messageOf(err))
+    return {
+      ok: false,
+      outcome: 'approval-error',
+      id: item.contentId,
+      status: item.status,
+      message: `批准请求失败：${messageOf(err)}（没有发送）`,
+    }
+  }
+
+  if (outcome !== 'allowed-once') {
+    await recordApprovalOutcome(store, settings, item, outcome, null)
+    return {
+      ok: false,
+      outcome: typeof outcome === 'string' && outcome ? outcome : 'unknown',
+      id: item.contentId,
+      status: 'checked',
+      approved: false,
+      message: approvalOutcomeMessage(outcome),
+    }
+  }
+
+  // TOCTOU: the approval carried only a reason string, so re-read storage and
+  // recompute what would actually be sent. Any difference means the keeper
+  // approved different bytes.
+  const fresh = store.findOutboxItem(item.contentId)
+  if (!fresh || fresh.status !== 'checked') {
+    return {
+      ok: false,
+      outcome: 'content-changed',
+      id: item.contentId,
+      status: fresh ? fresh.status : 'missing',
+      message: '批准期间记录状态已变化，旧批准作废；没有发送',
+    }
+  }
+  const relabeled = markChecked(fresh, {
+    now: new Date(),
+    labelOptions: labelOptionsFor(settings),
+  })
+  if (relabeled.contentVersion !== approvedVersion ||
+      relabeled.channel !== approvedChannel ||
+      relabeled.account !== approvedAccount) {
+    const reverted = store.updateOutboxItem(relabeled.contentId, relabeled, { max })
+    await recordApprovalOutcome(store, settings, reverted, 'content-changed', '版本/账号在批准期间变化')
+    return {
+      ok: false,
+      outcome: 'content-changed',
+      id: reverted.contentId,
+      status: 'checked',
+      approved: false,
+      message: '内容在批准期间变了，旧批准失效并回到 checked；需要重新入队确认',
+    }
+  }
+
+  const approvedRecord = approve(relabeled, {
+    approvedBy: 'approval:allowed-once',
+    now: new Date(),
+    labelOptions: labelOptionsFor(settings),
+  })
+  const noted = noteApproval(approvedRecord, { outcome: 'allowed-once', now: new Date() })
+  const result = await sendAttempt(noted, {
+    transport: resolved.transport,
+    now: new Date(),
+    persist: (record) => store.updateOutboxItem(record.contentId, record, { max }),
+    labelOptions: labelOptionsFor(settings),
+  })
+
+  if (result.outcome === 'confirmed') {
+    appendPublishLedger(store, settings, result.record, 'confirmed', result.record.platformId)
+    return {
+      ok: true,
+      outcome: 'confirmed',
+      id: result.record.contentId,
+      status: 'confirmed',
+      platformId: result.record.platformId,
+      approval: 'allowed-once',
+      message: '主人已批准这一版内容，平台回执已保存（platformId）',
+    }
+  }
+  if (result.outcome === 'unconfirmed') {
+    appendPublishLedger(store, settings, result.record, 'unconfirmed', null)
+    return {
+      ok: false,
+      outcome: 'unconfirmed',
+      id: result.record.contentId,
+      status: 'unconfirmed',
+      approval: 'allowed-once',
+      message: '批准已通过，但没拿到平台回执：结果未知。不要重发；先 life_publish_status reconcile 或人工确认',
+    }
+  }
+  return {
+    ok: false,
+    outcome: result.outcome || result.reason || 'not-sent',
+    id: result.record.contentId,
+    status: result.record.status,
+    message: result.error || '没有发送',
+  }
+}
+
+/** Injected transport wins; otherwise build the configured Telegram adapter. */
+function transportForItem (settings, runtime, item) {
+  if (runtime.transport && typeof runtime.transport.send === 'function') {
+    return { transport: runtime.transport, tokenEnv: null, source: 'injected' }
+  }
+  const channels = Array.isArray(settings.publisherChannels) ? settings.publisherChannels : []
+  const channel = channels.find((entry) => entry.id === item.channel)
+  if (!channel) return null
+  if (channel.kind === 'telegram' && channel.tokenEnv) {
+    return {
+      transport: createTelegramTransport({ tokenEnv: channel.tokenEnv, fetchImpl: globalThis.fetch }),
+      tokenEnv: channel.tokenEnv,
+      source: 'telegram-env',
+    }
+  }
+  return null
+}
+
+function envConfigured (name) {
+  const value = process.env ? process.env[name] : undefined
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+/**
+ * The only place dsh lets us bind content: `reason`. It is bounded to 200
+ * characters and starts with the identifiers so clipping can never hide them.
+ * No credential ever appears here.
+ */
+function approvalReasonFor (item) {
+  const firstLine = String(item.labeledText || item.text || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean) || ''
+  const identity = `life_publish contentId=${item.contentId} contentVersion=${item.contentVersion} ` +
+    `channel=${item.channel} account=${item.account}`
+  return clipText(`${identity} 首行=${firstLine}`, 200)
+}
+
+function approvalOutcomeMessage (outcome) {
+  if (outcome === 'unavailable') {
+    return '这个 profile 没有批准通道（headless 或无 UI）。按 fail-closed 处理：本次不发送'
+  }
+  if (outcome === 'rejected') return '主人或策略拒绝了这次发布；没有发送'
+  if (outcome === 'cancelled') return '批准被取消；没有发送'
+  return `批准结果不是 allowed-once（${String(outcome)}）；没有发送`
+}
+
+async function recordApprovalOutcome (store, settings, item, outcome, reason) {
+  const noted = noteApproval(item, { outcome, reason, now: new Date() })
+  store.updateOutboxItem(item.contentId, noted, { max: settings.publisherMaxOutbox })
+  return noted
+}
+
+/** Durable audit without the body: digest, length and routing only. */
+function appendPublishLedger (store, settings, record, status, platformId) {
+  store.appendLedger({
+    kind: 'publish',
+    detail: {
+      contentId: record.contentId,
+      contentVersion: record.contentVersion,
+      channel: record.channel,
+      account: record.account,
+      status,
+      platformId: platformId || null,
+      textLength: typeof record.text === 'string' ? record.text.length : 0,
+    },
+  }, { cap: settings.maxLedgerEntries })
+}
+
+function clipText (value, limit) {
+  const text = String(value ?? '')
+  if (text.length <= limit) return text
+  return `${text.slice(0, Math.max(0, limit - 1))}…`
 }
 
 // ---------------------------------------------------------------------------

@@ -137,15 +137,18 @@
 | **自主唤醒（自己过一天）** | ✅ 每轮 `turn/end` 向 dsh `schedule` 补一个一次性闹钟；抖动 / 静默时段 / 每日预算由生命层实现（dsh 的 `ScheduleCreateRequest` 没有这三项）；唤醒轮的系统提示词会声明「这一轮是你自己醒来的」，并附一份 ≤600 字符的候选短名单 | 见 §10.2 决策门：**策略与接口已验证（含 7 天确定性 soak），连续 7 天真实运行仍未做** |
 | **活动选择器（候选排序）** | ✅ `lib/choose.js`：`承诺紧迫度 + 兴趣匹配 + 未完成事项 + 探索加成 - 成本 - 风险 - 切换损耗`，每条候选带理由与七项明细；「休息」固定 0.35 且永远在名单里 | 权重是手写的，没有从经历里回归参数；模型是否照短名单行动未验 |
 | **「它的一天」可读报告** | ✅ `tools/day-report.mjs`：把 `ledger.jsonl` 渲染成人话（失败照实说、结论带证据、对话往返单独计数），`--json` 供程序消费；行为测试 22 项已进 CI | 无 |
+| **发布对账（回执、幂等、不盲目重发）** | ✅ `lib/outbox.js` 状态机（`draft → checked → approved → sending → confirmed / unconfirmed / failed`）+ 幂等键 + 内容版本绑定 + 三档修剪（committed 永不丢）；`lib/compliance.js` 标识硬闸（**没有 strip 函数**）；`life_publish` 走 dsh `approval`，只认 `allowed-once`，批准后**重算摘要**防 TOCTOU；`lib/telegram.js` 适配器（假 fetch 可测、错误擦 token）。`verify/publish.mjs` 26 项 | **一次真实 Telegram 都没发过**；真实 Web 批准弹窗未点过；跨进程并发与 `sending` 崩溃窗口未实测 |
+| **界面实体（一屏）** | ✅ `lib/ui.js` 的 `/life/state.json` **现读**真实状态 + `client/life-overview.js` 手写 lazy-CJS（零构建、只 `require('react')`）；headless 里不注册 | **像素级未验证**；`settings.section` 是盲注册（已 try/catch） |
+| **安装门槛实测（代理版）** | ✅ `docs/install-test.md`：抓到一个静默失败——自己起 profile 名字会得到**裸 profile**（无 agent/llm/schedule），鱼装上了却不动且不报错；README 已改成「先 `--from-default-profile web`」三步 | 不是真人实测；npm 发布后要重做 |
 
-**代码规模**：5 个文件 2438 行（`index` 877 / `choose` 629 / `store` 519 / `wake` 238 / `config` 175），零自有依赖，13 个工具，5 个挂载点，7 个状态文件。
+**代码规模**：9 个 host 文件 + 1 个 client 文件，4949 行（`index` 1590 / `outbox` 819 / `choose` 703 / `store` 707 / `config` 287 / `wake` 238 / `ui` 179 / `telegram` 133 / `compliance` 117 / `client` 176），零自有依赖，17 个工具，6 个服务挂载点 + 1 个客户端半身，9 个状态文件。
 
 ### 规划说了但还没做
 
 | 规划里的条目 | 现状 | 影响 |
 | --- | --- | --- |
-| 发布对账（回执、幂等、不盲目重发） | ⚠️ 设计完整（§7.3），未接真实平台 | 决定「能不能放心让它自己发」 |
-| 界面实体 | ⚠️ 只有原型 HTML | 见 §5 已按原型修正 |
+| 发布接**真实平台** | ⚠️ 适配器与对账逻辑齐了，凭据/渠道没配过，一次真发都没有 | 决策门（回执丢失→不重发）已在假 transport 上通过，真平台未验 |
+| 界面**真画出来** | ⚠️ 只验到 manifest / 注册 / 数据结构 | 需要一次有人看的浏览器验证 |
 | 能力包（冲浪/游戏/表达） | ❌ 未实现 | MVP 的后半 |
 | 长期行为回归（养 30 天） | ❌ 未开始 | 最需要时间的一项 |
 
@@ -766,31 +769,36 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 
 ### 11.1 代码级：已实现，可复现
 
-实测 **132 项全绿**，命令与前置条件见 `verify/README.md`：
+实测 **186 项全绿**，命令与前置条件见 `verify/README.md`：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |
-| `verify/smoke.mjs` | **62** | 存储不变量、持久性、损坏降级、**唤醒策略与记账、7 天 soak**、**活动选择器**（确定性，可注入随机量） | 否 |
+| `verify/smoke.mjs` | **68** | 存储不变量、持久性、损坏降级、**唤醒策略与记账、7 天 soak**、**活动选择器**（确定性，可注入随机量） | 否 |
 | `verify/day-report.mjs` | **22** | 「它的一天」报告工具：账本→人话的翻译、失败照实说、结论带证据、缺数据不崩 | 否 |
+| `verify/life-week.mjs` | **16** | 连跑七天（压缩时钟，复用生产的 store/choose/wake） | 否 |
+| `verify/ui.mjs` | **28** | 界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归 | 否（一条 dump-config 除外） |
+| `verify/publish.mjs` | **26** | 发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation | 否 |
 | `verify/e2e-tools.mjs` | **17** | 真 dsh 端到端：组合 profile → `dsh plugin` 安装 → 启动 → 断言运行系统实际产出 | 是 |
 | `verify/pack-install.mjs` | **9** | `pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身） | 是 |
 | `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |
 
-五套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（`.github/workflows/verify.yml`）。后两轮新增的是 `day-report`（把账本翻译成人话的那层）与 `life-week`（连跑七天）：**两个都不是新功能，是让「已经做到的」这件事可被检验。**
+七套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（`.github/workflows/verify.yml`）。这一轮新增的三套是 `ui`、`publish`，以及把 `life-week` 接进 CI：**都不是新功能，是让「已经做到的」这件事可被检验。**
 
 ```sh
 DSH_BIN=$PWD/node_modules/@deepseek-ai/dsh/lib/bin.js npm run verify
 ```
 
-**为什么值得记一笔**：这些套件抓出过**五个只在真跑/长跑/发布路径上暴露的 bug**——
+**为什么值得记一笔**：这些套件抓出过**七个只在真跑/长跑/发布路径上暴露的 bug**——
 
 1. 输出 schema 用了非法的 `{ type: 'json' }` → **11 个工具静默全部注册失败**（mock 测不出）。
 2. 会话事件字段名猜成 `{ kind: 'turn/end' }`，真实是 `{ type, seq, time, data }` → 账本一条 `turn` 都没记上。
 3. `DSH_BIN` 指向 pnpm junction 时 dsh 解析不到自有依赖，而 `dsh --version` 照过 → 看起来像 profile 组装 bug，其实是路径 bug。
 4. 唤醒时序：只用 `user/message` 会把「你醒了」推到下一轮（见 §6.3）。
 5. `finishActivity` 把 `evidence` 写进 `activity.json` 却漏写进 `ledger.jsonl` —— 账本是唯一可回放的长期记录，漏了证据等于「对外可信」在最底层就是假的；人眼几乎不可能从长 JSONL 里看出少了一个字段。修复后补了回归断言（先临时改回 bug 确认断言**真会 FAIL**，再改回来，见 §11.1 口径）。
+6. **一整天没有醒**：`every=24h±4h` 时目标被静默段推到后天，中间那个日历日整个消失（34 小时空窗）。soak 用固定时钟 + 固定随机数跑 367 次唤醒才量出来。
+7. **`pruneOutboxItems` 会静默删掉 `unconfirmed`** —— 那是「可能已经发出去了、等对账」的记录，删掉它等于把「不重发」的前提删了。发布线验证第一次读实现就抓到了它（函数的注释还写着「只修剪已结算」，代码却在 `open.slice(0, limit)`）。
 
-**共同点：全都不是逻辑写错，而是「以为接口长这样」。** 这是为什么 e2e 必须真启动，而不是 mock。
+**共同点：前五个是「以为接口长这样」，后两个是「以为不变量已经在代码里」。** 这就是为什么 e2e 必须真启动、soak 必须模拟多天、发布线必须有独立的验证者。
 
 ### 11.2 产品级：还没做，需要时间
 

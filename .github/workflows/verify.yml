@@ -110,8 +110,25 @@ jobs:
         run: |
           node verify/life-week.mjs 2>&1 | tee verify-life-week.log
 
+      # verify/ 里的 ui 套件：不需要浏览器，验包清单、桩 loader 注册、host 路由与
+      # 「私密内容不出 Host」。放在 pack 之前 —— 它便宜，且 `files` 与 client 入口
+      # 一旦写错，pack 那套会跟着红，先看到 ui 的结论更好定位。
+      - name: Verify — ui
+        id: ui
+        continue-on-error: true
+        run: |
+          node verify/ui.mjs 2>&1 | tee verify-ui.log
+
+      # 发布线：状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 载荷与脱敏。
+      # 全程假 approval + 假 fetch，**不发任何真实网络请求**。
+      - name: Verify — publish
+        id: publish
+        continue-on-error: true
+        run: |
+          node verify/publish.mjs 2>&1 | tee verify-publish.log
+
       # 打包检查放在 e2e 前面：它先跑 pnpm pack 与文件清单，漏文件这类问题在几秒内
-      # 就有结论，不必等慢的 e2e。三套都跑（continue-on-error），总时长不变。
+      # 就有结论，不必等慢的 e2e。所有套件都跑（continue-on-error），总时长不变。
       - name: Verify — pack
         id: pack
         shell: bash
@@ -128,8 +145,8 @@ jobs:
           set -euo pipefail
           node verify/e2e-tools.mjs 2>&1 | tee verify-e2e.log
 
-      # 汇总 dsh / node 版本、五套结果与输出尾部：写 step summary + verify-report.md，
-      # 并作为 job 的最终闸门（五套都 success 才放行）。
+      # 汇总 dsh / node 版本、七套结果与输出尾部：写 step summary + verify-report.md，
+      # 并作为 job 的最终闸门（七套都 success 才放行）。
       - name: Report and gate
         if: always()
         env:
@@ -137,6 +154,8 @@ jobs:
           SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
           DAYREPORT_OUTCOME: ${{ steps.dayreport.outcome }}
           LIFEWEEK_OUTCOME: ${{ steps.lifeweek.outcome }}
+          UI_OUTCOME: ${{ steps.ui.outcome }}
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           PACK_OUTCOME: ${{ steps.pack.outcome }}
         run: node .github/scripts/ci-report.mjs
@@ -150,6 +169,8 @@ jobs:
             verify-smoke.log
             verify-day-report.log
             verify-life-week.log
+            verify-ui.log
+            verify-publish.log
             verify-e2e.log
             verify-pack.log
             verify-report.md

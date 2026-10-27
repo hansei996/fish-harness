@@ -418,6 +418,14 @@ OpenClaw 的回答是：**「你的助手，到处都在」**（assistant everyw
 
 这一步的发现会比任何规划都真实。
 
+> **已完成代理版（2026-10-27）**：[`docs/install-test.md`](install-test.md)。只按 README 走，记录每步耗时、退出码与真实输出。
+>
+> 抓到的最严重一条不是报错，而是**静默失败**：直接 `dsh plugin --profile 新名字 add …` 会 exit 0，但 dsh 给的是一个**裸 profile**（只有 `dsh-base` + 插件，没有 `agent`/`llm`/`system-prompt`/`schedule`）——鱼装上了、永远不会说话也不会自己醒，而 `dsh --profile 新名字 "say hi"` 只是**挂起**（实测 180 秒无输出）。正确顺序是先 `--from-default-profile web` 再装插件。README 已按实测改成三步。
+>
+> 另外三条已修：`add dsh-life` 的 404（包未发布）、`findstr` 只适用于 Windows、`link:` 的 peer 依赖警告要写明可忽略。
+>
+> **仍未做真人实测**：代理知道「dsh 版本要 0.2.1-rc.2」「自己要有 pnpm」，真人不知道，所以真人的结论只会更差。npm 发布之后这一段要重做。
+
 ---
 
 ## 10. 度量：卖的不是活跃，是「还活着」

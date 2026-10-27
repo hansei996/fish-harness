@@ -20,7 +20,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | --- | --- |
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
 | [`tools/`](tools/) | 两个工具：`day-report` 把账本渲染成人能读的「它的一天」；`life-week` 把七天压缩跑完，产出「它的一周」 |
-| [`verify/`](verify/) | 68 项存储/策略/soak 不变量 + 22 项当天报告工具 + 16 项七天连续运行 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
+| [`verify/`](verify/) | 七套共 **186 项**：68 存储/策略/soak + 22 当天报告 + 16 七天连续 + 28 界面 + 26 发布线 + 17 真实 dsh 端到端 + 9 打包安装；另有一条 opt-in 的真实唤醒检查（3 项） |
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
 | [`docs/PRODUCT.md`](docs/PRODUCT.md) | **产品规划**：市场位置、竞争分析、分阶段对外策略 |
@@ -32,7 +32,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`docs/wake-verification.md`](docs/wake-verification.md) | 自主唤醒验了什么、**没验什么** |
 | [`docs/wake-e2e.md`](docs/wake-e2e.md) | 真实 web profile 下一次真实唤醒的实测记录 |
 | [`docs/ci.md`](docs/ci.md) | CI 的固定项与理由 |
-| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍五套 verify（smoke / day-report / life-week / e2e / pack） |
+| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍七套 verify（smoke / day-report / life-week / ui / publish / e2e / pack） |
 
 ---
 
@@ -145,25 +145,53 @@ ffmpeg -framerate 30 -i frames/f%04d.png -c:v libx264 \
 
 ## 装法
 
-> **还没发布到 npm。** 现在 `dsh plugin add dsh-life` 会以 `ERR_PNPM_FETCH_404` 失败（`dsh-life` 在 registry 上还是 404）。下面的 `link:` 方式是当前唯一能装上的路。发布之后这两行会换过来 —— 我不想在 README 里写一句你自己一跑就红的命令。
+> `dsh-life` **还没发布到 npm**：`dsh plugin add dsh-life` 现在会以 `ERR_PNPM_FETCH_404` 失败。下面的 `link:` 是当前唯一能装上的路。发布之后这两步会换过来 —— 我不想在 README 里写一句你自己一跑就红的命令。
+>
+> 这段是**照陌生人路径实测过**的（含耗时、卡点、以及「为什么不能自己起一个 profile 名字」）：[`docs/install-test.md`](docs/install-test.md)。
+
+### 1. 先有一个真实的 profile
 
 ```sh
-git clone https://github.com/hansei996/fish-harness
-cd fish-harness
-dsh plugin --profile <你的 profile> add link:$(pwd)/packages/dsh-life
+dsh --profile myfish --from-default-profile web --dump-config
 ```
 
-Windows PowerShell 里把 `$(pwd)` 换成绝对路径，例如：
+**不要跳过这一步。** 直接 `dsh plugin --profile 新名字 add …` 也能 exit 0，但 dsh 会给你一个**裸 profile**（只有 `dsh-base` + 插件）：没有 `agent`、没有 `llm`、没有 `system-prompt`、没有 `schedule`。鱼装上了，却永远不会说话、也不会自己醒 —— **而且不报错**。实测里它表现为「命令挂起、无输出」（见 `docs/install-test.md`）。
+
+`web` 模板才有界面和 `schedule`（自主唤醒的底座）。`headless` 也能装，但没有 `schedule`，**不会有自主唤醒**。
+
+### 2. 把插件装进去
+
+```sh
+dsh plugin --profile myfish add link:/绝对路径/fish-harness/packages/dsh-life
+```
+
+Windows PowerShell 里写绝对路径，例如：
 
 ```powershell
-dsh plugin --profile <你的 profile> add link:C:\Users\you\fish-harness\packages\dsh-life
+dsh plugin --profile myfish add link:C:\Users\you\fish-harness\packages\dsh-life
 ```
 
-插件自带 `cordis.patch.yml`，**不需要手改 profile 配置**。装完重启 profile。
+这一步会打印一句 `The linked in dependency will not resolve the peer dependencies…` —— **可以忽略**：插件零自有依赖，运行时只用 Node 内建模块，peer 依赖由 dsh 自己提供。
 
-装完怎么确认它真的挂上了：`dsh --profile <profile> --dump-config | findstr dsh-life`，或者在会话里问它 `life_whoami`。状态落在 `$DSH_HOME/life/<lifeId>/`，装坏了删掉那个目录就能从零开始。
+### 3. 启动
 
-> 装不上的两种常见原因：① dsh 用的是打包版（`dsh.cmd` 走 asar），`plugin add` 内部调不到 pnpm —— 换 `pnpm add @deepseek-ai/dsh` 装出来的那个；② PATH 里没有 `pnpm`（见 `verify/README.md` 的 shim 写法）。
+```sh
+dsh --profile myfish
+```
+
+模型与账号由 dsh 自己的登录流程处理；插件不碰凭据。
+
+**确认装上了**（跨平台写法）：
+
+```sh
+dsh --profile myfish --dump-config | grep -c dsh-life     # 输出 ≥1 就对了
+```
+
+PowerShell 用 `Select-String dsh-life`；`findstr` 只有 Windows 有。
+
+插件自带 `cordis.patch.yml`，**不需要手改 profile 配置**。状态落在 `$DSH_HOME/life/<lifeId>/`，装坏了删掉那个目录就能从零开始。
+
+> 还装不上时先看这两条：① dsh 用的是打包版（`dsh.cmd` 走 asar），`plugin add` 内部调不到 pnpm —— 换 `pnpm add @deepseek-ai/dsh` 装出来的那个；② PATH 里没有 `pnpm`（见 `verify/README.md` 的 shim 写法）。
 
 配置项（经 Standard Schema 校验，非法值会拒绝而不是静默忽略）：
 
@@ -201,9 +229,9 @@ dsh plugin --profile <你的 profile> add link:C:\Users\you\fish-harness\package
 
 安全策略与预算独立于这三档，**不随「成长」自动解除**。
 
-### 13 个模型可见工具
+### 17 个模型可见工具
 
-`life_whoami` · `life_start_activity` · `life_finish_activity` · `life_note_interest` · `life_note_skill` · `life_promise` · `life_settle_commitment` · `life_remember_person` · `life_ledger` · `life_identity_update` · `life_snapshot_for_keeper` · `life_wake` · `life_candidates`
+`life_whoami` · `life_start_activity` · `life_finish_activity` · `life_note_interest` · `life_note_skill` · `life_promise` · `life_settle_commitment` · `life_remember_person` · `life_ledger` · `life_identity_update` · `life_snapshot_for_keeper` · `life_wake` · `life_candidates` · `life_draft_post` · `life_publish_queue` · `life_publish` · `life_publish_status`
 
 ### 它到点会自己醒
 
@@ -235,6 +263,29 @@ dsh plugin --profile <你的 profile> add link:C:\Users\you\fish-harness\package
 - 当天唤醒额度快用完时，「开新坑」的成本上调，休息和继续手上的事自然上浮。
 
 它**不是命令**：模型可以选，也可以不选。非唤醒轮一个字符都不加（那是每轮成本）；`life_candidates` 可以让它随时追问「为什么这条排第一」。
+
+### 发出去这件事，单独设计过
+
+外部副作用不是「把字符串 POST 出去」。状态流是：
+
+```
+draft → checked → approved → sending → confirmed / unconfirmed / failed
+```
+
+四条硬规则：
+
+- **`sending` 之后一律先怀疑**。拿不到回执就是 `unconfirmed`（结果待确认），**绝不自动重发**；进程重启时磁盘上的 `sending` 会被读成 `unconfirmed`，只有**显式对账**或人来确认才能继续。这是 `PLAN.md §10.3` 的决策门：故意制造「发送成功但回执丢失」，系统必须停下来对账。
+- **改一个字就失效**。批准绑定 `contentVersion` + 渠道 + 账号；内容变了旧批准作废。而且批准**通过之后还要重新算一遍摘要**——dsh 的 approval 只回答「这次工具调用准不准」，不绑定内容。
+- **只有 `allowed-once` 是授权**。`rejected` / `cancelled` / `unavailable`（headless 没有批准通道）一律不发，`unavailable` 明确按 fail-closed 处理。
+- **标识是硬闸**。`lib/compliance.js` 里**没有** strip/remove 函数；显式标识必须含内容编号，进 `confirmed` 之前必须过 `assertLabeled`——收到回执也不行。依据是 `PLAN.md §6.8` 与中国大陆的标识办法（[`docs/compliance-cn.md`](docs/compliance-cn.md)）。
+
+`publisherEnabled` **默认 false**；token 只从环境变量读（配置里只存变量名）；`unconfirmed` 记录**永远不被修剪**——那是「未结的账」。
+
+### 界面上看得见
+
+`lib/ui.js` 起一个只读路由 `/life/state.json`，**每次请求现读状态文件**（不缓存、不写死），客户端半身 `client/life-overview.js` 用它渲染一屏：它现在在做什么、为什么、今天醒了几次、欠着几件事、下次什么时候醒。
+
+客户端是**手写的 176 行 lazy-CJS**，只 `require('react')`（shell 已提供），**零构建、零依赖、不写 JSX**。没有 `webServer` 的 profile（headless）里这半边**什么都不注册**。
 
 ### 一条证据规则
 
@@ -284,20 +335,27 @@ node tools/day-report.mjs --json              # 供程序消费（带 tone 与 e
 
 | 文件 | 行数 | 做什么 |
 | --- | --- | --- |
-| `lib/index.js` | 877 | 插件入口：注册工具、注入上下文、监听会话事件、向 `schedule` 布防 |
-| `lib/store.js` | 519 | 生命状态机：三档变量、承诺、关系、账本、唤醒绑定；原子落盘 |
+| `lib/index.js` | 1590 | 插件入口：注册 17 个工具、注入上下文、监听会话事件、向 `schedule` 布防、发布线接线 |
+| `lib/store.js` | 707 | 生命状态机：三档变量、承诺、关系、账本、唤醒绑定、outbox；原子落盘 |
+| `lib/outbox.js` | 819 | 发布状态机：`draft → checked → approved → sending → confirmed / unconfirmed / failed`、幂等键、三档修剪 |
+| `lib/choose.js` | 703 | 活动选择器：七项加权、理由与明细、休息恒存；时钟可注入、无随机 |
 | `lib/wake.js` | 238 | 唤醒策略纯函数：静默区间、`every ± jitter`、不跳日夹取、明日兜底；随机量可注入 |
-| `lib/choose.js` | 629 | 活动选择器：七项加权、理由与明细、休息恒存；时钟可注入、无随机 |
-| `lib/config.js` | 175 | 零依赖 Standard Schema 校验器（含唤醒与选择器字段） |
+| `lib/config.js` | 287 | 零依赖 Standard Schema 校验器（唤醒 / 选择器 / 发布） |
+| `lib/compliance.js` | 117 | 内容标识：显式 + 隐式、「没有 strip 函数」的硬闸 |
+| `lib/telegram.js` | 133 | Telegram 适配器（假 fetch 可测、错误里擦 token、平台不可反查就照实说） |
+| `lib/ui.js` | 179 | Host 半身：`/life/state.json` 现读真实状态，私密内容不出 Host |
+| `client/life-overview.js` | 176 | 浏览器半身：手写 lazy-CJS、只 `require('react')`、零构建 |
 
 **为什么零自有依赖**：插件会被装进 npm CLI 或内置 Electron 运行时，两者依赖解析根不同。只用 Node 内置模块，才能保证在两种环境下都加载得起来。
 
-**五个挂载点**（全部是公开扩展点）：
+**六个挂载点 + 客户端半身**（全部是公开扩展点）：
 
 ```
-inject(['tools'])            → ctx.tools.register()      注册 13 个工具
+inject(['tools'])            → ctx.tools.register()      注册 17 个工具
 inject(['systemPrompt'])     → ctx.systemPrompt.section() 注入每轮上下文
 inject(['schedule'])         → ctx.schedule.create()      布防一次性唤醒
+inject(['approval'])         → ctx.approval.request()     发布前逐条确认
+inject(['webServer'])        → ctx.webServer.register()   /life/state.json（headless 里不注册）
 on('agent/inbox/claimed')    → 在 prompt 组装前知道「这一轮是唤醒」
 on('session/event')          → 账本：turn/end、schedule 投递
 effect()                     → 卸载时全部反注册
@@ -325,22 +383,28 @@ wake.json          唤醒绑定 · 下一个闹钟 · 当天预算 · 已投递 
 
 ## 验证
 
-五套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。
+七套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。合计 **186 项**。
 
 ```sh
 node verify/smoke.mjs       # 68 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性，不 spawn dsh，约 5s）
 node verify/day-report.mjs  # 22 项：当天报告工具（不 spawn dsh，约 0.2s）
 node verify/life-week.mjs   # 16 项：连跑七天（不 spawn dsh，约 0.5s）
+node verify/ui.mjs          # 28 项：界面那半边的包清单 / 桩 loader / host 路由 / 私密不外泄
+node verify/publish.mjs     # 26 项：发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs   # 17 项：真实 dsh 端到端
 DSH_BIN=<dsh bin> node verify/pack-install.mjs # 9 项：打出来的包能不能装进 profile 并激活（约 20s）
 node verify/live/wake-live.mjs                # 可选：真实 web profile 的一次真实唤醒（约 1–2 min；会先验安装是否健康）
 ```
 
-`npm run verify` 一次跑前四套（不需要 dsh 的三套，加需要 dsh 的 e2e）。
+`npm run verify` 一次跑不需要 dsh 的几套 + e2e。
 
 `life-week` 那套是**这一轮新增的，也是它抓出了最多东西的一套**：它把七天压缩跑完，用的是生产的 store / choose / wake，只把时钟换成可注入的。**单日演示永远看不见的东西全在这里露出来** —— 重复没有代价、探索只有入口没有出口、「留下一个明天要继续的事」是死代码（详见 [`docs/life-week.md`](docs/life-week.md) 与 [`docs/PLAN.md`](docs/PLAN.md) §6.2）。
 
-`e2e` 那套**不是 mock**：它用 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装进去，真启动，然后断言运行系统的实际产出 —— 磁盘上的身份、账本里的真实 `turn/end`、**装配后**的系统提示词里的生命层 section、以及 13 个工具 schema 全部对模型可见。
+`e2e` 那套**不是 mock**：它用 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装进去，真启动，然后断言运行系统的实际产出 —— 磁盘上的身份、账本里的真实 `turn/end`、**装配后**的系统提示词里的生命层 section、以及 17 个工具 schema 全部对模型可见。
+
+`ui` 那套**不需要浏览器**：验包清单（`dsh.bundle` + `dsh.client` + `exports['./client']` + `files`）、在桩 loader 里真的执行客户端模块并断言它注册到 slot、host handler 用**真实临时 store** 返回字段且**不含**私密内容、状态文件写坏时优雅降级、以及 headless 里零回归。像素级没验（见「已知限制」）。
+
+`publish` 那套**不联网、不需要凭据**：状态机转移矩阵、`sending` 落盘后重读必须是 `unconfirmed` 且不重发、幂等键、三档修剪（committed 永不丢）、标识硬闸（**有回执但标识生成不出来仍然拒绝**）、approval 四态里只有 `allowed-once` 会碰 transport、**TOCTOU**（批准期间改正文 → 不发）、Telegram 载荷与 token 脱敏。还有两组 mutation：把关键不变量改坏，证明断言真的会红。
 
 `pack-install` 那套查的是**发布路径**：`pnpm pack` 出来的 tarball 清单是否完整（从 `package.json` 的 `files` 推导，漏了就报出文件名），以及它装进一个全新 profile 后能不能真的激活、真的写出 `identity.json`。
 
@@ -402,11 +466,13 @@ node verify/live/wake-live.mjs                # 可选：真实 web profile 的�
 
 ## 已知限制
 
-- **活动选择是排序器给的候选，不是命令。** `lib/choose.js` 把承诺紧迫度、兴趣、未完成事项、技能、探索加成和切换成本算成一份**带理由**的短名单（`休息` 永远在名单里、分数固定 0.35），只在唤醒轮注入（≤600 字符）。它还不会自己「学会」该偏好什么——权重是手写的，没有从经历里回归出参数。
+- **活动选择是排序器给的候选，不是命令。** `lib/choose.js` 把承诺紧迫度、兴趣、未完成事项、技能、探索加成和切换成本算成一份**带理由**的短名单（`休息` 永远在名单里、分数固定 0.35），只在唤醒轮注入（≤600 字符）。它还不会自己「学会」该偏好什么——权重是手写的，没有从经历里回归出参数。**模型是否照短名单行动也没验过。**
 - **真实 7 天无人干预仍未跑过。** 策略层用确定性模拟覆盖了「不跳日、不落静默、不超预算、跨天重置」这些不变量；真实长跑、真实凭据下的行为没测。会话归档会掐断唤醒（dsh `schedule` 的语义），归档策略还没定。
 - **`wakeEnabled: false` / `paused: true` 不撤销已排的闹钟**，只停止继续布防。
+- **发布线没在真实平台上跑过。** 状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷全部有断言，但**一次真实 Telegram 都没发过**（测试全是假 transport / 假 fetch）；**真实 Web 的批准弹窗也没点过**（e2e 是 headless，只能覆盖 `unavailable` 失败关闭）。跨进程并发与 `sending` 落盘后被 kill 的崩溃窗口未实测。
+- **加密钥不是安全边界。** token 不进模型上下文、不进账本/日志，但 dsh 官方明说 agent 工具进程与用户同 OS 用户；真正挡住「模型自发发帖」的是 approval + 工具边界。
+- **界面只验到「注册与数据」这一层，像素级没验。** 没有可驱动浏览器：我们证明了它进 boot manifest、被 shell 取到、在桩 loader 里注册成功并产出元素，以及 `/life/state.json` 返回真实状态；**没证明它被真的画出来**。`settings.section` 还是盲注册（slot props 契约看不到，已 try/catch 兜住）。
 - **账本只记了回合边界，还没记结果。** 监听工具结果能让账本证明更多，尚未接。
-- **没有 UI 实体。** 界面目前是原型，生命只能通过工具看到。
 - **默认单条命。** 多个 `lifeId` 可用，但还没有机制阻止两个 profile 指向同一个。
 - **对着 dsh `0.2.1-rc.2` 写的。** dsh 处于 developer preview，官方明写会有破坏性兼容变更，所以这里的配置与工具名还不是稳定契约。
 

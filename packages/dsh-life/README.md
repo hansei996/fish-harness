@@ -24,7 +24,7 @@ dsh 已经自带会话持久化与崩溃恢复（`core/session`）、持久目�
 - **中** —— 兴趣、技能、关系。由多次真实经历累积，每条带置信度和来源。
 - **快** —— 当前活动。**同时只允许一个**，并带原因。
 
-**13 个模型可见工具**（`life_*`）：我是谁、活动生命周期、兴趣、技能、承诺、人物、账本、主人确认的身份修改、**自己决定何时再来**（`life_wake`），以及**问自己现在能做什么**（`life_candidates`）。
+**17 个模型可见工具**（`life_*`）：我是谁、活动生命周期、兴趣、技能、承诺、人物、账本、主人确认的身份修改、**自己决定何时再来**（`life_wake`）、**问自己现在能做什么**（`life_candidates`），以及发布线的**起草 / 入队检查 / 状态与对账 / 经主人批准后发布**（`life_draft_post`、`life_publish_queue`、`life_publish_status`、`life_publish`）。发布必须过 dsh `approval`，只有 `allowed-once` 才算同意；没有批准通道（headless）一律不发。
 
 **自主唤醒** —— 每轮结束后向 dsh 的 Host 定时器补一个一次性闹钟；到点后 dsh 往原会话投一条 `source.kind === 'schedule'` 的消息并跑一个普通 turn。抖动、静默时段、每日预算由生命层自己实现（见下文）。
 
@@ -33,6 +33,10 @@ dsh 已经自带会话持久化与崩溃恢复（`core/session`）、持久目�
 **每轮一段有界的上下文** —— 连续性花的是固定小额 token，不随生命长度增长。唤醒轮会多两句：开头声明「这一轮是你自己醒来的，没有人跟你说话」，结尾要求先读状态再决定继续或休息。
 
 **一条证据规则** —— `life_finish_activity` 要证据，注入的上下文也告诉模型：没有证据就不许声称成功。产品要的是真做过事的鱼。
+
+**一屏只读的「运行总览」** —— 在 dsh 的 web 界面里显示它现在在做什么、为什么、今天醒了几次 / 做完几件事 / 失败几次、欠着的事、下次醒来的时间；数据来自 Host 现读状态文件的 `/life/state.json`，客户端零构建。见「界面」一节（含**像素级未验证**的说明）。
+
+**发出去这件事（本轮只做记录与状态机）** —— `draft → checked → approved → sending → confirmed | unconfirmed | failed`；内容标识是硬闸，`sending` 之后拿不到回执一律 `unconfirmed` 且绝不自动重发。见下文。
 
 ## 安装
 
@@ -70,6 +74,10 @@ dsh plugin --profile <你的 profile> add link:/绝对路径/packages/dsh-life
     wakePrompt: '（自主唤醒）现在没有人跟你说话，是你自己醒的。……'
     chooserEnabled: true
     chooserTopN: 3
+    publisherEnabled: false
+    publisherChannels: []
+    publisherProviderCode: dsh-life
+    publisherMaxOutbox: 200
 ```
 
 | 字段 | 含义 |
@@ -88,6 +96,10 @@ dsh plugin --profile <你的 profile> add link:/绝对路径/packages/dsh-life
 | `wakePrompt` | 到点时投进会话的正文，≤1000 字。 |
 | `chooserEnabled` | 是否开启活动选择器，默认 `true`。关掉后唤醒轮不加短名单，`life_candidates` 明确报错。 |
 | `chooserTopN` | 唤醒轮最多列几条**活动**候选（休息另算），1–5，默认 `3`。 |
+| `publisherEnabled` | 是否开启发布线，**默认 `false`**：没有明确配置渠道就不该有任何对外动作。 |
+| `publisherChannels` | 白名单渠道数组，默认 `[]`，每项 `{ id, kind, account, tokenEnv? }`；`kind` 只能是 `telegram` 或 `file`。`tokenEnv` 是**环境变量名**（如 `TELEGRAM_BOT_TOKEN`），不是 token 值；任何 token/secret 类**值字段**都会被拒绝。 |
+| `publisherProviderCode` | 写进隐式标识元数据的服务提供者编码，默认 `dsh-life`。 |
+| `publisherMaxOutbox` | **草案 + 已结算**的保留预算，10–2000，默认 `200`。`approved`/`sending`/`unconfirmed` 永不修剪、也不占这份预算，所以文件可能超过这个数；超出时先丢最老的草案、再用余量丢最老的已结算记录。 |
 
 ## 自主唤醒
 
@@ -152,6 +164,39 @@ dsh plugin --profile <你的 profile> add link:/绝对路径/packages/dsh-life
 
 普通主人轮**一个字符都不加**：这段是给「自己醒来、没人说话」的那一轮用的。`life_candidates` 工具可以在任何一轮按需取完整明细（`topN` 可选，默认 `chooserTopN`），返回 `parts`、`weights`、`notes` 和休息候选，用来回答「为什么它排第一」。`chooserEnabled: false` 时唤醒轮不加短名单，工具会明确报 `life/chooser-disabled`，而不是静默返回空列表。
 
+## 发出去这件事
+
+发布线分两层：**记录与状态机**（起草 / 标识 / outbox / 对账）和**批准与渠道**（`life_publish` 走 dsh `approval`，Telegram 适配器从环境变量读 token）。测试始终不联网、不真的发帖；真实发送只有在用户配置了带 `tokenEnv` 的渠道、且主人对**这一版内容**点了同意之后才会发生。
+
+状态流照 `docs/PLAN.md` §7.3，一字不改：
+
+```
+draft → checked → approved → sending → confirmed | unconfirmed | failed
+```
+
+- `life_draft_post`：从**真实经历**起草。`evidence` 必须引用账本里已存在的东西（`activity-end` 的 id/证据，或某条账本的时间）；引用不存在就拒绝——没做过的事不许写成做过。它只写一条 `outbox.json` 记录，不批准、不发送。
+- `life_publish_queue`：给正文加**显式标识**（含内容编号）、算出 `contentVersion`，把 `draft` 推到 `checked`，然后返回「等待主人确认」。**它不能把自己变成 `approved`**：只有 `life_publish` 在拿到 `allowed-once` 之后才会。
+- `life_publish_status`：看 outbox；`reconcile: true` 时对注入的 transport 做一次**显式**对账（没有注入就明确说「未配置渠道」，不会假装查过）。
+- `life_publish`：唯一的发送入口。先向 dsh 的 `approval` 服务请求批准，**只认 `allowed-once`**；`rejected` / `cancelled` / `unavailable` 一律不发送（headless 没有 UI，结果是 `unavailable`，fail closed）。批准之后会**重新从存储读记录并重算 `contentVersion`**，对不上就回到 `checked`（TOCTOU）。成功后保存 `platformId`；拿不到回执一律 `unconfirmed`，不自动重试。账本只记 `publish` 的摘要与长度，不记正文。
+- **保留策略**：`approved` / `sending` / `unconfirmed` 描述的是「可能已经发生的外部动作」，**永不删除**，也不占 `publisherMaxOutbox` 预算。只有最老的草案（`draft`/`checked`）与最老的已结算记录（`confirmed`/`failed`）会被清；`life_draft_post` 的返回和 `outbox.json` 的 `lastPruned` 会写明丢了几条，避免「我的草稿怎么没了」无从查起。
+
+**改一个字就失效。** `approved` 绑定 `contentVersion`（正文 sha256 前 16 位）+ `channel` + `account`（状态机也支持可选有效期；dsh 的 `approval` 本身不带 TTL）。发送前会从**当前正文**重新推导标识与版本；对不上就把旧批准作废、退回 `checked`。主人同意的是那一版字节，不是「这个想法」。
+
+**`sending` 之后一律先怀疑。** 进入 `sending` 之前先把状态**原子落盘**；之后 transport 抛错、超时、返回没有 `platformId`，一律记 `unconfirmed`，`platformId` 留空，**绝不自动重发**。同一幂等键同时只允许一次发送在进行：并发进来的第二次会明确返回 `send-in-flight`，不会也调用 transport。`unconfirmed` 只有两条出路：
+
+- 显式 `reconcile`：查到平台对象 → `confirmed`（保存 `platformId`）；平台明确说「没有」→ 才允许回到 `approved`（并记录这次对账结论）；查不了/没结论 → 保持 `unconfirmed`，等人确认。
+- `confirmManually({ platformId })`：人工确认。
+
+进程重启时，磁盘上的 `sending` 在读入时按 `unconfirmed` 处理（时间线记 `recovered-after-reload`），不会因为重启就再发一次。这也是产品决策门的核心用例：**故意制造「发送成功但回执丢失」，系统必须停下来对账，不能重复发帖。**
+
+**谁可以说发。** dsh 的 `approval.request({ agent, toolName, callId?, reason?, signal? })` 只有四种结果，**只有 `allowed-once` 是授权**：`rejected`（主人/策略拒绝）、`cancelled`、`unavailable`（没有批准通道——headless/无 UI 就是它）。`unavailable` **不是「没人反对」**，一律不发送。批准请求里没有摘要/账号/TTL 字段，所以 `reason` 里写 `contentId`+`contentVersion`+`channel`+`account`+正文首行（≤200 字符），并在批准后重算版本再校验一次——否则批准后被改写内容就是 TOCTOU。dsh 没有 request 级 TTL，所以本包**不新增** `publisherApprovalTimeoutSeconds` 之类的假配置。
+
+**token 从哪来。** 配置里只存环境变量名 `tokenEnv`，值只在发送那一刻从 `process.env[tokenEnv]` 读；token 不会进 outbox、账本、工具返回值或日志（Telegram 适配器的错误信息会先擦掉 token）。**但加密钥不是安全边界**：dsh 官方明说 agent 工具进程与用户是同一个 OS 用户，读得到凭据存储；挡住「模型自己发帖」的是 approval + 工具边界，不是密钥藏得好。
+
+**标识不能关。** 按 `docs/PLAN.md` §6.8 与 `docs/compliance-cn.md` 第 4/5 条：显式标识写在正文里、必须带内容编号；`metadata` 带生成合成属性、服务提供者编码与内容编号，纯文本渠道明确记 `implicit: 'not-applicable'`，不假装写了文件元数据。`lib/compliance.js` **没有 `strip` 之类的函数**，也不导出；`assertLabeled()` 是进入 `confirmed` 之前的硬闸——transport 说成功也不能绕过。文案可换模板，但模板必须含 `{contentId}`，否则直接报错。
+
+**为什么 `publisherEnabled` 默认 `false`。** 没配渠道的一条命不应该有对外动作。开启后 `publisherChannels` 是白名单（每项 `{ id, kind, account, tokenEnv? }`）；配置里不允许出现 token/secret 一类的**值**字段，校验会直接拒绝，只接受环境变量名。transport 注入优先级：`apply()` 的 `config.transport`（测试/宿主）> context 的 `lifeTransport` 服务 > 测试上下文 `root.lifeTransport`；没有注入时，`telegram` 渠道会用 `tokenEnv` 构建内置适配器（`lib/telegram.js`）。transport 契约是 `send(candidate) -> { platformId }`（抛错=结果未知）与可选的 `query(candidate) -> { platformId } | { found: false } | null`；Telegram Bot API 没有按幂等键反查的能力，所以它的 `query()` 明确返回 `null`（= 查不了，保持 `unconfirmed`）。
+
 ## 状态布局
 
 `$DSH_HOME/life/<lifeId>/`：
@@ -164,9 +209,22 @@ commitments.json   承诺及其结算
 activity.json      唯一的当前活动 + 上一次已完成的
 ledger.jsonl       追加式记录：真实发生了什么
 wake.json          唤醒绑定、下一个闹钟、当天预算、已投递 messageId
+outbox.json        发布线：每条内容的稳定编号、版本、批准、状态时间线、平台回执
 ```
 
 写是原子的（tmp + rename）。读容忍文件缺失或损坏 —— **一个截断的 JSON 不该弄死一条命**。账本会跳过写了一半的尾行，而不是丢掉它周围的历史。
+
+## 界面
+
+插件在 dsh 的 web 界面里挂一屏只读的**运行总览**：它现在在做什么、为什么（`activity.why`）、今天醒了几次 / 做完几件事 / 失败几次、欠着的事（最多 3 条，带到期时间）、下次醒来的时间。界面只读，不能改任何状态。
+
+**数据从哪来。** Host 半身 `lib/ui.js` 在 profile 有 `webServer` 时注册一个精确路由 `/life/state.json`；handler 每次请求都**现读 `LifeStore`**（不缓存、不预先组装），所以屏幕上不可能出现昨天的故事被当成今天。返回的字段只有 `generatedAt`、`identity{name,species,revision}`、`activity{what,why,startedAt}`、`nextWakeAt`、`wakeCountToday`、`openCommitments[{what,dueAt}]`、`today{turns,wakes,activities,failures}`。**不回** `relations` 的备注、**不回**账本正文 —— 私密内容不出 Host。状态文件坏掉时返回 `{ ok: false, error: "life/state-corrupt:<file>" }`，而不是编一个看起来正常的界面。
+
+**为什么客户端零构建。** dsh 的 web shell 用自有 lazy-CJS 表加载客户端模块：`window.__ModuleLoader__.load({ id, factory })`，`require('react')` 由 shell 提供。所以 `client/life-overview.js` 是一份手写文件，不含 JSX、不引依赖、不需要打包；`package.json` 里 `dsh.client.platform = 'web'`、`exports['./client']` 指向它、`files` 带上 `client/`。同时**保留** `dsh.bundle.patch`：只写 `dsh.client` 会让 `dsh plugin add` 只当普通依赖装、插件行不挂，客户端半身就永远不会被扫描（这个坑在 `docs/dsh-ui-slots.md` 里记着）。注册进 `shell.overlay`（已验证的 shell 级 slot）；`settings.section` 用同一个组件额外注册一次，slot 不存在就静默跳过。
+
+**没有界面的 profile 不受影响。** `webServer` 不在模块级 `inject` 里；headless/SDK 组合没有它，`installLifeUi` 就什么都不注册、不 warn —— 工具面仍是 17 个，验证见 `verify/ui.mjs` 的 headless 一节。
+
+**像素级未验证。** 我们只在两层证明过它：客户端模块出现在页面的 boot manifest 里、被 shell 按 URL 取到；模块在桩 loader 里执行 `apply()` 后确实注册进了 slot 并产出元素。**没有人真的看着它在屏幕上渲染出来** —— 本仓库没有可驱动的浏览器。别把「注册成功」读成「看得见」。
 
 ## 本包强制的设计规则
 
@@ -175,17 +233,21 @@ wake.json          唤醒绑定、下一个闹钟、当天预算、已投递 mes
 3. **要证据，不要声称。** 结束活动要记下结果和证据。
 4. **快照有界。** 连续性不该每天多花 token。
 5. **不自建定时器。** 唤醒走 dsh 的 `schedule`，插件不持有 `setInterval` —— 自己持有的定时器会随会话一起死掉，那正是 `schedule` 存在要修的问题。抖动 / 静默 / 预算是我们加的**策略**，不是第二套调度器。
+6. **外部副作用先记「发送中」。** 状态落盘之后才允许调用 transport；拿不到平台对象 ID 就是 `unconfirmed`，没有自动重发，只有显式对账或人工确认。
+7. **批准绑定字节。** 改一个字旧批准就失效；批准字段（版本/渠道/账号/有效期）缺失或过期都不允许发送。
+8. **标识是硬闸。** 没有显式标识（含内容编号）与元数据，记录不能进入 `confirmed`；没有任何去除标识的函数。
 
 ## 验证
 
 ```sh
-node ../../verify/smoke.mjs       # 62 项：存储不变量、持久性、损坏降级、唤醒策略与记账、7 天 soak、活动选择器（确定性，不 spawn dsh）
+node ../../verify/smoke.mjs       # 68 项：存储不变量、持久性、损坏降级、唤醒策略与记账、7 天 soak、活动选择器（确定性，不 spawn dsh）
 node ../../verify/day-report.mjs  # 22 项：把账本渲染成「它的一天」的报告工具
+node ../../verify/life-week.mjs   # 16 项：7 天生命线的端到端回放
 node ../../verify/e2e-tools.mjs   # 17 项：真实 dsh profile 启动并挂载
 node ../../verify/pack-install.mjs # 9 项：打出来的 tarball 能不能装进 profile 并激活
 ```
 
-`e2e` 那套不是 mock。它从 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装上，真启动，然后断言运行系统实际产出了什么：磁盘上的身份、账本里的真实 `turn/end` 事件、**装配后**系统提示词里的生命层 section、以及 13 个工具 schema 全部对模型可见。
+`e2e` 那套不是 mock。它从 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装上，真启动，然后断言运行系统实际产出了什么：磁盘上的身份、账本里的真实 `turn/end` 事件、**装配后**系统提示词里的生命层 section、以及 17 个工具 schema 全部对模型可见。
 
 ## 已知限制
 
@@ -196,4 +258,6 @@ node ../../verify/pack-install.mjs # 9 项：打出来的 tarball 能不能装�
 - **连续多日唤醒可靠性未实测。** `docs/PLAN.md` §10.2 的决策门是无人干预 7 天；策略层已用确定性 soak（8 组参数、367 次唤醒）覆盖「不跳日、不落静默、不超预算、跨天重置」，但真实跑 7 天没做过。会话归档会掐断唤醒（dsh 的 `schedule` 语义），产品层还没有归档策略。
 - **`every + jitter > 24h` 且目标本身不落静默段时，仍可能跨过一整个日历日**；当前只保证「被静默段推出整天」会被夹回该日最后一个允许时刻。
 - **`paused` / `wakeEnabled: false` 不撤销已排的闹钟**，只停止继续布防；见上文的说明。
+- **发布线只验证到「批准 + 假 transport」。** approval 四态、TOCTOU、`unconfirmed` 都用假 approval/假 fetch 覆盖；真实 Web 弹窗没点过、真实 Telegram 一次也没发过（测试从不联网）。Telegram `query()` 不可用，所以「已发但回执丢失」只能靠人工确认。
+- **平台会剥掉隐式标识。** 我们保证自己这一端显式+隐式都写；第三方平台重编码/剥离元数据不在我们控制内，不声称「已完全合规」（见 `docs/compliance-cn.md` §五）。
 - **对着 dsh `0.2.1-rc.2` 写的。** dsh 处于 developer preview，官方明写会有破坏性兼容变更，所以这里的配置与工具名还不是稳定契约。

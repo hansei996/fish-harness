@@ -42,6 +42,8 @@ const suites = [
   { name: 'smoke', file: 'verify-smoke.log', outcome: process.env.SMOKE_OUTCOME },
   { name: 'day report', file: 'verify-day-report.log', outcome: process.env.DAYREPORT_OUTCOME },
   { name: 'life week', file: 'verify-life-week.log', outcome: process.env.LIFEWEEK_OUTCOME },
+  { name: 'ui', file: 'verify-ui.log', outcome: process.env.UI_OUTCOME },
+  { name: 'publish', file: 'verify-publish.log', outcome: process.env.PUBLISH_OUTCOME },
   { name: 'e2e', file: 'verify-e2e.log', outcome: process.env.E2E_OUTCOME },
   { name: 'pack', file: 'verify-pack.log', outcome: process.env.PACK_OUTCOME },
 ].map((suite) => ({ ...suite, outcome: suite.outcome || 'unknown' }))
