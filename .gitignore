@@ -17,5 +17,6 @@ life/
 tmp/
 *.log
 
-# baked animation frames (regenerate with showcase/bake-showcase.mjs)
+# baked animation frames (regenerate with showcase/bake-*.mjs)
 showcase/frames/
+showcase/frames-scen/
