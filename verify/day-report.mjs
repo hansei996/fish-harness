@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const TOOL = path.join(REPO, 'tools', 'day-report.mjs')
@@ -34,7 +34,10 @@ function run (args) {
 }
 
 // ---------- build a life with the real store ----------
-const { LifeStore } = await import(path.join(REPO, 'packages', 'dsh-life', 'lib', 'store.js'))
+// Windows: import() 不接受裸的 C:\... 路径，必须转成 file:// URL。
+// 这是本仓库记过的坑（verify/README.md「Windows 上修过的四个坑」第 2 条），
+// 漏掉它的后果是 CI 在 windows-latest 上红、本机（macOS）全绿 —— 正是这样发生的。
+const { LifeStore } = await import(pathToFileURL(path.join(REPO, 'packages', 'dsh-life', 'lib', 'store.js')).href)
 const store = new LifeStore({ home: HOME, lifeId: 'demo' })
 store.ensure({ name: '大肥鱼', species: 'whale', seeds: ['懒'] })
 store.recordInterest({ topic: '挖矿类小品', confidence: 0.8, source: 'experience' })
@@ -108,6 +111,46 @@ fs.appendFileSync(path.join(HOME, 'life', 'demo', 'ledger.jsonl'), '{"half":')
 const afterCorrupt = await run(['--life', 'demo'])
 check('a truncated ledger tail still renders the day',
   afterCorrupt.code === 0 && afterCorrupt.out.includes('大肥鱼的一天'))
+
+// ---------- 5. the day-report tool must load anywhere ----------
+// 这一条是被 CI 抓出来的：`**/*.mjs` 里的裸路径 `import('./C:/...')` 在
+// Windows 上抛 ERR_UNSUPPORTED_ESM_URL_SCHEME，而 macOS 全绿 —— 于是「本机
+// 通过」的套件在 CI 上把整个 job 弄红了（gate 读的是 continue-on-error 下的
+// 真实 outcome）。修掉那处 import 容易，难的是别再犯，所以改成机器检查。
+{
+  const scanTargets = [
+    path.join(REPO, 'tools'),
+    path.join(REPO, 'verify'),
+  ]
+  const offenders = []
+  const walk = (dir) => {
+    for (const name of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, name.name)
+      if (name.isDirectory()) walk(full)
+      else if (name.name.endsWith('.mjs')) {
+        // 看每一条 import(...)：参数必须是 pathToFileURL(...) 的形式，
+        // 或是注释里提到的（本检查只认代码行）。
+        fs.readFileSync(full, 'utf8').split(/\r?\n/).forEach((line, i) => {
+          // 先去掉注释与字符串字面量：检查只针对真正的调用，避免把描述文字
+          // （例如断言标题里的 "import()"）当成违规。
+          const code = line
+            .replace(/\/\/.*$/, '')
+            .replace(/'(?:[^'\\]|\\.)*'/g, "''")
+            .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+            .replace(/`(?:[^`\\]|\\.)*`/g, '``')
+          if (!/\bimport\s*\(/.test(code)) return
+          if (/import\s*\(\s*''/.test(code) || /import\s*\(\s*""/.test(code) || /import\s*\(\s*``/.test(code)) return
+          if (/import\s*\(\s*pathToFileURL\s*\(/.test(code)) return // 正确写法
+          offenders.push(`${path.relative(REPO, full)}:${i + 1}`)
+        })
+      }
+    }
+  }
+  for (const t of scanTargets) if (fs.existsSync(t)) walk(t)
+  check('every dynamic import in tools/ and verify/ goes through pathToFileURL (Windows)',
+    offenders.length === 0,
+    offenders.length ? `裸路径 import 在 ${offenders.join(', ')}` : `${scanTargets.length} 个目录已扫`)
+}
 
 fs.rmSync(HOME, { recursive: true, force: true })
 const failed = results.filter((r) => !r.ok)

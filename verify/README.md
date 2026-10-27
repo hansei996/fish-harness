@@ -5,7 +5,7 @@
 | 套件 | 查什么 | 本机实测 |
 |---|---|---|
 | `verify/smoke.mjs` | 26 项存储不变量/装载 + 16 项自主唤醒 + 10 项 7 天模拟 soak + 9 项活动选择器（固定时钟与随机数，不需要真 dsh） | 62/62 通过 |
-| `verify/day-report.mjs` | 21 项「它的一天」报告工具：翻译对不对、该省的是否省了、缺数据崩不崩（不需要真 dsh） | 21/21 通过 |
+| `verify/day-report.mjs` | 22 项「它的一天」报告工具：翻译对不对、该省的是否省了、缺数据崩不崩（不需要真 dsh） | 22/22 通过 |
 | `verify/e2e-tools.mjs` | 17 项端到端：真 dsh 装载插件、13 个工具可见、身份/账本落盘、无 schedule 时降级、web 模板确实带 schedule | 17/17 通过 |
 | `verify/pack-install.mjs` | 9 项发布路径：`pnpm pack` 的 tarball 文件清单、装进全新 profile 能否激活 | 9/9 通过 |
 
@@ -45,7 +45,7 @@ export DSH_BIN=$(pwd)/node_modules/@deepseek-ai/dsh/lib/bin.js
 export DSH_BIN=<dsh bin>   # e2e / pack 需要；smoke 与 day-report 不需要
 npm run verify              # smoke + day-report + e2e 一起（跳过 pack）
 node verify/smoke.mjs       # 62 项
-node verify/day-report.mjs  # 21 项
+node verify/day-report.mjs  # 22 项
 node verify/e2e-tools.mjs   # 17 项
 node verify/pack-install.mjs # 9 项
 ```
@@ -68,6 +68,16 @@ node verify/pack-install.mjs # 9 项
 
 顺带修了一个**假绿**：`dsh plugin manager installs dsh-life` 原来只 grep 输出里有没有 `dsh-life`，
 命令失败也会 PASS。现在要求 `exit code === 0` 且输出里没有 `failed`。
+
+### 第二个坑又犯了一次（2026-10-27），所以改成机器检查
+
+新写的 `verify/day-report.mjs` 里用了一句裸路径 `import()`，**macOS 全绿、CI 的 windows-latest 红**。
+难得的是它没有被掩盖：`continue-on-error` 只让**步骤**显示 success，闸门读的是**真实 outcome**，
+所以 `Report and gate` 正确地红了（见 [`docs/ci.md`](../docs/ci.md)）。
+
+人记住一条坑，和机器保证不再犯，是两回事。现在 `verify/day-report.mjs` 会扫描 `tools/` 与 `verify/`
+下每个 `.mjs`，任何**没有经过 `pathToFileURL` 的动态 `import`**（排除字符串字面量说明符）都会 FAIL。
+这条断言先被验证过「临时恢复裸路径会 FAIL、并准确指出行号」，才留下。
 
 ## 第三套：打包产物能不能装（`verify/pack-install.mjs`）
 

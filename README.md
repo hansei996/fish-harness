@@ -20,7 +20,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | --- | --- |
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
 | [`tools/`](tools/) | 运维脚本：把机器账本渲染成人能读的「它的一天」 |
-| [`verify/`](verify/) | 62 项存储/策略/soak 不变量 + 21 项当天报告工具 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
+| [`verify/`](verify/) | 62 项存储/策略/soak 不变量 + 22 项当天报告工具 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
 | [`docs/PRODUCT.md`](docs/PRODUCT.md) | **产品规划**：市场位置、竞争分析、分阶段对外策略 |
@@ -302,7 +302,7 @@ wake.json          唤醒绑定 · 下一个闹钟 · 当天预算 · 已投递 
 
 ```sh
 node verify/smoke.mjs       # 62 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性，不 spawn dsh，约 5s）
-node verify/day-report.mjs  # 21 项：当天报告工具（不 spawn dsh，约 0.2s）
+node verify/day-report.mjs  # 22 项：当天报告工具（不 spawn dsh，约 0.2s）
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs   # 17 项：真实 dsh 端到端
 DSH_BIN=<dsh bin> node verify/pack-install.mjs # 9 项：打出来的包能不能装进 profile 并激活（约 20s）
 node verify/live/wake-live.mjs                # 可选：真实 web profile 的一次真实唤醒（约 1–2 min；会先验安装是否健康）

@@ -180,7 +180,7 @@ wake.json          唤醒绑定、下一个闹钟、当天预算、已投递 mes
 
 ```sh
 node ../../verify/smoke.mjs       # 62 项：存储不变量、持久性、损坏降级、唤醒策略与记账、7 天 soak、活动选择器（确定性，不 spawn dsh）
-node ../../verify/day-report.mjs  # 21 项：把账本渲染成「它的一天」的报告工具
+node ../../verify/day-report.mjs  # 22 项：把账本渲染成「它的一天」的报告工具
 node ../../verify/e2e-tools.mjs   # 17 项：真实 dsh profile 启动并挂载
 node ../../verify/pack-install.mjs # 9 项：打出来的 tarball 能不能装进 profile 并激活
 ```
