@@ -19,9 +19,10 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | 路径 | 是什么 |
 | --- | --- |
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
-| [`verify/`](verify/) | 61 项存储/策略/soak 不变量 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
+| [`tools/`](tools/) | 运维脚本：把机器账本渲染成人能读的「它的一天」 |
+| [`verify/`](verify/) | 62 项存储/策略/soak 不变量 + 21 项当天报告工具 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
-| [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.4（当前）· `v0.1` / `v0.2` / `v0.3` 保留在旁，可对照错在哪 |
+| [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
 | [`docs/PRODUCT.md`](docs/PRODUCT.md) | **产品规划**：市场位置、竞争分析、分阶段对外策略 |
 | [`docs/STORY.md`](docs/STORY.md) | **叙事**：软件史的下一次变化、三个落地场景、不声称什么 |
 | [`docs/index.html`](docs/index.html) | **对外页面**：单页静态站点，GitHub Pages 直接从 `docs/` 发布 |
@@ -29,7 +30,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`docs/wake-verification.md`](docs/wake-verification.md) | 自主唤醒验了什么、**没验什么** |
 | [`docs/wake-e2e.md`](docs/wake-e2e.md) | 真实 web profile 下一次真实唤醒的实测记录 |
 | [`docs/ci.md`](docs/ci.md) | CI 的固定项与理由 |
-| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍三套 verify（smoke / e2e / pack） |
+| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍四套 verify（smoke / day-report / e2e / pack） |
 
 ---
 
@@ -218,6 +219,38 @@ dsh plugin --profile <你的 profile> add link:C:\Users\you\fish-harness\package
 
 通过注册 `systemPrompt` 的 section 注入，**不替换** profile 已有的人格设定。成本是固定的小额 token，不随生命长度增长。
 
+### 它的一天，长这样
+
+账本 `ledger.jsonl` 是给机器看的；**用户第二天回来想看到的是一段人话**（[`docs/PRODUCT.md`](docs/PRODUCT.md) §9.2）。`tools/day-report.mjs` 就是这层翻译 —— 它不产生新事实，只把 `kind + detail` 渲染成一天：
+
+```sh
+node tools/day-report.mjs                     # 今天
+node tools/day-report.mjs --date 2026-10-27   # 指定日期
+node tools/day-report.mjs --json              # 供程序消费（带 tone 与 evidence 结构）
+```
+
+下面这段是**真跑出来的输出**，不是手写的样例（构造方式见 [`verify/day-report.mjs`](verify/day-report.mjs)）：
+
+```text
+  大肥鱼的一天 · 2026-10-27
+  ──────────────────────────────────────────────
+
+  08:02  ◦ 大肥鱼出生了
+  09:10    对「像素矿工小品」的兴趣 = 0.8（来自经历）
+  09:12  ▸ 开始：练《地底 38 层》（因为 昨天在第 37 层挂过两次）
+  10:40  · 没做成：补给带少了｜证据 save:38
+  11:00    答应了一件事：把打法写进自己的笔记（2026-10-28 前）
+  14:20  ▸ 开始：写一段「菜就多练」的段子（因为 挂得有节奏，想吐槽）
+  15:05  ✓ 做成了｜证据 draft:1
+  15:20  ✓ 兑现了一件事
+
+  ──────────────────────────────────────────────
+  今天：起了 2 件事 · 做成 1 件 · 没成 1 件
+  对话往返 3 次（不计入上面）
+```
+
+注意三件事：**失败被显示成失败**（不美化）、**每条结论跟着证据**、**对话往返单独计数**（不冒充「做了很多事」）。这就是「诚实」在界面上的样子 —— 一条一天只说了一句真话的记录，比十条流水账有用。
+
 ---
 
 ## 代码构成
@@ -265,14 +298,17 @@ wake.json          唤醒绑定 · 下一个闹钟 · 当天预算 · 已投递 
 
 ## 验证
 
-三套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。
+四套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。
 
 ```sh
-node verify/smoke.mjs       # 61 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性，不 spawn dsh，约 5s）
+node verify/smoke.mjs       # 62 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性，不 spawn dsh，约 5s）
+node verify/day-report.mjs  # 21 项：当天报告工具（不 spawn dsh，约 0.2s）
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs   # 17 项：真实 dsh 端到端
 DSH_BIN=<dsh bin> node verify/pack-install.mjs # 9 项：打出来的包能不能装进 profile 并激活（约 20s）
 node verify/live/wake-live.mjs                # 可选：真实 web profile 的一次真实唤醒（约 1–2 min；会先验安装是否健康）
 ```
+
+`npm run verify` 一次跑前三套（不需要 dsh 的 smoke + day-report，加需要 dsh 的 e2e）。
 
 `e2e` 那套**不是 mock**：它用 shipped 模板组合出一个真实的 dsh profile，用 `dsh plugin` 装进去，真启动，然后断言运行系统的实际产出 —— 磁盘上的身份、账本里的真实 `turn/end`、**装配后**的系统提示词里的生命层 section、以及 13 个工具 schema 全部对模型可见。
 
@@ -288,10 +324,11 @@ node verify/live/wake-live.mjs                # 可选：真实 web profile 的�
 
 三个都是 mock 测不出来的。这就是为什么 e2e 必须真启动。
 
-同类的还有两个，是被**模拟长期运行**和**发布路径**抓出来的：
+同类的还有三个：两个是被**模拟长期运行**和**发布路径**抓出来的，一个是被**同一份证据要求两处都成立**抓出来的：
 
 4. 策略层一度会「整天不醒」：`every=24h±4h` 时目标被静默段推到后天，那个日历日就整个消失了（34 小时空窗）。soak 用固定时钟 + 固定随机数跑 8 组参数、367 次唤醒才量出来。
 5. README 的第一行安装命令是红的：`dsh plugin add dsh-life` → `ERR_PNPM_FETCH_404`，因为这个包从没发布到 npm。任何人照做都会在第一分钟卡住 —— 这类问题单测永远测不到，只有把「陌生人的第一步」当成一条断言才会。
+6. `finishActivity` 把 `evidence` 写进了 `activity.json`，**却漏写进了 `ledger.jsonl`**。账本是唯一可回放、有顺序的长期记录，漏了证据等于「对外可信」这个卖点在最底层就是假的 —— 而人眼几乎不可能从一长串 JSONL 里看出少了一个字段。修复后补了一条回归断言（先把 bug 临时改回去，确认它**真的会 FAIL**，再改回来），见 [`verify/smoke.mjs`](verify/smoke.mjs)。
 
 ---
 

@@ -93,6 +93,14 @@ jobs:
           set -euo pipefail
           node verify/smoke.mjs 2>&1 | tee verify-smoke.log
 
+      # day-report 与 smoke 一样不需要 dsh：纯本地文件 + store.js。
+      # 放在需要 dsh 的套件之前，坏掉时能早几秒给结论。
+      - name: Verify — day report
+        id: dayreport
+        continue-on-error: true
+        run: |
+          node verify/day-report.mjs 2>&1 | tee verify-day-report.log
+
       # 打包检查放在 e2e 前面：它先跑 pnpm pack 与文件清单，漏文件这类问题在几秒内
       # 就有结论，不必等慢的 e2e。三套都跑（continue-on-error），总时长不变。
       - name: Verify — pack
@@ -111,13 +119,14 @@ jobs:
           set -euo pipefail
           node verify/e2e-tools.mjs 2>&1 | tee verify-e2e.log
 
-      # 汇总 dsh / node 版本、三套结果与输出尾部：写 step summary + verify-report.md，
-      # 并作为 job 的最终闸门（三套都 success 才放行）。
+      # 汇总 dsh / node 版本、四套结果与输出尾部：写 step summary + verify-report.md，
+      # 并作为 job 的最终闸门（四套都 success 才放行）。
       - name: Report and gate
         if: always()
         env:
           MATRIX_OS: ${{ matrix.os }}
           SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          DAYREPORT_OUTCOME: ${{ steps.dayreport.outcome }}
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           PACK_OUTCOME: ${{ steps.pack.outcome }}
         run: node .github/scripts/ci-report.mjs
@@ -129,6 +138,7 @@ jobs:
           name: verify-logs-${{ matrix.os }}
           path: |
             verify-smoke.log
+            verify-day-report.log
             verify-e2e.log
             verify-pack.log
             verify-report.md

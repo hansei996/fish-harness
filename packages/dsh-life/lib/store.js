@@ -446,7 +446,20 @@ export class LifeStore {
     activity.lastFinished = finished
     activity.updatedAt = nowIso()
     writeJsonAtomic(this.files.activity, activity)
-    this.appendLedger({ kind: 'activity-end', detail: { id: finished.id, outcome, note } })
+    // Evidence belongs in the ledger too: it is the append-only record the day
+    // report and any later reconciliation read. It used to be written only to
+    // activity.json, so the one durable, ordered trace of what happened dropped
+    // the very thing the evidence rule (PLAN.md §3.3) depends on.
+    this.appendLedger({
+      kind: 'activity-end',
+      detail: {
+        id: finished.id,
+        what: finished.what,
+        outcome,
+        note,
+        evidence: finished.evidence,
+      },
+    })
     return finished
   }
 

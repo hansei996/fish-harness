@@ -5,9 +5,11 @@
   "description": "数字生命 Harness：在 DeepSeek Harness 之上把 Agent 养起来。",
   "type": "module",
   "scripts": {
-    "verify": "node verify/smoke.mjs && node verify/e2e-tools.mjs",
+    "verify": "node verify/smoke.mjs && node verify/day-report.mjs && node verify/e2e-tools.mjs",
     "verify:smoke": "node verify/smoke.mjs",
-    "verify:e2e": "node verify/e2e-tools.mjs"
+    "verify:day-report": "node verify/day-report.mjs",
+    "verify:e2e": "node verify/e2e-tools.mjs",
+    "day-report": "node tools/day-report.mjs"
   },
   "license": "MIT"
 }

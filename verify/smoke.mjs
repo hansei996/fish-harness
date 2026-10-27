@@ -132,6 +132,21 @@ check('finishing with nothing running is rejected', noActivity)
 check('the finished activity keeps its outcome and evidence',
   first.outcome === 'failed' && first.evidence.includes('save:38'))
 
+// The ledger is the append-only, time-ordered record the day report and any
+// later reconciliation read (docs/PRODUCT.md §9.2). Evidence used to live only
+// in activity.json, so the durable trace dropped the one thing the evidence
+// rule (PLAN.md §3.3) depends on. Assert it reaches the ledger, not just the
+// in-memory object.
+{
+  const ends = store.readLedger({ limit: 500 }).filter((r) => r.kind === 'activity-end')
+  const last = ends[ends.length - 1]
+  const d = last && last.detail ? last.detail : {}
+  check('the ledger copy of activity-end carries outcome, what and evidence',
+    d.outcome === 'failed' && typeof d.what === 'string' && d.what.length > 0 &&
+    Array.isArray(d.evidence) && d.evidence.includes('save:38'),
+    `outcome=${d.outcome} what=${d.what} evidence=${JSON.stringify(d.evidence)}`)
+}
+
 // The causal chain the plan calls for: a failure becomes the next attempt.
 store.startActivity({ what: '再练一次第 38 层', why: '换了打法' })
 const second = store.finishActivity({ outcome: 'done', evidence: ['save:38-cleared'] })

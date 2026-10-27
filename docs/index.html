@@ -258,6 +258,20 @@
   .note b{color:var(--ink)}
   .note .ic{flex:none; color:var(--warn); font-size:17px; line-height:1.4}
 
+  /* terminal / day report */
+  .term{
+    margin:0; border:1px solid var(--line); border-radius:var(--radius);
+    background:var(--soft); color:var(--ink);
+    font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size:13.5px; line-height:1.95; padding:18px 20px; overflow-x:auto;
+    white-space:pre; tab-size:2;
+  }
+  .term .dim{color:var(--ink-3)}
+  .term .ends{color:var(--ink-3); user-select:none}
+  .term .bad{color:var(--warn)}
+  .term .good{color:var(--ok)}
+  .term .start{color:var(--blue-d)}
+
   footer{padding:50px 0 72px; border-top:1px solid var(--line-2); color:var(--ink-3); font-size:14px}
   footer .wrap{display:flex; gap:18px; flex-wrap:wrap; align-items:center}
   footer .sp{margin-left:auto}
@@ -274,6 +288,7 @@
       <a href="#alive">怎么活</a>
       <a href="#dayone">第一天</a>
       <a href="#human">活人感</a>
+      <a href="#oneday">它的一天</a>
       <a href="#limits">边界</a>
       <a href="#scene">场景</a>
       <a href="#now">进度</a>
@@ -571,9 +586,65 @@
   </div>
 </section>
 
+<section id="oneday">
+  <div class="wrap">
+    <div class="eyebrow">06 <span>可查证</span></div>
+    <h2>第二天回来，你会看到什么</h2>
+    <p class="sub">
+      「它活了」如果不可查证，就只是一句宣传。所以这件事必须落到一个具体的屏幕上 ——
+      下面不是设计稿，是<strong>真跑出来的输出</strong>。
+    </p>
+
+    <p>
+      账本本身是给机器看的：一行一个 JSON，带 <code>kind</code> 和时间戳，只有开发者读得懂。
+      但用户第二天回来要的不是 JSON，是<strong>一句话：它昨天干了什么、有没有真干成</strong>。
+      中间这层翻译就是 <code>tools/day-report.mjs</code> —— 它不产生任何新事实，只把已经落盘的记录渲染成人话。
+    </p>
+
+    <pre class="term"><span class="dim">  大肥鱼的一天 · 2026-10-27</span>
+<span class="ends">  ──────────────────────────────────────────────</span>
+
+  08:02  <span class="start">◦ 大肥鱼出生了</span>
+  09:10    对「像素矿工小品」的兴趣 = 0.8（来自经历）
+  09:12  ▸ 开始：练《地底 38 层》（因为 昨天在第 37 层挂过两次）
+  10:40  <span class="bad">· 没做成：补给带少了｜证据 save:38</span>
+  11:00    答应了一件事：把打法写进自己的笔记（2026-10-28 前）
+  14:20  ▸ 开始：写一段「菜就多练」的段子（因为 挂得有节奏，想吐槽）
+  15:05  <span class="good">✓ 做成了｜证据 draft:1</span>
+  15:20  <span class="good">✓ 兑现了一件事</span>
+
+<span class="ends">  ──────────────────────────────────────────────</span>
+  今天：起了 2 件事 · 做成 1 件 · 没成 1 件
+  对话往返 3 次（不计入上面）</pre>
+
+    <div class="cards" style="margin-top:20px">
+      <div class="card">
+        <h3>失败被显示成失败</h3>
+        <p>「没做成：补给带少了」就写「没做成」。<strong>不美化、不跳过</strong> ——
+           一条只报喜的记录，用户看三天就不信了，而信任是这个产品唯一的资产。</p>
+      </div>
+      <div class="card">
+        <h3>每条结论跟着证据</h3>
+        <p>「做成了」后面必须跟 <code>draft:1</code> 这样的凭证。
+           没有证据就不写「做成了」—— 规则写在 <code>lib/store.js</code> 里，不写在提示词里。</p>
+      </div>
+      <div class="card">
+        <h3>不把聊天冒充成做事</h3>
+        <p>对话往返<strong>单独计数</strong>。聊了 300 句不等于做了 300 件事 ——
+           分开列，是这套系统不肯含糊的地方。</p>
+      </div>
+    </div>
+
+    <p class="pull" style="margin-top:22px">
+      <strong>一条一天只说一句真话的记录，比十条流水账有用。</strong>
+      「有生活」的证据不是话多，是<strong>话可以被查</strong>。
+    </p>
+  </div>
+</section>
+
 <section id="limits">
   <div class="wrap">
-    <div class="eyebrow">06 <span>边界</span></div>
+    <div class="eyebrow">07 <span>边界</span></div>
     <h2>它会做什么，不会做什么</h2>
     <p class="sub">一套系统值不值得长期托付，看的是它肯把边界说多清楚。</p>
 
@@ -652,7 +723,7 @@
 
 <section id="scene">
   <div class="wrap">
-    <div class="eyebrow">07 <span>落地场景</span></div>
+    <div class="eyebrow">08 <span>落地场景</span></div>
     <h2>它落地的样子</h2>
     <p class="sub">三个具体场景。都是设想，用来检验前面这些话立不立得住。</p>
 
@@ -712,14 +783,15 @@
 
 <section id="now">
   <div class="wrap">
-    <div class="eyebrow">08 <span>进度</span></div>
+    <div class="eyebrow">09 <span>进度</span></div>
     <h2>现在到了哪一步</h2>
     <p class="sub">这份进度表按实际跑过的结果写，不是按计划写。<strong>做不到的地方直接标出来。</strong></p>
 
     <div class="rows">
       <div class="row"><span class="n">生命层：身份、兴趣、承诺、账本<span>5 个文件 2438 行，零自有依赖，13 个工具，7 个状态文件</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">自主唤醒与活动选择器<span>自己醒来、在有限候选里选活动、按预算与作息约束</span></span><span class="pill done">已完成</span></div>
-      <div class="row"><span class="n">验证：87 项全绿<span>存储不变量 · 真实 dsh 端到端 · 打包安装 · 7 天确定性 soak</span></span><span class="pill done">已完成</span></div>
+      <div class="row"><span class="n">「它的一天」可读报告<span>把机器账本渲染成人话，失败照实说、结论带证据（就是上面那一屏）</span></span><span class="pill done">已完成</span></div>
+      <div class="row"><span class="n">验证：109 项全绿<span>存储不变量 · 当天报告 · 真实 dsh 端到端 · 打包安装 · 7 天确定性 soak</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">连续 7 天真实运行<span>策略层已用 soak 覆盖，但「真实跑 7 天」和「模拟 7 天」不是一回事</span></span><span class="pill part">进行中</span></div>
       <div class="row"><span class="n">界面<span>七页可交互原型已就绪，尚未做成真实插件视图</span></span><span class="pill part">原型</span></div>
       <div class="row"><span class="n">发布到社交平台<span>设计完整（含幂等与对账），尚未接真实平台</span></span><span class="pill todo">未开始</span></div>

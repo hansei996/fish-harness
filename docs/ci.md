@@ -1,19 +1,21 @@
 # CI：.github/workflows/verify.yml
 
-三套 verify 在 `ubuntu-latest` 与 `windows-latest` 各跑一遍，`fail-fast: false`，一次能看到两个平台。
-只跑 `node verify/smoke.mjs`、`node verify/e2e-tools.mjs`、`node verify/pack-install.mjs`；零额外依赖，不改断言。
+四套 verify 在 `ubuntu-latest` 与 `windows-latest` 各跑一遍，`fail-fast: false`，一次能看到两个平台。
+只跑 `node verify/smoke.mjs`、`node verify/day-report.mjs`、`node verify/e2e-tools.mjs`、`node verify/pack-install.mjs`；零额外依赖，不改断言。
+
+顺序有讲究：`smoke` → `day-report` → `pack` → `e2e`。前两套不需要 dsh，坏掉时几秒内就有结论；`pack` 又是 `e2e` 的前置（包漏文件比运行时出错更容易定位），所以排在慢的 `e2e` 前面。四套都跑（`continue-on-error`），最终由 `Report and gate` 统一判定。
 
 ## 固定项与理由
 
 | 项 | 值 | 理由 |
 | --- | --- | --- |
-| Node | 24 | dsh 0.2.1-rc.2 自带运行时是 Node 24.21.0，本机三套 verify 在它上面通过；2026-10 的 Active LTS 是 24（22 已进维护期），依赖里最严的 engines 是 >=22.19。仓库无 lockfile，不开 setup-node cache。 |
+| Node | 24 | dsh 0.2.1-rc.2 自带运行时是 Node 24.21.0，本机四套 verify 在它上面通过；2026-10 的 Active LTS 是 24（22 已进维护期），依赖里最严的 engines 是 >=22.19。仓库无 lockfile，不开 setup-node cache。 |
 | pnpm | 11.28.5 | dsh 的 plugin manager 用 execa 直接 spawn("pnpm")；corepack 的 shim 是 .cmd，Windows 上非 shell spawn 找不到，所以用 pnpm/action-setup 装独立可执行文件，并固定到 DSH 运行时同版本。 |
 | dsh | 0.2.1-rc.2 | 与 verify/README.md 一致，装在 `$RUNNER_TEMP/dsh-install`，不碰仓库里的 package.json。 |
 | 超时 | 45 min | e2e 子进程 300s、pack 的 boot 90s；job 要比各套自己的超时宽裕。 |
 | 权限 | contents: read | verify 不需要写仓库、issue 或制品以外的东西。 |
 
-## 第三套：pack（打出来的包还能不能装）
+## 第四套：pack（打出来的包还能不能装）
 
 `verify/pack-install.mjs`：`pnpm pack` → 断言 `files`/`exports`/`dsh.bundle` 承诺的文件一个不少
 → 把 tarball 装进全新 profile → boot 一次（无凭据时只要求 `identity.json` 落盘；90s 超时算失败）。
@@ -34,8 +36,9 @@ pnpm 会拦下 koffi / node-pty / protobufjs 的 build script，并以 `ERR_PNPM
 
 ## 失败诊断
 
-- `Report and gate` 的 Step summary：dsh / node 版本、三套结果、各自输出尾部。
-- artifact `verify-logs-<os>`：`verify-smoke.log`、`verify-e2e.log`、`verify-pack.log`、`verify-report.md`。
+- `Report and gate` 的 Step summary：dsh / node 版本、四套结果、各自输出尾部。
+- artifact `verify-logs-<os>`：`verify-smoke.log`、`verify-day-report.log`、`verify-e2e.log`、`verify-pack.log`、`verify-report.md`。
+- `Verify — day report` 红 → 看 `verify-day-report.log`：工具的输出形状变了而没同步测试，或账本少写了字段（这类最值得修）。
 - `Verify — pack` 红 → 先看 `verify-pack.log` 的 FAIL 行：缺文件会列出具体文件名；安装被 peer/registry 挡住看 add 那段。
 - `DSH_BIN does not exist` → 装 dsh 那步失败，看同平台日志里的 registry/网络错误。
 - `'pnpm' is not recognized` 或 `pnpm-missing` → e2e/pack 里 dsh 找不到 pnpm，检查 action-setup 与 PATH。

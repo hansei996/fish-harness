@@ -35,18 +35,22 @@ function dshVersion () {
   }
 }
 
+// 每套件：报告里显示的名字、raw log 文件名、自己的 outcome 环境变量。
+// log 文件名显式写出，不用 `verify-${name}.log` 推：`day-report` 会让推导出错的
+// （推导得到 verify-day-report.log 只有当 name 恰好等于文件名片段时才成立）。
 const suites = [
-  ['smoke', process.env.SMOKE_OUTCOME || 'unknown'],
-  ['e2e', process.env.E2E_OUTCOME || 'unknown'],
-  ['pack', process.env.PACK_OUTCOME || 'unknown'],
-]
+  { name: 'smoke', file: 'verify-smoke.log', outcome: process.env.SMOKE_OUTCOME },
+  { name: 'day report', file: 'verify-day-report.log', outcome: process.env.DAYREPORT_OUTCOME },
+  { name: 'e2e', file: 'verify-e2e.log', outcome: process.env.E2E_OUTCOME },
+  { name: 'pack', file: 'verify-pack.log', outcome: process.env.PACK_OUTCOME },
+].map((suite) => ({ ...suite, outcome: suite.outcome || 'unknown' }))
 const os = process.env.MATRIX_OS || process.env.RUNNER_OS || 'unknown'
 
 const fence = (body) => '```text\n' + tail(body) + '\n```'
-const details = (name, outcome) => [
+const details = ({ name, file, outcome }) => [
   `<details><summary>${name} output (last 30 lines, ${outcome})</summary>`,
   '',
-  fence(read(`verify-${name}.log`)),
+  fence(read(file)),
   '',
   '</details>',
 ].join('\n')
@@ -55,7 +59,7 @@ const rows = [
   ['os', os],
   ['node', process.version],
   ['dsh', dshVersion()],
-  ...suites.map(([name, outcome]) => [name, outcome]),
+  ...suites.map(({ name, outcome }) => [name, outcome]),
 ]
 
 const markdown = [
@@ -65,7 +69,7 @@ const markdown = [
   '| --- | --- |',
   ...rows.map(([key, value]) => `| ${key} | ${value} |`),
   '',
-  ...suites.flatMap(([name, outcome]) => [details(name, outcome), '']),
+  ...suites.flatMap((suite) => [details(suite), '']),
 ].join('\n')
 
 fs.writeFileSync('verify-report.md', markdown)
@@ -74,8 +78,8 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 }
 console.log(markdown)
 
-const failed = suites.filter(([, outcome]) => outcome !== 'success')
+const failed = suites.filter(({ outcome }) => outcome !== 'success')
 if (failed.length) {
-  console.error(`verify failed: ${failed.map(([name, outcome]) => `${name}=${outcome}`).join(' ')}`)
+  console.error(`verify failed: ${failed.map(({ name, outcome }) => `${name}=${outcome}`).join(' ')}`)
   process.exit(1)
 }
