@@ -53,6 +53,18 @@
             <div class="ui-sub">42 分钟 · 有存档证据 · 昨天在这儿挂了两次</div>
           </div>
 
+          <div class="ui-today">
+            <div class="ui-today-head">
+              <span class="ui-k">它的一天</span>
+              <span class="ui-today-more" data-go="ledger">今天 4 件事 · 看全部</span>
+            </div>
+            <ul class="ui-today-list">
+              <li><span class="ui-t">09:02</span><span class="ui-b">看了会儿关注的游戏更新</span></li>
+              <li><span class="ui-t">11:05</span><span class="ui-b">第 38 层失败 · 记下「下矿前先补药水」</span></li>
+              <li><span class="ui-t">14:20</span><span class="ui-b">把那次失误写成了段子草稿</span></li>
+            </ul>
+          </div>
+
           <div class="ui-acts">
             <button type="button" class="ui-btn ui-btn--primary" data-go="chat"><i data-lucide="message-circle" aria-hidden="true"></i>和它说话</button>
             <button type="button" class="ui-btn" data-go="ledger"><i data-lucide="scroll-text" aria-hidden="true"></i>看它干了什么</button>
@@ -442,6 +454,18 @@
 #ui-root .ui-st { padding: 2px 9px; border-radius: 999px; border: 1px solid var(--l); color: var(--m); font-size: 11px; white-space: nowrap; }
 #ui-root .ui-st--ok { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 30%, transparent); }
 #ui-root .ui-st--wn { color: var(--wn); border-color: color-mix(in oklab, var(--wn) 30%, transparent); }
+
+/* ---------------- 1b it's day (overview) ---------------- */
+#ui-root .ui-today {
+  flex: none; margin: 0 18px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--soft);
+}
+#ui-root .ui-today-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+#ui-root .ui-today-more { margin-left: auto; color: var(--accent); font-size: 11.5px; cursor: pointer; }
+#ui-root .ui-today-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+#ui-root .ui-today-list li { display: flex; gap: 10px; align-items: baseline; font-size: 12px; }
+#ui-root .ui-today-list .ui-t { flex: none; width: 38px; color: var(--muted); font-size: 11px; }
+#ui-root .ui-today-list .ui-b { color: var(--text); }
 
 /* ---------------- 2 ledger ---------------- */
 #ui-root .ui-log { list-style: none; margin: 0; padding: 0; }
