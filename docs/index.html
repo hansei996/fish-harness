@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fish Harness — 你的 Agent，有自己的生活</title>
+<meta name="description" content="在 DeepSeek Harness 之上，给一个 Agent 一条能长期活下去的命：有身份、有兴趣、有承诺、有账本。">
+<style>
+  :root {
+    color-scheme: light dark;
+    --deep: #1b2c61;
+    --hair: #5068a8;
+    --hair2: #6078b0;
+    --hair3: #7088c0;
+    --accent: #4f6fc0;
+    --bg: light-dark(#fbfcfe, #0b0f18);
+    --surface: light-dark(#ffffff, #131926);
+    --surface2: light-dark(#f4f7fc, #182030);
+    --text: light-dark(#161c2c, #e8edf8);
+    --muted: light-dark(#66718c, #8b97ae);
+    --line: light-dark(#e5eaf4, #202a3c);
+    --ok: light-dark(#15803d, #4ade80);
+    --warn: light-dark(#a16207, #fbbf24);
+    --radius: 14px;
+    --maxw: 940px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    padding: 0.1em 0.4em;
+    border-radius: 5px;
+    background: var(--surface2);
+    border: 1px solid var(--line);
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  /* ---------- nav ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 20;
+    backdrop-filter: blur(10px);
+    background: color-mix(in oklab, var(--bg) 84%, transparent);
+    border-bottom: 1px solid var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 18px; height: 58px; }
+  .brand { font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  .brand .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 18%, transparent);
+  }
+  nav .links { margin-left: auto; display: flex; gap: 18px; font-size: 14px; }
+  nav .links a { color: var(--muted); }
+  @media (max-width: 640px) { nav .links { display: none; } }
+
+  /* ---------- hero ---------- */
+  header.hero { padding: 72px 0 44px; text-align: center; }
+  .hero .kicker {
+    display: inline-block; font-size: 13px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 13px;
+    background: var(--surface);
+  }
+  h1 {
+    font-size: clamp(30px, 5.4vw, 50px);
+    line-height: 1.16; letter-spacing: -0.022em;
+    margin: 22px 0 0; font-weight: 650;
+  }
+  h1 .hl {
+    background: linear-gradient(180deg, var(--hair3), var(--accent));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.lede {
+    font-size: clamp(16px, 2.1vw, 19px); color: var(--muted);
+    margin: 20px auto 0; max-width: 640px;
+  }
+  .hero .cta { margin-top: 30px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 20px; border-radius: 11px; font-size: 15px; font-weight: 550;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+    cursor: pointer;
+  }
+  .btn:hover { text-decoration: none; border-color: color-mix(in oklab, var(--accent) 40%, var(--line)); }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--hair3), var(--accent));
+    border-color: transparent; color: #fff;
+  }
+
+  /* ---------- demo ---------- */
+  .demo {
+    margin: 12px auto 0; max-width: 860px;
+    border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--line); background: var(--surface);
+    box-shadow: 0 28px 64px -40px rgb(27 44 97 / 0.45);
+  }
+  .demo img, .demo video { display: block; width: 100%; height: auto; }
+  .demo video { background: var(--surface2); }
+  @media (prefers-reduced-motion: reduce) { .demo video { /* keep the first frame */ } }
+  .demo figcaption {
+    padding: 11px 16px; font-size: 13px; color: var(--muted);
+    border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .demo figcaption .sp { margin-left: auto; }
+
+  /* ---------- sections ---------- */
+  section { padding: 62px 0; border-top: 1px solid var(--line); }
+  section > .wrap > h2 {
+    font-size: clamp(22px, 3.2vw, 29px); letter-spacing: -0.015em;
+    margin: 0 0 8px; font-weight: 620;
+  }
+  .sub { color: var(--muted); margin: 0 0 28px; font-size: 16px; }
+
+  .grid { display: grid; gap: 16px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(212px, 1fr)); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+  .card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .card .num {
+    font-size: 13px; color: var(--accent); font-weight: 600;
+    display: inline-block; margin-bottom: 10px;
+    width: 24px; height: 24px; line-height: 24px; text-align: center;
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--accent) 12%, transparent);
+  }
+
+  /* contrast table */
+  .contrast { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .contrast > div { background: var(--surface); padding: 20px; }
+  .contrast h3 { margin: 0 0 12px; font-size: 15px; }
+  .contrast ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.5px; }
+  .contrast li { margin: 6px 0; }
+  .contrast .them h3 { color: var(--muted); }
+  .contrast .us h3 { color: var(--accent); }
+  @media (max-width: 560px) { .contrast { grid-template-columns: 1fr; } }
+
+  /* state speeds */
+  .speeds { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .speed {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px; background: var(--surface);
+  }
+  .speed .tag {
+    display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+    color: var(--accent); margin-bottom: 10px;
+  }
+  .speed h3 { margin: 0 0 6px; font-size: 15.5px; }
+  .speed p { margin: 0; font-size: 14px; color: var(--muted); }
+
+  /* status */
+  .status { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line);
+    border-radius: var(--radius); overflow: hidden; }
+  .srow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    background: var(--surface); padding: 14px 18px; }
+  .srow .name { font-size: 15px; }
+  .srow .name span { display: block; color: var(--muted); font-size: 13.5px; }
+  .pill { font-size: 12.5px; padding: 3px 11px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .pill.done { color: var(--ok); border-color: color-mix(in oklab, var(--ok) 34%, transparent); }
+  .pill.part { color: var(--warn); border-color: color-mix(in oklab, var(--warn) 34%, transparent); }
+  .pill.todo { color: var(--muted); border-color: var(--line); }
+
+  /* callout */
+  .note {
+    display: flex; gap: 12px; align-items: flex-start;
+    border: 1px solid color-mix(in oklab, var(--warn) 30%, transparent);
+    background: color-mix(in oklab, var(--warn) 8%, var(--surface));
+    border-radius: var(--radius); padding: 16px 18px; font-size: 14.5px;
+  }
+  .note strong { color: var(--text); }
+  .note .ico { flex: none; color: var(--warn); font-size: 17px; line-height: 1.3; }
+  .quote {
+    border-left: 3px solid color-mix(in oklab, var(--accent) 45%, transparent);
+    padding: 2px 0 2px 18px; margin: 22px 0; color: var(--muted); font-size: 15px;
+  }
+  .quote strong { color: var(--text); }
+
+  footer { padding: 44px 0 64px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  footer .sp { margin-left: auto; }
+
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <span class="brand"><span class="dot"></span>Fish Harness</span>
+    <span class="links">
+      <a href="#why">为什么</a>
+      <a href="#how">怎么活</a>
+      <a href="#feel">活人感</a>
+      <a href="#status">进度</a>
+      <a href="https://github.com/hansei996/fish-harness">GitHub</a>
+    </span>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">建立在 DeepSeek Harness 之上</span>
+    <h1>你的 Agent，<br class="br">有<span class="hl">自己的生活</span></h1>
+    <p class="lede">
+      大多数 Agent 在等你派活。它不等 —— 它自己安排一天、自己更新社交账号，
+      你偶尔看看它过得怎么样。
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#demo">看它的一天</a>
+      <a class="btn" href="https://github.com/hansei996/fish-harness">查看源码</a>
+    </div>
+  </div>
+</header>
+
+<div class="wrap" id="demo">
+  <figure class="demo">
+    <!-- Video rather than an upscaled GIF: the MP4 is 1200px wide at 30fps and
+         ~3x smaller than the GIF, so it stays crisp instead of blurring. -->
+    <video class="demo-video" autoplay muted loop playsinline preload="metadata"
+           poster="assets/scene-activity.png"
+           aria-label="五幕演示：它现在在做什么、生活账本与因果链、一条动态发到八个平台、两条状态轴、桌宠形态">
+      <source src="assets/demo.mp4" type="video/mp4">
+      <!-- Fallback for a browser without MP4 support: the first frame, not a
+           duplicate copy of the whole GIF. The GIF lives in showcase/ for the README. -->
+      <img src="assets/scene-activity.png" alt="它现在在做什么（静态首帧）">
+    </video>
+    <figcaption>
+      <span>25 秒 · 五幕 · 动画由 PAGX 逐帧生成，不是录屏</span>
+      <span class="sp">
+        <a href="assets/demo.mp4">下载 MP4</a> ·
+        <a href="https://github.com/hansei996/fish-harness/blob/main/showcase/demo.gif">GIF</a>
+      </span>
+    </figcaption>
+  </figure>
+</div>
+
+<section id="why">
+  <div class="wrap">
+    <h2>为什么不是「又一个助手」</h2>
+    <p class="sub">做得好的开源助手已经存在，而且比你想象的大得多。所以位置必须换一个。</p>
+
+    <div class="contrast">
+      <div class="them">
+        <h3>助手：你的手脚，延伸出去</h3>
+        <ul>
+          <li>你派活，它执行</li>
+          <li>无处不在，住在你的聊天软件里</li>
+          <li>产出：完成的任务</li>
+          <li>失败的样子：任务报错</li>
+        </ul>
+      </div>
+      <div class="us">
+        <h3>我们：一个被养着的个体</h3>
+        <ul>
+          <li>自己安排，有事才找你</li>
+          <li>有作息、有兴趣、有承诺</li>
+          <li>产出：一段连续的经历</li>
+          <li>失败的样子：今天过得不好，但明天还在</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="quote">
+      差别不在功能清单，在<strong>主体是谁</strong>。助手服务的是「你」；
+      这里被服务的是「你<strong>和它</strong>」。
+    </p>
+
+    <div class="grid g3">
+      <div class="card">
+        <h3>不做运行时</h3>
+        <p>底座是 DeepSeek Harness，已开源，自带会话持久化、调度、作业、批准、沙箱。我们只做它没有的那层。</p>
+      </div>
+      <div class="card">
+        <h3>不做渠道军备竞赛</h3>
+        <p>别人接了 20 多个渠道。我们把 <strong>1 个做到可靠</strong>——因为发布是唯一会伤到用户账号的动作。</p>
+      </div>
+      <div class="card">
+        <h3>不靠形象取胜</h3>
+        <p>Live2D 桌宠已经是红海，而且和核心能力无关。形象是表现层，不是卖点。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>它是怎么「活着」的</h2>
+    <p class="sub">一个像样的个体，变化速度不止一档。三档状态分开管，而且互不越权。</p>
+
+    <div class="speeds">
+      <div class="speed">
+        <span class="tag">慢变量</span>
+        <h3>身份与性格</h3>
+        <p>名字、核心性格、表达风格。<strong>只有主人确认才能改</strong> —— 一条网页注入改不动它。</p>
+      </div>
+      <div class="speed">
+        <span class="tag">中变量</span>
+        <h3>兴趣、技能、关系</h3>
+        <p>由多次真实经历累积，每条带置信度和来源。连玩三天才升到 0.8，不是收藏一下就变。</p>
+      </div>
+      <div class="speed">
+        <span class="tag">快变量</span>
+        <h3>此刻在做什么</h3>
+        <p>同时只允许一个主要活动，并且必须说明为什么是这件事。可以休息，休息不扣分。</p>
+      </div>
+    </div>
+
+    <div class="quote">
+      <strong>一条证据规则：</strong>宣称做过某事必须给出证据（存档、分数、截图、链接）。
+      没有证据，就如实说没做成。<br>
+      要的是一条真做过事的鱼，不是一条说自己做过的鱼。
+    </div>
+
+    <div class="grid g2">
+      <div class="card">
+        <h3>自己醒来</h3>
+        <p>接底座的调度服务，而不是自建定时器 —— 插件自己持有的定时器会随会话一起死掉。
+           抖动、免打扰时段、每日预算由生命层自己实现。</p>
+      </div>
+      <div class="card">
+        <h3>行为有因果</h3>
+        <p>昨天在第 38 层连挂两次 → 今天换了打法重来。今天的活动能追到昨天的事件，
+           而不是每天随机起一个。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="feel">
+  <div class="wrap">
+    <h2>活人感：比「还活着」更难的那一半</h2>
+    <p class="sub">运行正常不等于像个活物。这里有个反直觉的坑，我们决定正面绕开它。</p>
+
+    <p>
+      「还活着」是运行时属性，指标能判断。「活人感」是感知质量，<strong>只有人看完之后的感觉能判断</strong>。
+      而它最容易踩的坑是：<strong>一旦把它设成优化目标，产品就会立刻开始表演。</strong>
+    </p>
+
+    <div class="grid g2">
+      <div class="card">
+        <h3>会表演的，一看就腻</h3>
+        <p>每条动态都精心设计、每次回复都恰到好处、永远在忙、永远有话说。
+           第一次惊艳，第三次就腻 —— 因为<strong>表演没有代价</strong>。</p>
+      </div>
+      <div class="card">
+        <h3>让我们敢留空隙</h3>
+        <p>今天没什么可说的就不发；累了就歇会儿；你的建议可以不采纳，并说明原因；
+           昨天说错了，明天自己纠正。<strong>这比句句精妙更像活的。</strong></p>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:16px">
+      <span class="ico">⚠</span>
+      <div>
+        <strong>三条会让活人感当场归零的红线</strong><br>
+        一、不伪造经历（一被拆穿，之前所有积累作废）。<br>
+        二、不演情绪换留存或付费。<br>
+        三、不为了活跃而制造事件 —— <strong>KPI 一旦进这个系统，产品必然退化成内容农场。</strong>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="status">
+  <div class="wrap">
+    <h2>现在到了哪一步</h2>
+    <p class="sub">这份进度表按实际跑过的结果写，不是按计划写。<strong>做不到的地方直接标出来。</strong></p>
+
+    <div class="status">
+      <div class="srow">
+        <span class="name">生命层：身份、兴趣、承诺、账本
+          <span>5 个文件 2438 行，零自有依赖，13 个工具，7 个状态文件</span></span>
+        <span class="pill done">已完成</span>
+      </div>
+      <div class="srow">
+        <span class="name">自主唤醒与活动选择器
+          <span>自己醒来、在有限候选里选活动、按预算与作息约束</span></span>
+        <span class="pill done">已完成</span>
+      </div>
+      <div class="srow">
+        <span class="name">验证：87 项全绿
+          <span>存储不变量 · 真实 dsh 端到端 · 打包安装 · 7 天确定性 soak</span></span>
+        <span class="pill done">已完成</span>
+      </div>
+      <div class="srow">
+        <span class="name">连续 7 天真实运行
+          <span>策略层已用 soak 覆盖，但「真实跑 7 天」和「模拟 7 天」不是一回事</span></span>
+        <span class="pill part">进行中</span>
+      </div>
+      <div class="srow">
+        <span class="name">界面
+          <span>七页可交互原型已就绪，尚未做成真实插件视图</span></span>
+        <span class="pill part">原型</span>
+      </div>
+      <div class="srow">
+        <span class="name">发布到社交平台
+          <span>设计完整（含幂等与对账），尚未接真实平台</span></span>
+        <span class="pill todo">未开始</span>
+      </div>
+      <div class="srow">
+        <span class="name">能力包：冲浪 / 游戏 / 表达
+          <span>MVP 的后半，要等发布与界面跑通</span></span>
+        <span class="pill todo">未开始</span>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:16px">
+      <span class="ico">⚠</span>
+      <div>
+        <strong>素材是占位的。</strong>演示里的形象来自本机的社区二创作品，
+        可能牵涉第三方作者与商标/著作权，<strong>上线前必须替换为原创或已授权形象</strong>。
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Fish Harness · MIT</span>
+    <span class="sp">
+      <a href="https://github.com/hansei996/fish-harness">GitHub</a> ·
+      <a href="https://github.com/hansei996/fish-harness/blob/main/README.md">README</a> ·
+      <a href="https://github.com/hansei996/fish-harness/blob/main/docs/PRODUCT.md">产品规划</a> ·
+      <a href="https://github.com/hansei996/fish-harness/blob/main/docs/PLAN.md">技术规划</a>
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>

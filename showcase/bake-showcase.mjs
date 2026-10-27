@@ -76,6 +76,10 @@ const header = (alpha) => `
   </Layer>`
 
 // ---------------- scene 1: activity ----------------
+// Avatar box inside the activity card. Card height is 336; leaving headroom for
+// the bob and the card's own padding keeps it inside without relying on masking.
+const FIG = 224
+
 function s1 (t) {
   const inP = eo(seg(t, 0, 0.8))
   const rise = (1 - inP) * 20
@@ -105,9 +109,13 @@ function s1 (t) {
     <Stroke color="#E4EAF5" width="1.5"/>
     <DropShadowStyle offsetY="10" blurX="30" blurY="30" color="#1B2C6116"/>
   </Layer>
+  <!-- The avatar is a child of the card-shaped clip layer, so its coordinates are
+       relative to that layer. Giving it absolute coordinates offset it twice and
+       pushed it out of the card. Size is capped so it also fits by construction,
+       independent of whether the mask is honoured. -->
   <Layer id="clip1" left="${C.x}" top="${C.y + rise}" alpha="${inP}" width="${C.w}" height="${C.h}" mask="mask1" maskType="contour">
-    <Layer left="${C.x + 44}" top="${C.y + rise + 58 + bob}" alpha="${figA}" width="224" height="224">
-      <Rectangle width="224" height="224"/><Fill><ImagePattern image="@avatar"/></Fill>
+    <Layer left="48" top="${Math.round((C.h - FIG) / 2)}" alpha="${figA}" width="${FIG}" height="${FIG}">
+      <Rectangle width="${FIG}" height="${FIG}"/><Fill><ImagePattern image="@avatar"/></Fill>
     </Layer>
   </Layer>
   <Layer left="${TX}" top="${C.y + rise + 56}" alpha="${l1}" width="360" height="22">
@@ -274,10 +282,223 @@ function s3 (t) {
 </pagx>`
 }
 
+// ---------------- scene 4: the kept ledger and its causal chain ----------------
+function s4 (t) {
+  const inP = eo(seg(t, 0, 0.6))
+  const C = { x: 40, y: 72, w: 720, h: 336 }
+  const L = C.x + 22               // left column x
+  const R = C.x + 372              // right column x
+
+  // ledger rows appear one by one, as if being written
+  const rows = [
+    ['13:46', 'activity-start', '练第 38 层', '进行中', '#4F6FC0'],
+    ['13:04', 'activity-end', '第 38 层失败', '证据 save:38', '#15803D'],
+    ['12:10', 'interest', '挖矿类小品 0.5 → 0.8', '连续 3 天真在玩', '#6D7893'],
+    ['09:02', 'session', '定时唤醒触发', '来自 schedule', '#6D7893'],
+  ]
+  let ledger = ''
+  rows.forEach(([tm, kind, body, note, col], i) => {
+    const a = eo(seg(t, 0.5 + i * 0.22, 0.4))
+    const y = C.y + 72 + i * 46
+    ledger += `
+    <Layer left="${L}" top="${y}" alpha="${a}">
+      <Layer left="0" top="0" width="42" height="20">
+        <TextBox textAlign="start" width="42" height="20"><Text text="${tm}" fontFamily="STHeiti" fontSize="12"/><Fill color="#8A95AD"/></TextBox>
+      </Layer>
+      <Layer left="46" top="0" width="104" height="20">
+        <TextBox textAlign="start" width="104" height="20"><Text text="${kind}" fontFamily="STHeiti" fontSize="12"/><Fill color="${col}"/></TextBox>
+      </Layer>
+      <Layer left="156" top="0" width="150" height="20">
+        <TextBox textAlign="start" width="150" height="20"><Text text="${body}" fontFamily="STHeiti" fontSize="12"/><Fill color="#1B2C61"/></TextBox>
+      </Layer>
+      <Layer left="0" top="20" width="300" height="16">
+        <TextBox textAlign="start" width="300" height="16"><Text text="${note}" fontFamily="STHeiti" fontSize="11"/><Fill color="#A9B2C4"/></TextBox>
+      </Layer>
+    </Layer>`
+  })
+
+  // causal chain: nodes reveal in order, arrows between
+  const chain = [
+    ['昨天 21:40', '第 38 层连挂两次'],
+    ['今天 11:05', '记下「下矿前先补药水」'],
+    ['今天 13:04', '换打法重来 · 仍失败'],
+    ['现在', '第三次尝试'],
+  ]
+  let nodes = ''
+  chain.forEach(([tm, txt], i) => {
+    const a = eo(seg(t, 1.0 + i * 0.32, 0.42))
+    const last = i === chain.length - 1
+    const y = C.y + 78 + i * 56
+    nodes += `
+    <Layer left="${R}" top="${y}" alpha="${a}">
+      <Layer left="0" top="1" width="76" height="20">
+        <TextBox textAlign="start" width="76" height="20"><Text text="${tm}" fontFamily="STHeiti" fontSize="12"/><Fill color="${last ? '#4F6FC0' : '#8A95AD'}"/></TextBox>
+      </Layer>
+      <Layer left="78" top="0" width="220" height="22">
+        <TextBox textAlign="start" width="220" height="22"><Text text="${txt}" fontFamily="STHeiti" fontSize="${last ? 14 : 13}"/><Fill color="${last ? '#4F6FC0' : '#1B2C61'}"/></TextBox>
+      </Layer>
+    </Layer>`
+    if (!last) {
+      const la = eo(seg(t, 1.0 + i * 0.32 + 0.28, 0.3))
+      nodes += `
+      <Layer left="${R + 6}" top="${y + 24}" alpha="${la}">
+        <Layer left="0" top="0" width="14" height="16">
+          <Path data="M 1 1 L 1 10 L 11 10"/>
+          <Stroke color="#C3CCDD" width="1.4"/>
+        </Layer>
+        <Layer left="18" top="2" width="40" height="18">
+          <TextBox textAlign="start" width="40" height="18"><Text text="因此" fontFamily="STHeiti" fontSize="11"/><Fill color="#A9B2C4"/></TextBox>
+        </Layer>
+      </Layer>`
+    }
+  })
+
+  const head = eo(seg(t, 0.2, 0.4))
+  const rule = eo(seg(t, 2.3, 0.5))
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="${W}" height="${H}">
+  <Layer name="bg" width="100%" height="100%"><Rectangle width="100%" height="100%"/><Fill color="#EEF3FB"/></Layer>
+  ${header(inP)}
+  <Layer id="card4" left="${C.x}" top="${C.y}" alpha="${inP}" width="${C.w}" height="${C.h}">
+    <Rectangle width="${C.w}" height="${C.h}" roundness="24"/><Fill color="#FFFFFF"/>
+    <Stroke color="#E4EAF5" width="1.5"/>
+    <DropShadowStyle offsetY="10" blurX="30" blurY="30" color="#1B2C6116"/>
+  </Layer>
+  <Layer left="${L}" top="${C.y + 24}" alpha="${head}" width="300" height="26">
+    <TextBox textAlign="start" width="300" height="26"><Text text="生活账本" fontFamily="STHeiti" fontStyle="Bold" fontSize="16"/><Fill color="#1B2C61"/></TextBox>
+  </Layer>
+  <Layer left="${L + 200}" top="${C.y + 26}" alpha="${head}" width="120" height="22">
+    <TextBox textAlign="start" width="120" height="22"><Text text="只记真实发生的事" fontFamily="STHeiti" fontSize="12"/><Fill color="#8A95AD"/></TextBox>
+  </Layer>
+  <Layer left="${R}" top="${C.y + 24}" alpha="${head}" width="300" height="26">
+    <TextBox textAlign="start" width="300" height="26"><Text text="因果链" fontFamily="STHeiti" fontStyle="Bold" fontSize="16"/><Fill color="#1B2C61"/></TextBox>
+  </Layer>
+  <Layer left="${R + 60}" top="${C.y + 26}" alpha="${head}" width="240" height="22">
+    <TextBox textAlign="start" width="240" height="22"><Text text="今天的活动能追到昨天" fontFamily="STHeiti" fontSize="12"/><Fill color="#8A95AD"/></TextBox>
+  </Layer>
+  <!-- column divider -->
+  <Layer left="${C.x + 352}" top="${C.y + 60}" alpha="${inP}" width="1" height="${C.h - 84}">
+    <Rectangle width="1" height="${C.h - 84}"/><Fill color="#EDF1F8"/>
+  </Layer>
+  ${ledger}
+  ${nodes}
+  <Layer left="${L}" top="${C.y + C.h - 46}" alpha="${rule}" width="640" height="24">
+    <TextBox textAlign="start" width="640" height="24"><Text text="失败也留在账本里 · 宣称做过某事必须给出证据" fontFamily="STHeiti" fontSize="13"/><Fill color="#4F6FC0"/></TextBox>
+  </Layer>
+</pagx>`
+}
+
+// ---------------- scene 5: two state axes, and how failure ends ----------------
+function s5 (t) {
+  const inP = eo(seg(t, 0, 0.55))
+  const C = { x: 40, y: 72, w: 720, h: 336 }
+
+  // the two axes fill in, then faults resolve one by one
+  const living = eo(seg(t, 0.35, 0.5))
+  const health = eo(seg(t, 0.7, 0.5))
+
+  const faults = [
+    ['模型不可用', '有限重试；可切备用模型，否则保存状态休眠', 'dsh'],
+    ['进程退出 / 重启', '从会话日志与检查点恢复，承诺不丢', 'dsh'],
+    ['社交账号过期', '停该账号写操作，攒有上限的草稿', '我们'],
+    ['预算达到上限', '不再发起新付费任务，转低成本', '我们'],
+    ['无法确认是否已发帖', '标待确认去对账，不盲目重发', '我们'],
+  ]
+  let rows = ''
+  faults.forEach(([k, v, owner], i) => {
+    const a = eo(seg(t, 1.15 + i * 0.26, 0.42))
+    const y = C.y + 172 + i * 33
+    const oc = owner === 'dsh' ? '#8A95AD' : '#4F6FC0'
+    rows += `
+    <Layer left="${C.x + 26}" top="${y}" alpha="${a}">
+      <Layer left="0" top="0" width="130" height="22">
+        <TextBox textAlign="start" width="130" height="22"><Text text="${k}" fontFamily="STHeiti" fontSize="13"/><Fill color="#1B2C61"/></TextBox>
+      </Layer>
+      <Layer left="140" top="0" width="440" height="22">
+        <TextBox textAlign="start" width="440" height="22"><Text text="${v}" fontFamily="STHeiti" fontSize="12"/><Fill color="#6D7893"/></TextBox>
+      </Layer>
+      <Layer left="596" top="1" width="80" height="20">
+        <TextBox textAlign="end" width="80" height="20"><Text text="${owner}" fontFamily="STHeiti" fontSize="11"/><Fill color="${oc}"/></TextBox>
+      </Layer>
+    </Layer>`
+  })
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<pagx width="${W}" height="${H}">
+  <Layer name="bg" width="100%" height="100%"><Rectangle width="100%" height="100%"/><Fill color="#EEF3FB"/></Layer>
+  ${header(inP)}
+  <Layer id="card5" left="${C.x}" top="${C.y}" alpha="${inP}" width="${C.w}" height="${C.h}">
+    <Rectangle width="${C.w}" height="${C.h}" roundness="24"/><Fill color="#FFFFFF"/>
+    <Stroke color="#E4EAF5" width="1.5"/>
+    <DropShadowStyle offsetY="10" blurX="30" blurY="30" color="#1B2C6116"/>
+  </Layer>
+
+  <Layer left="${C.x + 26}" top="${C.y + 24}" alpha="${inP}" width="400" height="26">
+    <TextBox textAlign="start" width="400" height="26"><Text text="两条独立的状态轴" fontFamily="STHeiti" fontStyle="Bold" fontSize="16"/><Fill color="#1B2C61"/></TextBox>
+  </Layer>
+
+  <!-- axis 1: living -->
+  <Layer left="${C.x + 26}" top="${C.y + 62}" alpha="${living}">
+    <Layer left="0" top="2" width="66" height="22">
+      <TextBox textAlign="start" width="66" height="22"><Text text="生活状态" fontFamily="STHeiti" fontSize="12"/><Fill color="#6D7893"/></TextBox>
+    </Layer>
+    <Layer left="74" top="0" width="120" height="24">
+      <Rectangle width="120" height="24" roundness="12"/><Fill color="#EAF0FF"/>
+      <Layer left="0" top="2" width="120" height="20">
+        <TextBox textAlign="center" width="120" height="20"><Text text="活动中" fontFamily="STHeiti" fontSize="12"/><Fill color="#4F6FC0"/>
+        </TextBox>
+      </Layer>
+    </Layer>
+    <Layer left="202" top="0" width="90" height="24">
+      <Layer left="0" top="2" width="90" height="20">
+        <TextBox textAlign="center" width="90" height="20"><Text text="休息" fontFamily="STHeiti" fontSize="12"/><Fill color="#8A95AD"/></TextBox>
+      </Layer>
+    </Layer>
+    <Layer left="300" top="0" width="150" height="24">
+      <Layer left="0" top="2" width="150" height="20">
+        <TextBox textAlign="center" width="150" height="20"><Text text="等待主人确认" fontFamily="STHeiti" fontSize="12"/><Fill color="#8A95AD"/></TextBox>
+      </Layer>
+    </Layer>
+  </Layer>
+
+  <!-- axis 2: health -->
+  <Layer left="${C.x + 26}" top="${C.y + 102}" alpha="${health}">
+    <Layer left="0" top="2" width="66" height="22">
+      <TextBox textAlign="start" width="66" height="22"><Text text="系统健康" fontFamily="STHeiti" fontSize="12"/><Fill color="#6D7893"/></TextBox>
+    </Layer>
+    <Layer left="74" top="0" width="90" height="24">
+      <Rectangle width="90" height="24" roundness="12"/><Fill color="#E7F6EC"/>
+      <Layer left="0" top="2" width="90" height="20">
+        <TextBox textAlign="center" width="90" height="20"><Text text="正常" fontFamily="STHeiti" fontSize="12"/><Fill color="#15803D"/></TextBox>
+      </Layer>
+    </Layer>
+    <Layer left="172" top="0" width="90" height="24">
+      <Layer left="0" top="2" width="90" height="20">
+        <TextBox textAlign="center" width="90" height="20"><Text text="降级" fontFamily="STHeiti" fontSize="12"/><Fill color="#A16207"/></TextBox>
+      </Layer>
+    </Layer>
+    <Layer left="270" top="0" width="110" height="24">
+      <Layer left="0" top="2" width="110" height="20">
+        <TextBox textAlign="center" width="110" height="20"><Text text="安全停机" fontFamily="STHeiti" fontSize="12"/><Fill color="#8A95AD"/></TextBox>
+      </Layer>
+    </Layer>
+  </Layer>
+
+  <Layer left="${C.x + 26}" top="${C.y + 136}" alpha="${health}" width="660" height="22">
+    <TextBox textAlign="start" width="660" height="22"><Text text="它休息不等于系统故障；系统降级也不会伪装成它心情不好。" fontFamily="STHeiti" fontSize="12.5"/><Fill color="#4F6FC0"/></TextBox>
+  </Layer>
+
+  ${rows}
+</pagx>`
+}
+
 const SCENES = [
-  { name: 'activity', dur: 5.5, fn: s1 },
-  { name: 'publish', dur: 5.0, fn: s2 },
-  { name: 'pet', dur: 4.5, fn: s3 },
+  { name: 'activity', dur: 5.5, fn: s1 },   // 它现在在做什么
+  { name: 'ledger', dur: 5.5, fn: s4 },     // 账本与因果链
+  { name: 'publish', dur: 5.0, fn: s2 },    // 一条动态发到八个平台
+  { name: 'health', dur: 5.0, fn: s5 },     // 两条状态轴与故障收场
+  { name: 'pet', dur: 4.5, fn: s3 },        // 桌宠形态
 ]
 
 let idx = 0

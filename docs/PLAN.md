@@ -9,6 +9,7 @@
 - 当前状态：**生命层已实现**；三套验证实测 **87 项全绿**（61 + 17 + 9），另有一条 opt-in 真实唤醒检查。**界面为原型，发布尚未接真实平台。**
 - 数字均由 `node verify/*.mjs` 实测，不是文档里抄来的。实测命令见 §11。
 - 已完成与未完成的具体清单见 §0.7，不要只看路线图。
+- **这份是技术规划。给谁用、凭什么留下、怎么一步步对外，见 [`PRODUCT.md`](PRODUCT.md)。**
 
 ## 0. 先对齐五个词
 
@@ -59,7 +60,7 @@
 
 ### 0.3 事实核实状态
 
-已核实（2026-10-26 联网查询官方仓库与文档）：
+已核实（2026-10-26 首次查询，2026-10-27 复核星数）：
 
 - 仓库 `deepseek-ai/deepseek-harness` 存在，MIT 协议（`LICENSE` 首行 `MIT License / Copyright (c) 2026 DeepSeek`），2026-08 起开源。
 - 当前版本 `v0.2.1-rc.3`（2026-10-23 发布），处于 *developer preview*，官方 README 明写 **THERE WILL BE COMPATIBILITY-BREAKING CHANGES**。
@@ -67,7 +68,8 @@
 - 子系统清单（`docs/subsystems/`）与上文表格一致。
 - 运行方式 `npx @deepseek-ai/dsh web`；profiles 为 `web` / `headless` / `sdk` / `sdk-minimal` / `acp`。
 - **你本机已安装**：`~/.dsh` 存在，含 `profiles/desktop`、`plugins/dsh-market`、`pet.json`（`petId: whale-girl`）、`task-board/`、`memories/dsh-memory-evolve/`、`extensions/DeepSeek-Balance-Whale-Widget/`。
-- **未核实**：GitHub API 返回该仓库 ★262,080。这个数字高出常见量级，可能包含 API 口径或统计异常，**不要对外引用**。
+- **★263,158**（2026-10-27 复核）。早先这一行写的是「未核实，可能异常，不要对外引用」——**那是错的**。用仓库页的权威字段 `stargazerCount` 核过，数字真实；当时误判的原因是 GitHub 的 search API 在本环境返回过不可靠结果（`total_count` 与头号条目对不上）。
+- **教训**：星数这类会变的数字，**用仓库页 HTML 的 `stargazerCount` 字段核**，不要信 search 的汇总值。核对方法：`curl -sSL https://github.com/<owner>/<repo> | grep -o '"stargazerCount":[0-9]*'`。
 
 未核实 / 需实测：
 
@@ -197,6 +199,8 @@
 而是：「在 dsh 之上，我把 Agent 变成一个有连续生活的个体：一次配置、长期运行、有事才找你。」
 
 一键领养不等于零授权：平台登录、账号归属、发布权限和预算仍需主人明确确认。可做到的是**一次配置、持续运行**。
+
+> 本节只做最低限度的定位；**市场调研、竞争位置、分阶段对外策略见 [`PRODUCT.md`](PRODUCT.md)。**
 
 ### 2.3 第一批用户与成功体验
 

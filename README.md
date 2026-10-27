@@ -8,6 +8,8 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 
 > **Harness 是产品，鱼是它在运行时的样子。**
 >
+> 🌐 **[对外页面](https://hansei996.github.io/fish-harness/)** —— 给不读代码的人看的版本
+>
 > 「养鱼」是抽象说法 —— 让 Agent 在 Harness 上长期稳定运行。鱼是运行态，不是产品本身。
 
 ---
@@ -20,6 +22,8 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`verify/`](verify/) | 61 项存储/策略/soak 不变量 + 17 项真实 dsh 端到端 + 9 项打包安装 + 一条 opt-in 的真实唤醒检查（3 项） |
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.4（当前）· `v0.1` / `v0.2` / `v0.3` 保留在旁，可对照错在哪 |
+| [`docs/PRODUCT.md`](docs/PRODUCT.md) | **产品规划**：市场位置、竞争分析、分阶段对外策略 |
+| [`docs/index.html`](docs/index.html) | **对外页面**：单页静态站点，GitHub Pages 直接从 `docs/` 发布 |
 | [`docs/dsh-schedule-api.md`](docs/dsh-schedule-api.md) | dsh `schedule` 的可落地 API 结论（带 `包名/文件:行号` 证据） |
 | [`docs/wake-verification.md`](docs/wake-verification.md) | 自主唤醒验了什么、**没验什么** |
 | [`docs/wake-e2e.md`](docs/wake-e2e.md) | 真实 web profile 下一次真实唤醒的实测记录 |
@@ -60,7 +64,7 @@ dsh 已经开源并且自带：会话持久化与崩溃恢复、持久目标（`
 
 ![demo](showcase/demo.gif)
 
-> 15 秒、30fps，**由 PAGX 逐帧烘焙生成**（不是录屏）。三幕连续：它现在在做什么 → 一条动态发到八个平台 → 桌宠形态。
+> 25 秒、30fps、五幕，**由 PAGX 逐帧烘焙生成**（不是录屏）：它现在在做什么 → 生活账本与因果链 → 一条动态发到八个平台 → 两条状态轴与故障收场 → 桌宠形态。
 > 高画质版本：[`showcase/demo.mp4`](showcase/demo.mp4)（365 KB）
 
 | | |
@@ -69,6 +73,8 @@ dsh 已经开源并且自带：会话持久化与崩溃恢复、持久目标（`
 | **它现在在做什么** — 有界的当前活动：为什么是这件事、存档证据、进度与上限、下一步想做什么 | **一条动态发到八个平台** — 逐渠道开关（这里关掉 QQ 与 OnlyFans）、同步发布、逐条回执 |
 | ![](showcase/scene-pet.png) | |
 | **桌宠形态** — 浮在桌面一角，气泡说话；「回它 / 别烦我」 | |
+
+> 另两幕（生活账本与因果链、两条状态轴）只在视频里，因为它们是动画。
 
 ### 动画是怎么做的
 
