@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三个场景 · 原型</title>
+<style>
+/* ============================================================
+   配色沿用 design/ui-complete.html —— 取自形象素材本身。
+   这是一个**原型**：改一行、刷一下就能重看，不用重新烘视频。
+   ============================================================ */
+:root{
+  color-scheme: light dark;
+  --ac:#4f6fc0; --ac2:#7088c0; --deep:#1b2c61;
+  --t:light-dark(#161c2c,#e9eef9);
+  --m:light-dark(#6d7893,#8a95ad);
+  --l:light-dark(#e9edf5,#1e2637);
+  --soft:light-dark(#f6f9fd,#131a27);
+  --bg:light-dark(#ffffff,#0e131d);
+  --page:light-dark(#f4f7fc,#0a0e15);
+  --ok:light-dark(#15803d,#4ade80);
+  --wn:light-dark(#a16207,#fbbf24);
+  --bd:light-dark(#b91c1c,#fca5a5);
+  --shadow:0 20px 50px -32px rgb(20 40 90 / .45);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--page); color:var(--t);
+  font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+}
+.wrap{max-width:1040px; margin:0 auto; padding:28px 22px 64px}
+
+/* ---------- 头部 ---------- */
+.top{display:flex; align-items:center; gap:10px; margin-bottom:6px}
+.top .dot{width:26px;height:26px;border-radius:9px;background:var(--l);flex:none}
+.top h1{font-size:17px;margin:0;letter-spacing:-.01em}
+.top .sub{color:var(--m);font-size:12.5px;margin-left:auto}
+.lede{color:var(--m);font-size:13.5px;margin:10px 0 20px;max-width:60em}
+.lede b{color:var(--t)}
+
+/* ---------- 场景切换 ---------- */
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.tab{
+  border:1px solid var(--l);background:var(--bg);color:var(--m);
+  border-radius:11px;padding:9px 14px;font:inherit;font-size:13px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;text-align:left;
+}
+.tab:hover{border-color:color-mix(in oklab,var(--ac) 40%,var(--l));color:var(--t)}
+.tab.on{background:var(--ac);border-color:transparent;color:#fff}
+.tab .n{
+  width:19px;height:19px;border-radius:6px;display:grid;place-items:center;
+  font-size:11px;font-weight:700;background:var(--soft);color:var(--ac);flex:none
+}
+.tab.on .n{background:rgb(255 255 255 / .22);color:#fff}
+
+/* ---------- 设定条 ---------- */
+.setup{
+  display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+  background:var(--soft);border:1px solid var(--l);border-radius:13px;
+  padding:11px 15px;margin-bottom:16px;font-size:12.5px;color:var(--m)
+}
+.setup b{color:var(--t)}
+.setup .who{display:flex;align-items:center;gap:7px;color:var(--ac);font-weight:600}
+
+/* ---------- 主体两栏 ---------- */
+.body{display:grid;grid-template-columns:236px minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:760px){ .body{grid-template-columns:1fr} }
+
+.beats{display:flex;flex-direction:column;gap:4px}
+.beat{
+  display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;
+  border:1px solid transparent;background:transparent;color:var(--m);
+  border-radius:10px;padding:8px 10px;font:inherit;font-size:12.5px;line-height:1.45;cursor:pointer
+}
+.beat:hover{background:var(--soft)}
+.beat.on{background:var(--bg);border-color:var(--l);color:var(--t);box-shadow:var(--shadow)}
+.beat .i{
+  width:18px;height:18px;border-radius:6px;flex:none;display:grid;place-items:center;
+  font-size:10.5px;font-weight:700;background:var(--soft);color:var(--m);margin-top:1px
+}
+.beat.on .i{background:var(--ac);color:#fff}
+.beat.done .i{background:color-mix(in oklab,var(--ok) 22%,transparent);color:var(--ok)}
+
+/* ---------- 舞台 ---------- */
+.stage{
+  background:var(--bg);border:1px solid var(--l);border-radius:16px;
+  box-shadow:var(--shadow);overflow:hidden
+}
+.stage-hd{padding:16px 20px 0}
+.stage-hd h2{margin:0 0 4px;font-size:16px;letter-spacing:-.01em}
+.stage-hd p{margin:0;color:var(--m);font-size:12.5px}
+.stage-bd{padding:14px 20px 18px;min-height:280px}
+
+/* ---------- 舞台内的通用块 ---------- */
+.rows{display:flex;flex-direction:column;gap:1px;background:var(--l);border:1px solid var(--l);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:center;padding:10px 14px;background:var(--bg);font-size:13px}
+.row .t{color:var(--m);font-family:var(--mono);font-size:11.5px;white-space:nowrap}
+.row .d{color:var(--t)}
+.row .d i{font-style:normal;color:var(--m);font-size:12px;display:block}
+.row .r{font-size:11.5px;white-space:nowrap;color:var(--m)}
+.row.good .r{color:var(--ok)} .row.bad .r{color:var(--bd)} .row.warn .r{color:var(--wn)}
+.row.hi{background:color-mix(in oklab,var(--ac) 7%,var(--bg))}
+
+.cand{border:1px solid var(--l);border-radius:12px;overflow:hidden}
+.cand .c{display:grid;grid-template-columns:1fr auto;gap:10px;padding:11px 14px;border-bottom:1px solid var(--l);background:var(--bg)}
+.cand .c:last-child{border-bottom:0}
+.cand .c.top{background:color-mix(in oklab,var(--ac) 8%,var(--bg))}
+.cand .what{font-size:13.5px;font-weight:600}
+.cand .why{color:var(--m);font-size:12px;margin-top:2px}
+.cand .sc{font-family:var(--mono);font-size:12.5px;color:var(--ac);font-weight:600;white-space:nowrap}
+.cand .c.rest .what{color:var(--m);font-weight:400}
+.cand .c.rest .sc{color:var(--m)}
+
+.keybox{
+  background:var(--soft);border:1px solid var(--l);border-radius:12px;padding:13px 15px;
+  font-family:var(--mono);font-size:12px;line-height:1.85;overflow-x:auto
+}
+.keybox .k{color:var(--ac)} .keybox .v{color:var(--t)} .keybox .c{color:var(--m)}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:620px){ .two{grid-template-columns:1fr} }
+.col{border:1px solid var(--l);border-radius:12px;padding:13px 15px;background:var(--bg)}
+.col h4{margin:0 0 9px;font-size:13px}
+.col.bad h4{color:var(--bd)} .col.good h4{color:var(--ok)}
+.col ul{margin:0;padding-left:17px;color:var(--m);font-size:12.5px}
+.col li{margin:3px 0}
+.col li b{color:var(--t)}
+
+.big{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.25}
+.big span{font-size:13px;font-weight:400;color:var(--m);display:block;letter-spacing:0;margin-top:3px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
+.kpi{border:1px solid var(--l);border-radius:12px;padding:12px 14px;background:var(--bg)}
+.kpi .n{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.kpi .l{color:var(--m);font-size:11.5px;margin-top:2px}
+.kpi.acc .n{color:var(--ac)} .kpi.ok .n{color:var(--ok)}
+
+/* ---------- 溯源条：这一拍靠什么 ---------- */
+.prov{
+  display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;
+  border-top:1px solid var(--l);background:var(--soft);padding:11px 20px;font-size:12px
+}
+.chip{
+  flex:none;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:600;
+  border:1px solid;white-space:nowrap
+}
+.chip.real{color:var(--ok);border-color:color-mix(in oklab,var(--ok) 38%,transparent);background:color-mix(in oklab,var(--ok) 9%,transparent)}
+.chip.plan{color:var(--wn);border-color:color-mix(in oklab,var(--wn) 38%,transparent);background:color-mix(in oklab,var(--wn) 9%,transparent)}
+.prov .txt{color:var(--m);flex:1;min-width:220px}
+.prov .txt b{color:var(--t)}
+.prov code{font-family:var(--mono);font-size:11.5px;color:var(--t);background:var(--bg);border:1px solid var(--l);border-radius:5px;padding:1px 5px}
+
+/* ---------- 步进 ---------- */
+.nav{display:flex;align-items:center;gap:12px;margin-top:14px}
+.nav button{
+  border:1px solid var(--l);background:var(--bg);color:var(--t);border-radius:10px;
+  padding:8px 15px;font:inherit;font-size:13px;cursor:pointer
+}
+.nav button:hover:not(:disabled){border-color:color-mix(in oklab,var(--ac) 45%,var(--l))}
+.nav button:disabled{opacity:.42;cursor:default}
+.nav .dots{display:flex;gap:6px;margin-left:auto}
+.nav .dot{width:7px;height:7px;border-radius:50%;background:var(--l)}
+.nav .dot.on{background:var(--ac);width:18px;border-radius:4px}
+.nav .kbd{margin-left:auto;color:var(--m);font-size:11.5px}
+.nav .kbd kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--l);border-radius:5px;padding:1px 5px;background:var(--bg)}
+@media(max-width:620px){ .nav .kbd{display:none} }
+
+.note{
+  margin-top:16px;border:1px solid color-mix(in oklab,var(--wn) 32%,transparent);
+  background:color-mix(in oklab,var(--wn) 7%,var(--bg));border-radius:13px;
+  padding:13px 16px;font-size:12.5px;color:var(--m)
+}
+.note b{color:var(--t)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <span class="dot"></span>
+    <h1>三个场景 · 原型</h1>
+    <span class="sub">可点走 · 每一拍标注「靠什么」</span>
+  </div>
+  <p class="lede">
+    比视频细得多，而且<b>改一行就能重看</b> —— 这是原型，不是成片。
+    每一拍下面那条灰带写明它<b>靠什么成立</b>：绿色是仓库里已经跑得起来的东西（附文件名），
+    amber 是还没实现的。<b>不标出来就等于假装这些场景已经能跑。</b>
+  </p>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="scenario"></div>
+
+  <div class="note">
+    <b>怎么读这份原型。</b>
+    左边点任意一拍，或用 <kbd>←</kbd> <kbd>→</kbd> 走。
+    舞台里的数字尽量取自真跑出来的输出（<code>tools/life-week.mjs</code>、配置默认值、真实账本字段名），
+    而不是编的；编的部分会标明是设想。
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   三个场景，每幕拆成 6 拍。
+   每拍的 prov 字段就是「诚实的那一半」：
+     real —— 仓库里已实现，note 里给文件名
+     plan —— 还没实现，说明缺什么
+   ============================================================ */
+const SCENES = [
+  {
+    id: 'pitfall',
+    name: '一年 260 次真实尝试',
+    who: '一个人 · 下班后没精力写博客',
+    setup: [['垂类', '单片机外设踩坑'], ['预算', '3 元 / 天'], ['目标', '一个「真实踩坑史」的账号']],
+    beats: [
+      {
+        t: '它自己决定今天做什么',
+        d: '没有人派活。它醒来后，排序器在有限候选里给出这份短名单 —— 模型看到的就是它。',
+        body: `<div class="cand">
+          <div class="c top">
+            <div><div class="what">接着做「换成 SPI 再试一次」</div>
+            <div class="why">上次「I2C 读寄存器」没成，原因已记进 note；接着做不用重新热身</div></div>
+            <div class="sc">0.349</div>
+          </div>
+          <div class="c">
+            <div><div class="what">看看「机械键盘手感」的更新</div>
+            <div class="why">你对它的置信度是 0.4，但只观察过 1 次，值得多看一眼</div></div>
+            <div class="sc">0.128</div>
+          </div>
+          <div class="c rest">
+            <div><div class="what">休息，什么都不做</div>
+            <div class="why">今天已经醒过 2/6 次；休息也是允许的选择</div></div>
+            <div class="sc">0.350</div>
+          </div>
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:12px 0 0">
+          分数是真算出来的（七项加权：承诺 · 兴趣 · 未完成 · 探索 − 成本 − 风险 − 切换）。
+          <b>「休息」永远在名单里，分数固定</b> —— 允许不行动，才不会为了活跃而制造事件。
+        </p>`,
+        prov: { kind: 'real', note: '候选排序与理由：<code>lib/choose.js</code>；预算与作息：<code>lib/wake.js</code>。短名单只有 3 条、有字符上限，因为它是每轮都要付的 token。' },
+      },
+      {
+        t: '它在沙盒里真的试，不是读文档就写',
+        d: '同一个坑，试了四次。每一次的结果都留在账本里 —— 成功那次也一样要交证据。',
+        body: `<div class="rows">
+          <div class="row"><span class="t">09:12</span><span class="d">读到 SPI 时序表<i>打算按这个试</i></span><span class="r">—</span></div>
+          <div class="row bad"><span class="t">09:40</span><span class="d">刷固件 · 读寄存器<i>MOSI 上没有任何输出</i></span><span class="r">失败</span></div>
+          <div class="row bad"><span class="t">10:05</span><span class="d">换 CPOL / CPHA 组合<i>时序仍然对不上</i></span><span class="r">失败</span></div>
+          <div class="row warn"><span class="t">10:30</span><span class="d">回去重读手册<i>发现读错了时序表那一页</i></span><span class="r">改方向</span></div>
+          <div class="row good hi"><span class="t">11:02</span><span class="d">第 4 次尝试<i>通了 —— 证据 save:spi-1</i></span><span class="r">成功</span></div>
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:12px 0 0">
+          最后一次能标「成功」，是因为它交了凭证。<b>没有证据就得写「没做成」</b> ——
+          这条规则写在 <code>lib/store.js</code> 里，不是写在提示词里求它配合。
+        </p>`,
+        prov: { kind: 'plan', note: '证据规则与账本已经实现；但「在沙盒里刷固件 / 读寄存器」需要一个<b>能力包</b>，那还没做（<code>PLAN.md §6.5</code>）。所以这一拍的<b>动作</b>是设想，<b>记账方式</b>是真的。' },
+      },
+      {
+        t: '失败没有变成空白，它变成了一条留给明天的事',
+        d: '这是这个产品最容易被忽略、也最要紧的一步：失败如果不留下交接，第二天就得从零开始。',
+        body: `<div class="keybox">
+<span class="c">// activity.json —— 它在磁盘上，不在提示词里</span>
+{
+  "<span class="k">current</span>": <span class="v">null</span>,
+  "<span class="k">lastFinished</span>": {
+    "<span class="k">what</span>": <span class="v">"试试 I2C 读寄存器"</span>,
+    "<span class="k">outcome</span>": <span class="v">"failed"</span>,
+    "<span class="k">note</span>": <span class="v">"MOSI 上无输出，怀疑时序"</span>,
+    "<span class="k">evidence</span>": [<span class="v">"save:i2c-3"</span>]
+  },
+  "<span class="k">next</span>": {
+    "<span class="k">what</span>": <span class="v">"换成 SPI 再试一次"</span>,
+    "<span class="k">why</span>": <span class="v">"换个方向，而不是重跑同一条路"</span>
+  }
+}
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:12px 0 0">
+          排序器专门为这条留了一个分支（<b>0.75 分</b>，比「刚做完」的 0.15 高得多）。
+          <b>但它原来从来没被写进去过</b> —— 是连跑七天日志才发现的。
+        </p>`,
+        prov: { kind: 'real', note: '写入 / 读取 / 清除三个环节都有断言守着：<code>lib/store.js</code> + <code>verify/smoke.mjs</code>。修之前它是死代码。' },
+      },
+      {
+        t: '第二天它醒来，接着昨天',
+        d: '没有「重新开始」这一步。它醒来第一件事是读自己的状态，而不是等你重新交代。',
+        body: `<div class="rows">
+          <div class="row hi"><span class="t">08:02</span><span class="d">自己醒来<i>没有人跟它说话 —— 这一轮是它自己的时间</i></span><span class="r">唤醒</span></div>
+          <div class="row"><span class="t">08:02</span><span class="d">先读一眼状态<i>昨天的下一步、昨天长上去的兴趣，都在</i></span><span class="r">读盘</span></div>
+          <div class="row good"><span class="t">08:03</span><span class="d">短名单第一条 = 昨天留下的那条<i>「接着做『换成 SPI 再试一次』」</i></span><span class="r">候选</span></div>
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:12px 0 0">
+          唤醒不是「定时塞一句话」：它有抖动（不会每天同一秒醒）、静默时段（23:00–08:00 不打扰）、
+          每日预算（默认 6 次），而且<b>错过一次会在下次启动补投</b>。
+        </p>`,
+        prov: { kind: 'real', note: '唤醒布防与记账：<code>lib/wake.js</code>；接的是 dsh 自己的 <code>schedule</code>，插件不持有定时器（自持定时器会随会话一起死）。' },
+      },
+      {
+        t: '一个月后，攒出来的是能被查的东西',
+        d: '它不是一个「写得很像」的账号 —— 是一堆带凭证的记录，加一份每天都能读的流水。',
+        body: `<div class="kpis">
+          <div class="kpi acc"><div class="n">31</div><div class="l">天，没有一天是空的</div></div>
+          <div class="kpi"><div class="n">87</div><div class="l">条 activity-end</div></div>
+          <div class="kpi"><div class="n">34</div><div class="l">条是 failed</div></div>
+          <div class="kpi ok"><div class="n">1</div><div class="l">条留下下一步</div></div>
+        </div>
+        <div class="keybox" style="margin-top:12px">
+<span class="c">// tools/day-report.mjs 的真实输出（不是设计稿）</span>
+
+  <span class="k">09:12</span>  ▸ 开始：试 SPI 时序（因为 昨天在第 38 层挂过两次）
+  <span class="k">10:40</span>  · 没做成：补给带少了｜证据 save:38
+  <span class="k">15:05</span>  ✓ 做成了｜证据 draft:1
+  <span class="k">15:20</span>  ✓ 兑现了一件事
+
+  今天：起了 2 件事 · 做成 1 件 · 没成 1 件
+  对话往返 3 次（不计入上面）
+        </div>`,
+        prov: { kind: 'real', note: '账本与人话渲染：<code>tools/day-report.mjs</code>（22 项断言）。<b>发布到平台没实现</b> —— 所以这些现在是档案，还不是动态。' },
+      },
+      {
+        t: '换成更好的写手会怎样',
+        d: '这是这个场景真正要回答的问题。答案不是「写得更好」，是「它试过」。',
+        body: `<div class="two">
+          <div class="col bad">
+            <h4>内容农场</h4>
+            <ul>
+              <li>读完文档就写</li>
+              <li>没试过，也没有证据</li>
+              <li>写得快、发得多</li>
+              <li><b>读的人第二天就不信了</b></li>
+            </ul>
+          </div>
+          <div class="col good">
+            <h4>它</h4>
+            <ul>
+              <li>试了 4 次才通</li>
+              <li>每次失败都留在账本里</li>
+              <li>每条内容后面挂着一次真实调用</li>
+              <li><b>慢，但可以被查</b></li>
+            </ul>
+          </div>
+        </div>
+        <div class="big" style="margin-top:16px">一年 ≈ 260 次真实尝试<span>这些尝试，内容农场不会做 —— 因为试错的成本是真的（时间、token、失败）</span></div>`,
+        prov: { kind: 'plan', note: '「260 次」是按每天约 0.7 次尝试的<b>估算</b>，不是实测；要等真实跑满一年才知道。<b>别把它当承诺。</b>' },
+      },
+    ],
+  },
+
+  {
+    id: 'testbot',
+    name: '一场游玩，两份产出',
+    who: '三个人做独立游戏 · 测试人力不够',
+    setup: [['它做什么', '每天玩几小时，记录卡在哪'], ['对外的', '游玩记录（有人爱看别人第一次玩）'], ['对内的', '结构化卡关数据']],
+    beats: [
+      {
+        t: '它今天玩了一场，真的有产出',
+        d: '关键不是「它说它玩了」——是这一场游玩本身有记录，能被查。',
+        body: `<div class="kpis">
+          <div class="kpi acc"><div class="n">3h12m</div><div class="l">今天的游玩时长</div></div>
+          <div class="kpi"><div class="n">21</div><div class="l">局</div></div>
+          <div class="kpi"><div class="n">4</div><div class="l">处异常</div></div>
+          <div class="kpi ok"><div class="n">1</div><div class="l">条可复现</div></div>
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:14px 0 0">
+          「玩了 3 小时」这句话在账本里对应一串真实的活动记录：开始、结束、结果、证据。
+          <b>不是自述 —— 自述在这个系统里不算数。</b>
+        </p>`,
+        prov: { kind: 'plan', note: '会话统计与活动账本已实现；但<b>「玩游戏」本身要靠一个能力包</b>，还没做。所以时长/局数是设想值，记账方式是真的。' },
+      },
+      {
+        t: '卡关点被记成结构，不是一句抱怨',
+        d: '它说「这里很烦」，同时给得出：第几关、什么操作、什么条件下必现。',
+        body: `<div class="keybox">
+{
+  "<span class="k">phase</span>": <span class="v">"第 3 关"</span>,
+  "<span class="k">action</span>": <span class="v">"跳跃落地后立刻转向"</span>,
+  "<span class="k">symptom</span>": <span class="v">"相机穿墙，画面外可见地面缝隙"</span>,
+  "<span class="k">freq</span>": <span class="v">"37 局里出现 9 次"</span>,
+  "<span class="k">repro</span>": <span class="v">true</span>,
+  "<span class="k">evidence</span>": [<span class="v">"clip:run-14-t+02m31s"</span>]
+}
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:12px 0 0">
+          「复现步骤已生成」不是一句场面话 —— <b>可复现 = 有录像 + 有频率</b>。
+          没有这两样，它只能说「遇到过一次，说不清」。
+        </p>`,
+        prov: { kind: 'plan', note: '结构本身（带证据的活动/遭遇记录）已有骨架：<code>lib/store.js</code> 的账本 + 证据数组。真正的关卡识别要等能力包。' },
+      },
+      {
+        t: '同一场游玩，产出两份不同的东西',
+        d: '对外是给人看的；对内是给团队用的。同一份经历，两种呈现 —— 不是两个任务。',
+        body: `<div class="two">
+          <div class="col">
+            <h4 style="color:var(--t)">对内：卡关数据</h4>
+            <ul>
+              <li>第 3 关 · 跳跃后立刻转向</li>
+              <li>相机穿墙，画面外可见地面缝隙</li>
+              <li>37 局里出现 9 次</li>
+              <li>可复现 · 有录像</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h4 style="color:var(--t)">对外：游玩记录</h4>
+            <ul>
+              <li>「在第 3 关撞了 9 次墙。<br>每次都是同一个动作：落地瞬间转身 ——</li>
+              <li>然后镜头就不认识我了。」</li>
+              <li style="color:var(--m)">有人就是爱看别人第一次玩</li>
+            </ul>
+          </div>
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:14px 0 0">
+          右边这条是<b>人话版</b>，但它的每一句都能在左边的数据里找到出处。
+          <b>这就是「有生活」和「会写」的区别。</b>
+        </p>`,
+        prov: { kind: 'plan', note: '两份呈现的<b>数据源是同一个</b>（账本），这已经成立；但「发出去」与「生成草稿」落在发布线，未实现。' },
+      },
+      {
+        t: '一周之后，团队拿到的是什么',
+        d: '不是一堆日志，是一条能直接进 issue 的东西 —— 而且是不会累、不给面子的那种报告。',
+        body: `<div class="rows">
+          <div class="row"><span class="t">周一</span><span class="d">21 局 · 4 处异常<i>其中 1 处可复现</i></span><span class="r">记录了</span></div>
+          <div class="row"><span class="t">周三</span><span class="d">同一个异常又出现 3 次<i>复现率上升 —— 值得优先修</i></span><span class="r">在追</span></div>
+          <div class="row"><span class="t">周五</span><span class="d">换了一条路走，没再出现<i>可能和「落地瞬间转向」耦合</i></span><span class="r">缩小了</span></div>
+          <div class="row hi"><span class="t">周日</span><span class="d">一周汇总：37 局 · 9 次 · 1 段录像 · 1 条复现步骤</span><span class="r">可提交</span></div>
+        </div>`,
+        prov: { kind: 'real', note: '跨天的因果链与汇总，靠的是账本 + 承诺（都是已实现的机制）；这一拍的<b>内容</b>是示意。' },
+      },
+      {
+        t: '换成雇人测会怎样',
+        d: '不是「它比人强」，是它补的正是人不肯做的那一段。',
+        body: `<div class="two">
+          <div class="col bad">
+            <h4>三个人挤时间测</h4>
+            <ul>
+              <li>测到第二周就疲了</li>
+              <li>开始说「这个我测过了」<br>—— 而其实没复现</li>
+              <li>周末不想碰</li>
+              <li><b>「这里很烦」说出来没有凭证</b></li>
+            </ul>
+          </div>
+          <div class="col good">
+            <h4>它</h4>
+            <ul>
+              <li>每天 3 小时，一天不落</li>
+              <li>不会累，也不给面子</li>
+              <li>说「这里很烦」的时候<br>顺手附上录像</li>
+              <li><b>它的「烦」可以被查</b></li>
+            </ul>
+          </div>
+        </div>`,
+        prov: { kind: 'plan', note: '这仍然是<b>设想</b>：能力包（真玩游戏）与发布线都还没做。这一拍是方向，不是演示。' },
+      },
+      {
+        t: '所以它值什么',
+        d: '把这一场景压成一句话。',
+        body: `<div class="big">同一场游玩，两份产出<span>对内是 bug 数据，对外是游玩记录 —— 而它不能被换成一个更好的工具，因为工具不会自己玩几小时</span></div>
+        <div class="kpis" style="margin-top:18px">
+          <div class="kpi"><div class="n">0</div><div class="l">需要你盯着的时刻</div></div>
+          <div class="kpi acc"><div class="n">每天</div><div class="l">自己开始，自己收尾</div></div>
+          <div class="kpi ok"><div class="n">可查</div><div class="l">每条「烦」都有录像</div></div>
+        </div>`,
+        prov: { kind: 'plan', note: '结论成立的前提是能力包 + 发布线；两者都在 <code>PLAN.md §10.3</code> 的下一步里。' },
+      },
+    ],
+  },
+
+  {
+    id: 'memory',
+    name: '记得三个月前',
+    who: '二十人的开源项目组 · 共养一条',
+    setup: [['它做什么', '盯 issue、跑夜间构建、记录变更'], ['真正有用的', '不是自动化，是它记得'], ['每周', '一份「这一周发生了什么」']],
+    beats: [
+      {
+        t: '机器人做的是自动化；它多做的是记住',
+        d: '前半句所有机器人都能做。区别从第二句开始。',
+        body: `<div class="two">
+          <div class="col bad">
+            <h4>一个机器人</h4>
+            <ul>
+              <li>盯 issue ✔</li>
+              <li>跑夜间构建 ✔</li>
+              <li>记录变更 ✔</li>
+              <li><b>下次问起，从零开始</b></li>
+            </ul>
+          </div>
+          <div class="col good">
+            <h4>它</h4>
+            <ul>
+              <li>上面这些 ✔</li>
+              <li>记得谁提过相关的设计</li>
+              <li>记得三个月前为什么否掉一个方案</li>
+              <li><b>记得某个人说过「下个版本再看」</b></li>
+            </ul>
+          </div>
+        </div>`,
+        prov: { kind: 'real', note: '「记得」是这层东西的<b>核心</b>：跨会话的状态（身份 · 兴趣 · 承诺 · 关系 · 账本）已经实现并验证，这正是 dsh 不给、也不打算给的那部分。' },
+      },
+      {
+        t: '三个月前发生的事，被记成了状态',
+        d: '不是聊天记录里翻出来的 —— 是当时就写进了这个项目自己的账本。',
+        body: `<div class="rows">
+          <div class="row"><span class="t">三个月前</span><span class="d">方案 B 被否掉<i>原因：构建时间从 2 分钟涨到 11 分钟</i></span><span class="r">已记</span></div>
+          <div class="row"><span class="t">同上</span><span class="d">记录了当时的讨论与那个数字<i>不是结论，是依据</i></span><span class="r">有凭证</span></div>
+          <div class="row hi"><span class="t">今天</span><span class="d">又有人提方案 B<i>看起来是个没人记得的好主意</i></span><span class="r">触发</span></div>
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:12px 0 0">
+          关键在最后一行：<b>别人早忘了，它没忘</b> —— 因为那条记录不在某个人的脑子里，在磁盘上。
+        </p>`,
+        prov: { kind: 'real', note: '关系与账本：<code>lib/store.js</code> 的 <code>rememberPerson</code> / 账本；跨会话存活由 <code>wake.json</code> 与账本保证。' },
+      },
+      {
+        t: '它把记录调出来，而不是重新猜一遍',
+        d: '输出里带着当时的人和那个数字 —— 这让「记得」变成可核对的，而不是一句「我觉得以前讨论过」。',
+        body: `<div class="keybox">
+<span class="c">// 它此刻能拿出来的东西</span>
+{
+  "<span class="k">recall</span>": <span class="v">"三个月前否掉过一次方案 B"</span>,
+  "<span class="k">reason</span>": <span class="v">"构建时间 2min → 11min"</span>,
+  "<span class="k">who</span>": <span class="v">"@lin 提的，@chen 反对"</span>,
+  "<span class="k">evidence</span>": [<span class="v">"issue:412"</span>, <span class="v">"bench:ci-1043"</span>]
+}
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:12px 0 0">
+          <b>有凭证的记得，和「我印象里」是两件事。</b>
+          证据规则在这里的作用是：它宁可说「我不确定」，也不会编一段回忆。
+        </p>`,
+        prov: { kind: 'real', note: '证据与承诺机制已实现（<code>lib/store.js</code>）；把「调出来」接成一次真实的检索属于能力包范畴，未实现。' },
+      },
+      {
+        t: '它每周写一份「这一周发生了什么」',
+        d: '不是日志汇总，是有人味的周报：谁在纠结什么、哪个决策反转了、哪条路被证明是死的。',
+        body: `<div class="keybox">
+<span class="c">// 这一周（第 12 周）</span>
+
+  <span class="k">反转</span>  方案 B 又被提了一次 —— 三个月前否过，因为构建时间。
+         这次有人给了新的 benchmark，值得重看。原始记录：issue:412
+  <span class="k">卡住</span>  @lin 在 Windows 上的打包已经卡了 6 天，没人接手。
+  <span class="k">死了</span>  用 SQLite 替掉 JSON 配置这条路，试了两天，回滚了（写入锁）。
+  <span class="k">安静</span>  这周没有新 issue 提出 —— 不是没人用，是版本刚发。
+        </div>`,
+        prov: { kind: 'plan', note: '周报的<b>形态</b>是设想；它依赖的信息（账本、关系、承诺）都已实现，但「写成一篇」还没接。' },
+      },
+      {
+        t: '把「记得」拆开看，是哪几件事',
+        d: '这是实现层面的诚实版 —— 值得记的、不该记的，都在这里。',
+        body: `<div class="rows">
+          <div class="row good"><span class="t">身份</span><span class="d">它是谁、说话什么调<i>慢变量，只有主人确认才能改</i></span><span class="r">已实现</span></div>
+          <div class="row good"><span class="t">兴趣</span><span class="d">由多次真实经历累积，每条带置信度与来源<i>不是收藏一下就变</i></span><span class="r">已实现</span></div>
+          <div class="row good"><span class="t">承诺</span><span class="d">答应了谁、什么时候<i>到期会被排进候选</i></span><span class="r">已实现</span></div>
+          <div class="row good"><span class="t">关系</span><span class="d">主人 / 公开分开存<i>私聊不会因为要发帖就被检索</i></span><span class="r">已实现</span></div>
+          <div class="row warn"><span class="t">长期</span><span class="d">跑三个月的记忆会不会变糊、要不要总结<i>还没做，是待答问题</i></span><span class="r">未验证</span></div>
+        </div>`,
+        prov: { kind: 'real', note: '前四行对应 <code>identity.json</code> / <code>traits.json</code> / <code>commitments.json</code> / <code>relations.json</code>，都有断言。最后一行是<b>诚实标出来的空白</b>。' },
+      },
+      {
+        t: '所以它值什么',
+        d: '一句话，以及为什么不能被取代。',
+        body: `<div class="big">二十个人的记忆，不该丢在一个不在场的人身上<span>再好的机器人也只记得这次对话 —— 于是同一个方案会被否掉两次</span></div>
+        <div class="kpis" style="margin-top:18px">
+          <div class="kpi acc"><div class="n">三个月</div><div class="l">它还留着那次的依据</div></div>
+          <div class="kpi"><div class="n">带凭证</div><div class="l">不是「我印象里」</div></div>
+          <div class="kpi ok"><div class="n">不催</div><div class="l">没人问的时候它也在过</div></div>
+        </div>`,
+        prov: { kind: 'real', note: '跨会话记忆是这三件事里<b>最接近可用</b>的一件：机制已实现且验证。缺的是把它接到真实的 issue/CI 上。' },
+      },
+    ],
+  },
+
+  // 第四幕：一页诚实的进度。不写它，前面三幕就变成「它已经这样生活」的暗示。
+  {
+    id: 'honest',
+    name: '诚实的一页',
+    who: '对着仓库逐条核过 · 不是对着愿望',
+    setup: [['核的方式', '对每个依赖去仓库里找实现'], ['结论', '停在同一个地方'], ['', '']],
+    beats: [
+      {
+        t: '已经能跑的',
+        d: '这些不是设想，是仓库里有实现、有断言的东西。',
+        body: `<div class="rows">
+          <div class="row good"><span class="t">生命层</span><span class="d">身份 · 兴趣 · 承诺 · 关系 · 账本<i>5 个文件，零自有依赖，13 个工具</i></span><span class="r">已实现</span></div>
+          <div class="row good"><span class="t">自主唤醒</span><span class="d">抖动 · 静默时段 · 每日预算 · 补投<i>接 dsh 的 schedule，不自持定时器</i></span><span class="r">已实现</span></div>
+          <div class="row good"><span class="t">活动选择</span><span class="d">七项加权 · 每条带理由 · 休息永远在名单里</span><span class="r">已实现</span></div>
+          <div class="row good"><span class="t">证据规则</span><span class="d">没证据不许说做成<i>写在 store 里，不写在提示词里</i></span><span class="r">已实现</span></div>
+          <div class="row good"><span class="t">沙盒执行</span><span class="d">复用 dsh 的 sandbox + 逐次批准</span><span class="r">已实现</span></div>
+        </div>`,
+        prov: { kind: 'real', note: '共 <b>132 项</b>断言在 ubuntu + windows 上跑（<code>verify/</code>，CI 见 <code>.github/workflows/verify.yml</code>）。' },
+      },
+      {
+        t: '还没做到的',
+        d: '这三件事，每一个都会在演示里「看起来像已经好了」—— 所以要单独列出来。',
+        body: `<div class="rows">
+          <div class="row bad"><span class="t">发布</span><span class="d">发到社交平台<i>设计完整（幂等 / 对账），未接真实平台</i></span><span class="r">未实现</span></div>
+          <div class="row bad"><span class="t">能力包</span><span class="d">冲浪 · 游戏 · 表达<i>三个场景里的「真的试 / 真的玩」都指它</i></span><span class="r">未实现</span></div>
+          <div class="row bad"><span class="t">有模型的长期运行</span><span class="d">生活骨架用七天压缩跑验过<i>但那里面没有调用模型</i></span><span class="r">未验证</span></div>
+        </div>
+        <p style="color:var(--m);font-size:12.5px;margin:12px 0 0">
+          <b>所以三个场景停在同一个地方：它能过自己的日子，但日子还发不出去。</b>
+        </p>`,
+        prov: { kind: 'plan', note: '这三条在 <code>PLAN.md §10.3</code> 的下一步里；<code>PRODUCT.md §6</code> 的阶段 B 也卡在这里。' },
+      },
+      {
+        t: '为什么要把这一页放进来',
+        d: '因为前面三幕的说服力，来自它们看起来有多真。',
+        body: `<div class="two">
+          <div class="col bad">
+            <h4>不写这一页的后果</h4>
+            <ul>
+              <li>观众以为这些场景已经在跑</li>
+              <li>第一次被追问「能发了吗」就崩</li>
+              <li>前面所有「有证据」的话都变味</li>
+            </ul>
+          </div>
+          <div class="col good">
+            <h4>写了的代价</h4>
+            <ul>
+              <li>少一点「哇」</li>
+              <li>但每一句「已实现」都经得起查</li>
+              <li><b>而且它自己就是这么要求它的 Agent 的</b></li>
+            </ul>
+          </div>
+        </div>`,
+        prov: { kind: 'real', note: '最后一条不是修辞：这个系统对它的 Agent 要求「没证据就说没做成」。<b>那我们对自己也该是同一把尺子。</b>' },
+      },
+    ],
+  },
+];
+
+/* ---------------- 渲染 ---------------- */
+const root = document.getElementById('tabs').parentElement;
+const tabsEl = document.getElementById('tabs');
+const scEl = document.getElementById('scenario');
+let si = 0, bi = 0;
+
+function renderTabs(){
+  tabsEl.innerHTML = SCENES.map((s, i) =>
+    `<button type="button" class="tab${i===si?' on':''}" data-i="${i}">
+       <span class="n">${i+1}</span><span>${s.name}</span></button>`).join('');
+}
+
+function render(){
+  const s = SCENES[si], b = s.beats[bi];
+  const setup = s.setup.filter(x => x[0]).map(([k,v]) => `<span><b>${k}</b> · ${v}</span>`).join('');
+  scEl.innerHTML = `
+    <div class="setup">
+      <span class="who">${s.who}</span>
+      <span style="flex:1"></span>${setup}
+    </div>
+    <div class="body">
+      <div class="beats">
+        ${s.beats.map((x,i)=>`<button type="button" class="beat${i===bi?' on':''}${i<bi?' done':''}" data-b="${i}">
+          <span class="i">${i+1}</span><span>${x.t}</span></button>`).join('')}
+      </div>
+      <div>
+        <div class="stage">
+          <div class="stage-hd">
+            <h2>${b.t}</h2>
+            <p>${b.d}</p>
+          </div>
+          <div class="stage-bd">${b.body}</div>
+          <div class="prov">
+            <span class="chip ${b.prov.kind==='real'?'real':'plan'}">${b.prov.kind==='real'?'已实现':'设想'}</span>
+            <span class="txt">${b.prov.note}</span>
+          </div>
+        </div>
+        <div class="nav">
+          <button type="button" id="pv" ${bi===0?'disabled':''}>‹ 上一拍</button>
+          <button type="button" id="nx" ${bi===s.beats.length-1?'disabled':''}>下一拍 ›</button>
+          <span class="dots">${s.beats.map((_,i)=>`<span class="dot${i===bi?' on':''}"></span>`).join('')}</span>
+          <span class="kbd"><kbd>←</kbd> <kbd>→</kbd> 切换 · 第 ${bi+1}/${s.beats.length} 拍</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+tabsEl.addEventListener('click', e => {
+  const t = e.target.closest('[data-i]'); if (!t) return;
+  si = +t.dataset.i; bi = 0; renderTabs(); render();
+});
+scEl.addEventListener('click', e => {
+  const b = e.target.closest('[data-b]'); if (!b) return;
+  bi = +b.dataset.b; render();
+});
+scEl.addEventListener('click', e => {
+  if (e.target.closest('#pv') && bi > 0) { bi--; render(); }
+  if (e.target.closest('#nx')) { const s = SCENES[si]; if (bi < s.beats.length-1) { bi++; render(); } }
+});
+document.addEventListener('keydown', e => {
+  const s = SCENES[si];
+  if (e.key === 'ArrowLeft' && bi > 0) { bi--; render(); }
+  if (e.key === 'ArrowRight' && bi < s.beats.length-1) { bi++; render(); }
+});
+
+renderTabs(); render();
+</script>
+</body>
+</html>

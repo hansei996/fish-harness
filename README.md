@@ -26,6 +26,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`docs/PRODUCT.md`](docs/PRODUCT.md) | **产品规划**：市场位置、竞争分析、分阶段对外策略 |
 | [`docs/STORY.md`](docs/STORY.md) | **叙事**：软件史的下一次变化、三个落地场景、不声称什么 |
 | [`docs/index.html`](docs/index.html) | **对外页面**：单页静态站点，GitHub Pages 直接从 `docs/` 发布 |
+| [`docs/scenarios.html`](docs/scenarios.html) | **三个落地场景的详版原型**：4 幕 × 6 拍，可点走，每拍标「已实现 / 设想」 |
 | [`docs/dsh-schedule-api.md`](docs/dsh-schedule-api.md) | dsh `schedule` 的可落地 API 结论（带 `包名/文件:行号` 证据） |
 | [`docs/life-week.md`](docs/life-week.md) | 一份真实跑出来的七天日志，以及它**没**证明什么 |
 | [`docs/wake-verification.md`](docs/wake-verification.md) | 自主唤醒验了什么、**没验什么** |
@@ -103,6 +104,10 @@ dsh 已经开源并且自带：会话持久化与崩溃恢复、持久目标（`
 
 > ⚠️ **三个场景是设想，不是演示已有功能。** 生命层、自主唤醒、活动选择、证据规则都已实现并验证；
 > 但**对外发布尚未实现**。所以画面里它「发了内容」的部分，目前停在草稿。
+>
+> **想要更细的版本，看原型**：[`docs/scenarios.html`](docs/scenarios.html)（浏览器直接打开，也已发布到线上）。
+> 4 幕 × 6 拍、可点走，比视频密得多，而且**改一行就能重看** —— 每一拍还标了它靠什么成立：
+> 绿色是仓库里已经跑得起来的（附文件名），amber 是还没实现的。**没标出来就等于假装这些场景已经能跑。**
 
 ### 三、它的一周：七天之后，它还是同一个它吗
 
