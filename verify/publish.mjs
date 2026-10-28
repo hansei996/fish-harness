@@ -849,6 +849,46 @@ const labelledForTelegram = compliance.labelContent({
     `query()=${String(queried)} (null means unverifiable, so the outbox stays unconfirmed)`)
 }
 {
+  // The outbox comment used to claim cross-process safety came partly from "the
+  // platform idempotency key". That was never true for Telegram, and a false
+  // safety claim is worse than none: it makes a duplicate post look impossible
+  // when it is merely unlikely. Pin the fact down instead of trusting prose.
+  //
+  // Two halves, both measured rather than asserted:
+  //   1. the request body contains no idempotency-ish field, even though the
+  //      candidate carries `idempotencyKey`; and
+  //   2. `query()` cannot look a message up, so an `unconfirmed` row can never
+  //      be resolved by asking the platform.
+  const bodies = []
+  const transport = telegram.createTelegramTransport({
+    tokenEnv: 'DSH_LIFE_VERIFY_TELEGRAM_TOKEN',
+    fetchImpl: async (url, options) => {
+      bodies.push(JSON.parse(options.body))
+      return { ok: true, status: 200, json: async () => ({ ok: true, result: { message_id: 7 } }) }
+    },
+    apiBase: 'https://telegram.invalid',
+  })
+  await transport.send({
+    contentId: 'key-probe',
+    contentVersion: 'v1',
+    // The key is offered to the transport on purpose: if the adapter ever starts
+    // sending it, this check should notice rather than silently pass.
+    idempotencyKey: 'key-probe|v1|tg|acct',
+    account: 'chat-1',
+    text: '正文\n\n—— AI 生成 · 内容编号 key-probe',
+  })
+  const body = bodies[0] || {}
+  const sentKeys = Object.keys(body).sort()
+  const idempotencyFields = sentKeys.filter((key) => /idempot|dedup|client_?id|message_?key/i.test(key))
+  const lookup = await transport.query({ contentId: 'key-probe', idempotencyKey: 'key-probe|v1|tg|acct' })
+  check('telegram D6: the adapter sends no idempotency key and cannot reverse-query — so a Telegram send has no platform-side duplicate guard',
+    idempotencyFields.length === 0 &&
+    lookup === null &&
+    sentKeys.join(',') === 'chat_id,disable_web_page_preview,text',
+    `sent fields=[${sentKeys.join(',')}]; idempotency-ish=${idempotencyFields.length}; query()=${String(lookup)}` +
+    ` → duplicates are prevented by application logic only, and an unconfirmed row needs a human`)
+}
+{
   const telegramSource = fs.readFileSync(path.join(PLUGIN, 'lib', 'telegram.js'), 'utf8')
   // Comments mention "fetch" in prose; only real calls in code matter here.
   const telegramCode = telegramSource

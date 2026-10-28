@@ -56,8 +56,37 @@ const MAX_RECONCILE_ENTRIES = 20
  * The outbox file can only tell us what was durable; two sendAttempt calls can
  * both read the same `approved` record before either writes `sending`. This
  * set is the in-process guard that makes the second call fail loudly instead of
- * posting twice. Cross-process safety still comes from the durable `sending`
- * record plus the platform idempotency key.
+ * posting twice.
+ *
+ * ## What actually prevents a second post across processes
+ *
+ * This used to claim "the durable `sending` record plus the platform
+ * idempotency key". The second half of that was not true, and it is worth
+ * spelling out what is, because the difference decides how much damage an
+ * `unconfirmed` row can do:
+ *
+ *   1. **The re-read after approval** (`index.js` `publishNow`): the approval
+ *      wait is the real window — a keeper may take a minute to answer, and
+ *      another process can move the record meanwhile. After the answer, the
+ *      record is re-read and its status and content version are both compared.
+ *      A record that left `checked`, or whose bytes changed, is refused. This
+ *      is the load-bearing check; both halves were verified against a second
+ *      writer in this same window.
+ *   2. **`inFlightSends`** — in-process only. It cannot see another process.
+ *   3. **There is no platform idempotency key for Telegram.** `sendMessage`
+ *      takes no such parameter (Bot API docs), `telegram.js` accordingly sends
+ *      only `chat_id`/`text`/`disable_web_page_preview`, and its `query()`
+ *      returns `null` because the API cannot look a message up by key either.
+ *
+ * So for a Telegram channel the honest statement is: **a concurrent duplicate
+ * is prevented by application logic alone, and once a send is `unconfirmed`
+ * there is no way to ask the platform whether it landed.** That is exactly why
+ * `unconfirmed` has no automatic retry path — the human/reconcile step is the
+ * only exit, and it exists because the platform offers no better one.
+ *
+ * A transport that *does* support an idempotency key can honour it; the
+ * candidate already carries `idempotencyKey` for that purpose. Telegram is not
+ * such a transport, and the adapter says so instead of pretending.
  */
 const inFlightSends = new Set()
 
