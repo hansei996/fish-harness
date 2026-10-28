@@ -158,6 +158,9 @@
 
   /* ---------- sections ---------- */
   section{padding:78px 0; border-top:1px solid var(--line-2); scroll-margin-top:78px}
+  /* 锚点别名用的空元素：它自己不带 padding，但同样要躲开粘性导航，
+     否则 `#cold` 会停在导航条底下（等于还是没跳到）。 */
+  .anchor-alias{display:block; height:0; scroll-margin-top:78px}
   .eyebrow{
     display:flex; align-items:baseline; gap:10px; margin-bottom:10px;
     font-size:12.5px; letter-spacing:.08em; color:var(--blue); font-weight:600;
@@ -504,6 +507,15 @@
   </div>
 </section>
 
+<!--
+  锚点别名：`#cold` 是这一节从前的 id（「第一天：最要命的那一段」，见提交 b891f4c）。
+  重做落地页时这一节的 id 改成了 `#dayone`，但**已经有人把 `#cold` 存成了书签** ——
+  那个人就是这份文档的作者，而他打开时页面停在顶部、什么都没说明。
+
+  改 id 不像改标题，它会让外部链接静默失效。所以这里留一个空锚点把旧名字接住。
+  这一条现在有断言守着（verify/landing.mjs 的「所有对外锚点都还在」）。
+-->
+<span id="cold" class="anchor-alias" aria-hidden="true"></span>
 <section id="dayone">
   <div class="wrap">
     <div class="eyebrow">04 <span>冷启动</span></div>
@@ -935,7 +947,7 @@
       <div class="row"><span class="n">「它的一天」可读报告<span>把机器账本渲染成人话，失败照实说、结论带证据（就是上面那一屏）</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">连跑七天（「它的一周」）<span>生产的 store / choose / wake，七天压缩跑完；当场抓出三件单日看不见的问题</span></span><span class="pill done">已完成</span></div>
       <!-- facts:verify-count -->
-      <div class="row"><span class="n">验证：213 项全绿<span>存储不变量 · 当天报告 · 连跑七天 · 界面注册 · 发布线 · 真实 dsh 端到端 · 打包安装</span></span><span class="pill done">已完成</span></div>
+      <div class="row"><span class="n">验证：230 项全绿<span>存储不变量 · 当天报告 · 连跑七天 · 界面注册 · 发布线 · 真实 dsh 端到端 · 打包安装</span></span><span class="pill done">已完成</span></div>
 <!-- /facts:verify-count -->
       <div class="row"><span class="n">连续 7 天真实运行<span>七天生活骨架已验证，但「真实跑」要等有模型的运行 —— 模拟证明不了「模型会照它过日子」</span></span><span class="pill part">进行中</span></div>
       <div class="row"><span class="n">界面<span>七页可交互原型已就绪，尚未做成真实插件视图</span></span><span class="pill part">原型</span></div>
