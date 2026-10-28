@@ -354,6 +354,43 @@ export const BLOCKS = [
     },
   },
   {
+    // PLAN §11.1 的表：它手写了每套的项数（68/22/26…）与合计（186），
+    // 一个都没跟上代码。这两处直接由真跑结果生成。
+    name: 'plan-verify-table',
+    file: 'docs/PLAN.md',
+    render: (facts) => {
+      if (!facts.verify) throw new Error('plan-verify-table 需要真跑结果')
+      const byName = new Map(facts.verify.suites.map((s) => [s.name, s]))
+      const rows = [
+        ['smoke', 'verify/smoke.mjs', '存储不变量、持久性、损坏降级、**唤醒策略与记账、7 天 soak**、**活动选择器**（确定性，可注入随机量）', false],
+        ['day-report', 'verify/day-report.mjs', '「它的一天」报告工具：账本→人话的翻译、失败照实说、结论带证据、缺数据不崩', false],
+        ['demo-data', 'verify/demo-data.mjs', '对外页面引用的数据产物与实现一致；含「换时区结论不变」与「篡改能被发现」', false],
+        ['life-week', 'verify/life-week.mjs', '连跑七天（压缩时钟，复用生产的 store/choose/wake）', false],
+        ['ui', 'verify/ui.mjs', '界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归', false],
+        ['publish', 'verify/publish.mjs', '发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation', false],
+        ['e2e', 'verify/e2e-tools.mjs', '真 dsh 端到端：组合 profile → `dsh plugin` 安装 → 启动 → 断言运行系统实际产出', true],
+        ['pack', 'verify/pack-install.mjs', '`pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身）', true],
+      ]
+      const table = [
+        '| 套件 | 项数 | 查什么 | 需要真 dsh？ |',
+        '| --- | --- | --- | --- |',
+        ...rows.map(([name, file, what, dsh]) => {
+          const s = byName.get(name)
+          return `| \`${file}\` | **${s.count}** | ${what} | ${dsh ? '是' : '否'} |`
+        }),
+        '| `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |',
+      ].join('\n')
+      return [
+        `实测 **${facts.verify.total} 项全绿**，命令与前置条件见 [\`verify/README.md\`](../verify/README.md)：`,
+        '',
+        table,
+        '',
+        `${['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'][facts.verify.suites.length]}套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[\`.github/workflows/verify.yml\`](../.github/workflows/verify.yml)）。`,
+        `**项数与合计都是真跑出来的**（\`node tools/facts.mjs\` 量、\`node verify/claims.mjs\` 拦），不再手写。`,
+      ].join('\n')
+    },
+  },
+  {
     // verify/README 的总表：项数在这里被手抄了三遍（smoke 68、day-report 22、
     // e2e 写 13 个工具），而真值一直在动。
     name: 'verify-table',

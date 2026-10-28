@@ -6,7 +6,7 @@
 
 - 日期：2026-10-27
 - 版本：v0.5。**这一版修正规划与实现的三处不一致，并把下一步从「唤醒」改判为「发布 + 界面」。** 自主唤醒与活动选择器已在 v0.4 之后落地。旧版保留在旁。
-- 当前状态：**生命层已实现**；七套验证实测 **195 项全绿**，另有一条 opt-in 真实唤醒检查。数字口径见 [`tools/facts.mjs`](../tools/facts.mjs)（量事实）与 [`verify/claims.mjs`](claims.mjs)（拦回流的旧数字）。**界面为原型，发布尚未接真实平台。**
+- 当前状态：**生命层已实现**；验证全绿，**项数与合计由 `node tools/facts.mjs` 真跑量出、由 `node verify/claims.mjs` 守着，本文不再手写**（见 §11.1 的生成表）。另有一条 opt-in 真实唤醒检查。**界面为原型，发布尚未接真实平台。**
 - 数字均由 `node verify/*.mjs` 实测，不是文档里抄来的。实测命令见 §11。
 - 已完成与未完成的具体清单见 §0.7，不要只看路线图。
 - **这份是技术规划。给谁用、凭什么留下、怎么一步步对外，见 [`PRODUCT.md`](PRODUCT.md)。**
@@ -771,20 +771,24 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 
 ### 11.1 代码级：已实现，可复现
 
-实测 **186 项全绿**，命令与前置条件见 `verify/README.md`：
+<!-- facts:plan-verify-table -->
+实测 **211 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |
-| `verify/smoke.mjs` | **68** | 存储不变量、持久性、损坏降级、**唤醒策略与记账、7 天 soak**、**活动选择器**（确定性，可注入随机量） | 否 |
-| `verify/day-report.mjs` | **22** | 「它的一天」报告工具：账本→人话的翻译、失败照实说、结论带证据、缺数据不崩 | 否 |
+| `verify/smoke.mjs` | **70** | 存储不变量、持久性、损坏降级、**唤醒策略与记账、7 天 soak**、**活动选择器**（确定性，可注入随机量） | 否 |
+| `verify/day-report.mjs` | **28** | 「它的一天」报告工具：账本→人话的翻译、失败照实说、结论带证据、缺数据不崩 | 否 |
+| `verify/demo-data.mjs` | **16** | 对外页面引用的数据产物与实现一致；含「换时区结论不变」与「篡改能被发现」 | 否 |
 | `verify/life-week.mjs` | **16** | 连跑七天（压缩时钟，复用生产的 store/choose/wake） | 否 |
-| `verify/ui.mjs` | **28** | 界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归 | 否（一条 dump-config 除外） |
-| `verify/publish.mjs` | **26** | 发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation | 否 |
+| `verify/ui.mjs` | **28** | 界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归 | 否 |
+| `verify/publish.mjs` | **27** | 发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation | 否 |
 | `verify/e2e-tools.mjs` | **17** | 真 dsh 端到端：组合 profile → `dsh plugin` 安装 → 启动 → 断言运行系统实际产出 | 是 |
 | `verify/pack-install.mjs` | **9** | `pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身） | 是 |
 | `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |
 
-七套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（`.github/workflows/verify.yml`）。这一轮新增的三套是 `ui`、`publish`，以及把 `life-week` 接进 CI：**都不是新功能，是让「已经做到的」这件事可被检验。**
+八套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[`.github/workflows/verify.yml`](../.github/workflows/verify.yml)）。
+**项数与合计都是真跑出来的**（`node tools/facts.mjs` 量、`node verify/claims.mjs` 拦），不再手写。
+<!-- /facts:plan-verify-table -->
 
 ```sh
 DSH_BIN=$PWD/node_modules/@deepseek-ai/dsh/lib/bin.js npm run verify
@@ -908,7 +912,7 @@ v0.5 只做三件事，都围绕同一个病：**文档会悄悄地落后于代�
 | --- | --- | --- | --- |
 | §6.3 调度 | 「直接用 `dsh-proactive` 或 `schedule` seam」 | 接 dsh 内置 `schedule`，抖动/免打扰/预算自己实现 | **没先查接口就写方案。** dsh 的 `ScheduleCreateRequest` 根本没有那三项 |
 | §10.3 下一步 | 「发布线与界面线并行」 | 唤醒已完成，这两条确实该并行，但优先级与决策门没写清 | **路线图没跟上进度。** 唤醒做完之后，缺口换人了 |
-| §11 验证 | 「41 项」，验收标准与验证脱节 | 当时实测 87 项（61+17+9）；写这一行时是 132 项（68+22+16+17+9）；**现在是 195 项**（七套，新增「它的一天」报告、「连跑七天」、界面、发布线）—— 这个格子本身就是「数字会漂」的证据 | **数字靠抄，不靠跑。** 抄来的数字比没有更误导。现已机械化：`tools/facts.mjs` 量、`verify/claims.mjs` 拦 |
+| §11 验证 | 「41 项」，验收标准与验证脱节 | （历史：）当时 87 项（61+17+9），后来 132 项、195 项，**现在由机器写**（§11.1 的表是生成的）。**这个格子本身就是「数字会漂」的证据**：它在 v0.5 里已经过期过一次 | **数字靠抄，不靠跑。** 抄来的数字比没有更误导。现已机械化：`tools/facts.mjs` 量并生成、`verify/claims.mjs` 在 CI 上拦 |
 
 三条教训：
 

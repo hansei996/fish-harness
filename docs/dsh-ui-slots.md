@@ -46,7 +46,7 @@
 
 ## headless 与「优雅不存在」（A5）
 
-界面半身只在**声明并挂载了 `dsh.client` 的包**存在于该 profile 时才会被扫到。`headless`/`sdk` profile 不含 web shell，`dsh-client-modules` 缺席，`dsh.client` 无人读取；so 宿主半身必须写成 `export const inject = []` + `apply` 内 `root.inject(['webServer'], …)`，这样没有 `webServer` 的 profile 里它只是不注册路由、不报错。探针正是这个写法（`pkg/lib/index.js`）。**代价为零**：本次所有文件都在 `_scratch/`，`packages/dsh-life` 没有一个字节改动，CI 的 132 项不受影响。
+界面半身只在**声明并挂载了 `dsh.client` 的包**存在于该 profile 时才会被扫到。`headless`/`sdk` profile 不含 web shell，`dsh-client-modules` 缺席，`dsh.client` 无人读取；so 宿主半身必须写成 `export const inject = []` + `apply` 内 `root.inject(['webServer'], …)`，这样没有 `webServer` 的 profile 里它只是不注册路由、不报错。探针正是这个写法（`pkg/lib/index.js`）。**代价为零**：本次所有文件都在 `_scratch/`，`packages/dsh-life` 没有一个字节改动，CI 的 verify 不受影响（项数见 §11.1 的生成表）。
 
 ## 约束与代价（C1/C3）
 
