@@ -787,7 +787,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 ### 11.1 代码级：已实现，可复现
 
 <!-- facts:plan-verify-table -->
-实测 **268 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
+实测 **269 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |

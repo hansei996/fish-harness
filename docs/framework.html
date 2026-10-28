@@ -200,7 +200,8 @@ h1 em{font-style:normal;color:var(--life2)}
         <span class="gt">① 连续性：dsh 自己就有</span>
         <p class="gn">「活得久」这件事<b>有一半是别人做好的</b>。这一组我们一行都不写。</p>
         <div class="pkg relied" id="p-session"><div class="p">dsh-session</div>
-          <div class="n">会话与事件流<em>on('session/event') 也在这里</em></div></div>
+          <div class="n">会话与事件流。<b>同一个包在 ② 里也出现</b> ——
+            它既提供连续性，也是我们监听事件的地方。</div></div>
         <div class="pkg relied" id="p-persist"><div class="p">dsh-session-persistence-jsonl</div>
           <div class="n">每会话一个追加式 JSONL，zstd 压缩，含<b>尾部截断恢复</b></div></div>
         <div class="pkg relied" id="p-compact"><div class="p">dsh-compaction-basic</div>
@@ -218,8 +219,9 @@ h1 em{font-style:normal;color:var(--life2)}
       </div>
 
       <div class="dgrp">
-        <span class="gt">② 我们挂上去的：7 个扩展点</span>
-        <p class="gn">全部是公开扩展点，<b>没有一处改 dsh 核心</b>。每个框下面写着真实 API。</p>
+        <span class="gt">② 我们挂上去的</span>
+        <p class="gn">这 <b>7 个包</b>共给了我们 <b>5 个服务注入 + 2 个事件监听 + 2 个客户端 slot</b>，
+          全部是公开扩展点，<b>没有一处改 dsh 核心</b>。每个框下面那行斜体就是真实 API。</p>
         <div class="pkg wired" id="p-loop"><div class="p">dsh-agent-loop</div>
           <div class="n">跑轮次<em>ctx.tools.register() × 17</em></div></div>
         <div class="pkg wired" id="p-prompt"><div class="p">dsh-system-prompt</div>

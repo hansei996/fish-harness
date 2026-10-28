@@ -115,6 +115,24 @@ for (const c of NUMERIC_CLAIMS) {
     m ? `页面写 ${m[1]}，实测 ${c.real}` : `页面里没找到${c.label}那句（改文案要同步改这里）`)
 }
 
+// ② 组里每个包都必须至少有一条真实挂载（写进文案却没有任何线指向它，
+// 读者会以为它被接上了）。判据用 `WIRES` 那份表本身 —— 它就是页面脚本画线用的源。
+{
+  // 只数 dsh 那一侧的接线（元素 id 前缀 `p-`）：`DISK` 表用的也是 `from:`
+  // 这个键（值是 `n-*` 的模块），不加前缀会把磁盘线也算进来，得出 9 而不是 7。
+  const wiredIds = [...page.matchAll(/\{ from:'(p-[a-z-]+)'/g)].map((m) => m[1])
+  const wiredCount = new Set(wiredIds).size
+  const m = /这 <b>(\d+) 个包<\/b>共给了我们 <b>(\d+) 个服务注入 \+ (\d+) 个事件监听 \+ (\d+) 个客户端 slot<\/b>/.exec(page)
+  const realMounts = facts.serviceMounts.length
+  const realEvents = facts.events.length
+  const realSlots = facts.slots.length
+  check('页面里「N 个包给了多少扩展点」与实测一致',
+    Boolean(m) && Number(m[1]) === wiredCount && Number(m[2]) === realMounts
+      && Number(m[3]) === realEvents && Number(m[4]) === realSlots,
+    m ? `页面写 ${m[1]} 包 / ${m[2]} 注入 / ${m[3]} 事件 / ${m[4]} slot；实测 ${wiredCount} 包 / ${realMounts} 注入 / ${realEvents} 事件 / ${realSlots} slot`
+      : '页面里没找到那句扩展点计数')
+}
+
 // ---------- 2. 页面上出现的工具名 / 状态文件名都真实存在 --------------------
 const mentionedTools = [...new Set([...page.matchAll(/\b(life_[a-z_]+)\b/g)].map((m) => m[1]))]
 const realTools = new Set(facts.tools.names)
