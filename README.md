@@ -31,6 +31,9 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`docs/SCENARIOS.md`](docs/SCENARIOS.md) | **落地剧本**：三个场景的逐时刻动作，每个动作标 `[实]`/`[缺]`，并附「怎么核对」的判据 |
 | [`docs/index.html`](docs/index.html) | **对外页面**：单页静态站点，GitHub Pages 直接从 `docs/` 发布 |
 | [`docs/scenarios.html`](docs/scenarios.html) | **三个落地场景的详版原型**：4 幕 × 6 拍，可点走，每拍标「已实现 / 设想」 |
+| [`docs/memory-architecture.html`](docs/memory-architecture.html) | **技术架构总图**：dsh 的模块与生命层的模块画在一起，标出 6 个真实接线点 |
+| [`docs/module-graph.html`](docs/module-graph.html) | **模块依赖图**：9 个模块谁 import 谁，哪些是纯函数（可脱离 dsh 单跑） |
+| [`docs/install-path.html`](docs/install-path.html) | **开箱即用路径**：正确顺序 vs 会静默失败的陷阱，附裸 profile 缺的服务清单 |
 | [`docs/dsh-schedule-api.md`](docs/dsh-schedule-api.md) | dsh `schedule` 的可落地 API 结论（带 `包名/文件:行号` 证据） |
 | [`docs/life-week.md`](docs/life-week.md) | 一份真实跑出来的七天日志，以及它**没**证明什么 |
 | [`docs/wake-verification.md`](docs/wake-verification.md) | 自主唤醒验了什么、**没验什么** |

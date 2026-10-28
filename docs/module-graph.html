@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模块图：9 个模块谁依赖谁</title>
+<style>
+:root{
+  color-scheme: dark;
+  --ink:#eef3ff; --ink2:#95a4c7; --ink3:#5a688a; --ink4:#39435e;
+  --bg:#05070d; --panel:#0a0f1a; --line:#18203a; --line2:#232d47;
+  --dsh:#7c8aa8; --life:#4f86ff; --life2:#a8c8ff;
+  --ok:#4ade80; --warm:#ffb765; --vio:#a78bfa; --cyan:#22d3ee;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:13.5px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.scroller{overflow-x:auto;padding:22px 18px 30px}
+.board{width:1260px;margin:0 auto}
+.head{padding:34px 0 0}
+.kicker{font-size:11px;letter-spacing:.24em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;margin-bottom:12px}
+h1{font-size:26px;line-height:1.22;letter-spacing:-.03em;margin:0 0 9px;font-weight:700}
+h1 em{font-style:normal;color:var(--life2)}
+.lead{color:var(--ink2);font-size:13px;margin:0;max-width:84em;line-height:1.72}
+.lead b{color:var(--ink)}
+
+/* ===== 画布 ===== */
+.canvas{position:relative;margin-top:20px;border:1px solid var(--line2);border-radius:15px;
+  background:linear-gradient(180deg,#080d17,#060a12);height:640px;overflow:hidden}
+.canvas svg{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+.node{position:absolute;z-index:2;border-radius:10px;padding:9px 11px;
+  border:1px solid var(--line2);background:#0c1220;box-shadow:0 10px 24px -20px #000}
+.node .fn{font-family:var(--mono);font-size:11px;font-weight:600;margin-bottom:3px;
+  display:flex;align-items:baseline;gap:6px}
+.node .fn .ln{font-size:9px;color:var(--ink4);font-weight:400;margin-left:auto}
+.node .rl{font-size:10px;color:var(--ink2);line-height:1.45}
+.node .svc{margin-top:5px;padding-top:5px;border-top:1px dashed var(--line2);
+  font-family:var(--mono);font-size:9px;color:var(--life2);line-height:1.4;word-break:break-all}
+
+.node.entry{border-color:rgba(79,134,255,.65);background:rgba(79,134,255,.09)}
+.node.entry .fn{color:var(--life2)}
+.node.domain{border-color:rgba(79,134,255,.38)}
+.node.domain .fn{color:#dbe7ff}
+.node.leaf{border-color:#2f3a58}
+.node.leaf .fn{color:#b6c2d8}
+.node.io{border-color:rgba(34,211,238,.42);background:rgba(34,211,238,.05)}
+.node.io .fn{color:var(--cyan)}
+.node.local{border-color:rgba(167,139,250,.38);background:rgba(167,139,250,.045)}
+.node.local .fn{color:var(--vio)}
+
+.rowlabel{position:absolute;left:12px;font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink4);z-index:3;writing-mode:vertical-rl;transform:rotate(180deg)}
+
+/* ===== 图例 ===== */
+.legend{display:flex;gap:22px;flex-wrap:wrap;margin:16px 0 0;font-size:11px;color:var(--ink3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{flex:none;display:block;width:11px;height:11px;border-radius:3px;border:1px solid}
+.legend .e{background:rgba(79,134,255,.09);border-color:rgba(79,134,255,.65)}
+.legend .d{background:#0c1220;border-color:rgba(79,134,255,.38)}
+.legend .l{background:#0c1220;border-color:#2f3a58}
+.legend .i2{background:rgba(34,211,238,.05);border-color:rgba(34,211,238,.42)}
+.legend .lo{background:rgba(167,139,250,.045);border-color:rgba(167,139,250,.38)}
+.legend .ln{width:22px;height:0;border-top:1.5px solid var(--life);border-radius:0}
+
+/* ===== 底部 ==== */
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:20px}
+.fact{border:1px solid var(--line2);border-radius:11px;padding:13px 14px;background:var(--panel)}
+.fact .v{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--life2);letter-spacing:-.02em}
+.fact .k{font-size:11px;color:var(--ink2);margin-top:7px;line-height:1.55}
+.fact .k b{color:var(--ink)}
+
+.tail{margin:30px 0 0;padding:0 0 48px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.tail h3{font-size:10px;letter-spacing:.2em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;font-weight:500;margin:0 0 11px}
+.tail ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.tail li{font-size:11.5px;color:var(--ink2);line-height:1.62;padding-left:14px;position:relative}
+.tail li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%}
+.tail .did li::before{background:var(--ok)}
+.tail .not li::before{background:var(--warm)}
+.tail li b{color:var(--ink)}
+.tail code{font-family:var(--mono);font-size:10px;color:var(--ink2);
+  background:#0d1220;border:1px solid var(--line2);border-radius:3px;padding:0 4px}
+a{color:var(--life2)}
+</style>
+</head>
+<body>
+<div class="scroller"><div class="board">
+
+<div class="head">
+  <div class="kicker">Module graph · dependencies</div>
+  <h1>九个模块，谁依赖谁 —— 以及每个模块<b>接哪一个 dsh 服务</b></h1>
+  <p class="lead">
+    箭头方向是 <b>import 方向</b>（谁引用谁），全部扫自真实源码。
+    灰蓝色的是 <b>纯逻辑模块</b>（只用 Node 内建，时钟可注入）；
+    青色的是 <b>IO 模块</b>；紫色的是 <b>本地化/配置</b>。
+    <b>每个模块框里写着它挂在哪个 dsh 服务上 —— 没有写的就是纯函数，不碰 IO。</b>
+  </p>
+</div>
+
+<div class="canvas">
+  <svg id="g" viewBox="0 0 1260 640" preserveAspectRatio="none"></svg>
+
+  <span class="rowlabel" style="top:78px">入口 / 装配</span>
+  <span class="rowlabel" style="top:290px">领域模块</span>
+  <span class="rowlabel" style="top:470px">共享底层</span>
+
+  <!-- 入口 -->
+  <div class="node entry" id="n-index" style="left:520px;top:64px;width:220px">
+    <div class="fn">index.js<span class="ln">1590 行</span></div>
+    <div class="rl">插件入口。唯一的装配点：注册工具、注入上下文、监听事件、布防唤醒。</div>
+    <div class="svc">tools · systemPrompt · schedule · approval · webServer</div>
+  </div>
+
+  <!-- 领域层 -->
+  <div class="node domain" id="n-store" style="left:36px;top:256px;width:196px">
+    <div class="fn">store.js<span class="ln">737 行</span></div>
+    <div class="rl">生命状态机。三档变量 · 承诺 · 关系 · 账本；原子写、容忍坏文件。</div>
+  </div>
+  <div class="node domain" id="n-choose" style="left:256px;top:256px;width:196px">
+    <div class="fn">choose.js<span class="ln">703 行</span></div>
+    <div class="rl">活动选择器。七项加权给出带理由的候选；休息永远在名单里。</div>
+  </div>
+  <div class="node domain" id="n-outbox" style="left:476px;top:256px;width:196px">
+    <div class="fn">outbox.js<span class="ln">849 行</span></div>
+    <div class="rl">发布状态机。不确定就不重发；committed 永不裁剪。</div>
+  </div>
+  <div class="node io" id="n-ui" style="left:696px;top:256px;width:196px">
+    <div class="fn">ui.js<span class="ln">179 行</span></div>
+    <div class="rl">只读界面接口 <code>/life/state.json</code>；私密内容不出主机。</div>
+    <div class="svc">webServer 路由</div>
+  </div>
+  <div class="node io" id="n-tg" style="left:916px;top:256px;width:196px">
+    <div class="fn">telegram.js<span class="ln">133 行</span></div>
+    <div class="rl">唯一真实渠道适配器。token 只从环境变量读；query() 返回 null。</div>
+    <div class="svc">（经 outbox 调用）</div>
+  </div>
+  <div class="node local" id="n-config" style="left:1136px;top:256px;width:88px">
+    <div class="fn">config<span class="ln">287</span></div>
+    <div class="rl">零依赖校验器</div>
+  </div>
+
+  <!-- 共享底层 -->
+  <div class="node leaf" id="n-wake" style="left:256px;top:470px;width:230px">
+    <div class="fn">wake.js<span class="ln">238 行</span></div>
+    <div class="rl">唤醒策略纯函数：静默时段 · 抖动 · 不整天消失。时钟与随机数可注入。</div>
+  </div>
+  <div class="node leaf" id="n-comp" style="left:536px;top:470px;width:230px">
+    <div class="fn">compliance.js<span class="ln">118 行</span></div>
+    <div class="rl">标识硬闸 <code>assertLabeled()</code>；<b>没有任何 strip/remove 函数</b>。</div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><i class="e"></i>入口 / 装配</span>
+  <span><i class="d"></i>领域模块（纯逻辑）</span>
+  <span><i class="l"></i>共享底层（纯函数）</span>
+  <span><i class="i2"></i>IO 模块</span>
+  <span><i class="lo"></i>本地化 / 配置</span>
+  <span><i class="ln"></i>import 方向</span>
+</div>
+
+<div class="facts">
+  <div class="fact"><div class="v">9</div><div class="k">宿主模块<br><b>零自有依赖</b></div></div>
+  <div class="fact"><div class="v">4834</div><div class="k">宿主代码行数<br>另有客户端 176 行</div></div>
+  <div class="fact"><div class="v">4</div><div class="k">纯函数模块<br><b>时钟可注入 → 能确定性测试</b></div></div>
+  <div class="fact"><div class="v">1</div><div class="k">唯一装配点<br><b>index.js 收口所有接线</b></div></div>
+</div>
+
+<div class="tail">
+  <div class="did">
+    <h3>这张图证明什么</h3>
+    <ul>
+      <li><b>依赖是单向的、没有环</b>：index → 领域模块 → 共享底层。
+        四个纯函数模块（choose / wake / compliance / config）<b>不 import 任何 IO</b>，
+        所以能脱离 dsh 单独跑 —— 七天长跑就是靠这个压成 0.1 秒。</li>
+      <li><b>只有一个装配点</b>：全部接线收在 <code>index.js</code>，
+        其他八个模块不知道 dsh 的存在。换底座只改一个文件。</li>
+      <li><b>没有循环依赖</b>：<code>store → outbox → compliance</code>、
+        <code>store → wake</code>、<code>ui → wake</code>，方向一致。</li>
+    </ul>
+  </div>
+  <div class="not">
+    <h3>这张图没有证明什么</h3>
+    <ul>
+      <li><b>不代表模块划分是唯一正确的</b>：outbox 849 行偏大，
+        以后可能要拆（发布 vs 对账）。</li>
+      <li><b>客户端不在这张图里</b>：<code>client/life-overview.js</code>（176 行）
+        跑在浏览器半身，与这九个模块不共享内存。</li>
+      <li><b>真实长跑没做过</b>：模块边界在七天压缩跑里成立，不等于在真实进程重启下成立。</li>
+    </ul>
+  </div>
+</div>
+
+</div></div>
+
+<script>
+(function(){
+  const svg = document.getElementById('g');
+  const canvas = svg.closest('.canvas');
+  const NS = 'http://www.w3.org/2000/svg';
+  const R = {
+    index:  document.getElementById('n-index'),
+    store:  document.getElementById('n-store'),
+    choose: document.getElementById('n-choose'),
+    outbox: document.getElementById('n-outbox'),
+    ui:     document.getElementById('n-ui'),
+    tg:     document.getElementById('n-tg'),
+    config: document.getElementById('n-config'),
+    wake:   document.getElementById('n-wake'),
+    comp:   document.getElementById('n-comp'),
+  };
+  // 真实 import 边（扫自源码）
+  const EDGES = [
+    ['index','store'],['index','choose'],['index','outbox'],
+    ['index','ui'],['index','tg'],['index','config'],['index','wake'],
+    ['store','wake'],['store','outbox'],
+    ['outbox','comp'],
+    ['ui','wake'],
+  ];
+  function center(el, cr, side){
+    const r = el.getBoundingClientRect();
+    const x = r.left - cr.left + r.width/2;
+    return { x, top: r.top - cr.top, bottom: r.bottom - cr.top, w: r.width, h: r.height };
+  }
+  function draw(){
+    const cr = canvas.getBoundingClientRect();
+    svg.innerHTML = '';
+    EDGES.forEach(([a,b], i) => {
+      const A = center(R[a], cr), B = center(R[b], cr);
+      const p = document.createElementNS(NS,'path');
+      if (Math.abs(A.x - B.x) < 6 && B.top > A.bottom) {
+        p.setAttribute('d', `M${A.x},${A.bottom} L${B.x},${B.top}`);
+      } else if (B.top > A.bottom) {
+        const midY = A.bottom + (B.top - A.bottom) * 0.5;
+        p.setAttribute('d', `M${A.x},${A.bottom} C${A.x},${midY} ${B.x},${midY} ${B.x},${B.top}`);
+      } else {
+        // 同一行或往上的边：绕行
+        const midY = A.top - 14;
+        p.setAttribute('d', `M${A.x},${A.top} C${A.x},${midY} ${B.x},${midY} ${B.x},${B.top}`);
+      }
+      p.setAttribute('stroke','#4f86ff');
+      p.setAttribute('stroke-width','1.35');
+      p.setAttribute('fill','none');
+      p.setAttribute('opacity','0.5');
+      if (i % 2 === 0) {
+        const a = document.createElementNS(NS,'animate');
+        a.setAttribute('attributeName','opacity');
+        a.setAttribute('values','0.5;0.85;0.5');
+        a.setAttribute('dur','3s'); a.setAttribute('repeatCount','indefinite');
+        p.appendChild(a);
+      }
+      svg.appendChild(p);
+    });
+  }
+  window.addEventListener('load', draw);
+  window.addEventListener('resize', draw);
+  draw(); setTimeout(draw, 250);
+})();
+</script>
+</body>
+</html>

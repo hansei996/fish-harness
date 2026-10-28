@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开箱即用：从零到「它真的出生」</title>
+<style>
+:root{
+  color-scheme: dark;
+  --ink:#eef3ff; --ink2:#95a4c7; --ink3:#5a688a; --ink4:#39435e;
+  --bg:#05070d; --panel:#0a0f1a; --line:#18203a; --line2:#232d47;
+  --dsh:#7c8aa8; --life:#4f86ff; --life2:#a8c8ff;
+  --ok:#4ade80; --warm:#ffb765; --bad:#f87171;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:13.5px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.scroller{overflow-x:auto;padding:22px 18px 30px}
+.board{width:1240px;margin:0 auto}
+.head{padding:34px 0 0}
+.kicker{font-size:11px;letter-spacing:.24em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;margin-bottom:12px}
+h1{font-size:26px;line-height:1.22;letter-spacing:-.03em;margin:0 0 9px;font-weight:700}
+h1 em{font-style:normal;color:var(--life2)}
+.lead{color:var(--ink2);font-size:13px;margin:0;max-width:86em;line-height:1.72}
+.lead b{color:var(--ink)}
+
+/* ===== 两条路 ===== */
+.paths{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;align-items:start}
+.col{border-radius:14px;overflow:hidden;border:1px solid}
+.col.bad{border-color:rgba(248,113,113,.4)}
+.col.good{border-color:rgba(74,222,128,.42)}
+.col-hd{padding:12px 16px;display:flex;align-items:baseline;gap:9px;border-bottom:1px solid}
+.col.bad .col-hd{background:rgba(248,113,113,.08);border-bottom-color:rgba(248,113,113,.28)}
+.col.good .col-hd{background:rgba(74,222,128,.08);border-bottom-color:rgba(74,222,128,.28)}
+.col-hd b{font-size:13.5px}
+.col.bad .col-hd b{color:#fca5a5}
+.col.good .col-hd b{color:#86efac}
+.col-hd .t{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink3)}
+.col-bd{padding:15px 16px 17px;background:var(--panel)}
+
+.step{position:relative;padding-left:26px;padding-bottom:15px}
+.step:last-child{padding-bottom:0}
+.step::before{content:"";position:absolute;left:8px;top:16px;bottom:0;width:1px;background:var(--line2)}
+.step:last-child::before{display:none}
+.step .dot{position:absolute;left:0;top:3px;width:17px;height:17px;border-radius:50%;
+  display:grid;place-items:center;font-family:var(--mono);font-size:9px;font-weight:700;
+  border:1px solid}
+.col.bad .step .dot{color:#fca5a5;border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.1)}
+.col.good .step .dot{color:#86efac;border-color:rgba(74,222,128,.45);background:rgba(74,222,128,.1)}
+.step .sh{font-size:12px;font-weight:600;margin-bottom:4px}
+.step .sb{font-size:11px;color:var(--ink2);line-height:1.6}
+.step code{font-family:var(--mono);font-size:10px;background:#0d1220;border:1px solid var(--line2);
+  border-radius:3px;padding:1px 5px;color:var(--ink);display:inline-block;margin:3px 0}
+.step pre{margin:5px 0 0;background:#080c15;border:1px solid var(--line2);border-radius:7px;
+  padding:8px 10px;font-family:var(--mono);font-size:10px;line-height:1.6;overflow-x:auto;color:#b9c6de}
+.out{margin-top:6px;font-family:var(--mono);font-size:10px;padding:6px 9px;border-radius:6px;line-height:1.55}
+.col.bad .out{background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.28);color:#fca5a5}
+.col.good .out{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.26);color:#86efac}
+
+/* ===== 裸 profile vs web 模板 对比 ===== */
+.cmp{margin-top:20px;border:1px solid var(--line2);border-radius:14px;overflow:hidden}
+.cmp-hd{padding:11px 16px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+  border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink3)}
+.cmp-row{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:1px;background:var(--line2)}
+.cmp-row>div{background:var(--panel);padding:11px 15px;font-size:11.5px}
+.cmp-row.head>div{background:#0d1322;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink3);padding:8px 15px}
+.cmp-row .svc{font-family:var(--mono);font-size:11px;color:var(--ink)}
+.cmp-row .no{color:#fca5a5} .cmp-row .yes{color:#86efac}
+.cmp-row.hi>div{background:rgba(255,183,101,.06)}
+.cmp-row.hi .svc{color:var(--warm)}
+
+/* ===== 关键数字 ===== */
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:20px}
+.fact{border:1px solid var(--line2);border-radius:11px;padding:13px 14px;background:var(--panel)}
+.fact .v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--life2);letter-spacing:-.02em}
+.fact .k{font-size:11px;color:var(--ink2);margin-top:7px;line-height:1.55}
+.fact .k b{color:var(--ink)}
+
+/* ===== 分布 ===== */
+.flow{margin-top:20px;border:1px solid var(--line2);border-radius:14px;background:var(--panel);padding:18px 16px}
+.flow-hd{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:16px}
+.chain{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.st{border:1px solid rgba(79,134,255,.34);border-radius:11px;padding:12px 13px;
+  background:rgba(79,134,255,.05);position:relative}
+.st+.st::before{content:"→";position:absolute;left:-9px;top:50%;transform:translateY(-50%);
+  color:var(--life);font-size:13px}
+.st .n{font-family:var(--mono);font-size:9.5px;color:var(--life2);margin-bottom:6px}
+.st .h{font-size:12px;font-weight:600;margin-bottom:5px}
+.st .d{font-size:10.5px;color:var(--ink2);line-height:1.5}
+.st code{font-family:var(--mono);font-size:9.5px;color:var(--life2);
+  background:rgba(79,134,255,.1);border:1px solid rgba(79,134,255,.2);border-radius:3px;padding:0 3px}
+
+.tail{margin:30px 0 0;padding:0 0 48px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.tail h3{font-size:10px;letter-spacing:.2em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;font-weight:500;margin:0 0 11px}
+.tail ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.tail li{font-size:11.5px;color:var(--ink2);line-height:1.62;padding-left:14px;position:relative}
+.tail li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%}
+.tail .did li::before{background:var(--ok)}
+.tail .not li::before{background:var(--warm)}
+.tail li b{color:var(--ink)}
+.tail code{font-family:var(--mono);font-size:10px;color:var(--ink2);
+  background:#0d1220;border:1px solid var(--line2);border-radius:3px;padding:0 4px}
+a{color:var(--life2)}
+</style>
+</head>
+<body>
+<div class="scroller"><div class="board">
+
+<div class="head">
+  <div class="kicker">Install path · from zero to born</div>
+  <h1>开箱即用：从零到「它真的出生」<em>—— 以及那一步会静默失败的陷阱</em></h1>
+  <p class="lead">
+    左边是<b>照直觉做会掉进去的路</b>：命令 exit 0、没有任何报错，
+    但它给你一个<b>裸 profile</b> —— 鱼装上了，却永远不会说话、也不会自己醒。
+    右边是正确顺序。<b>下面的对比表列出裸 profile 缺的每一个服务</b>，
+    全部来自真实实测（<code>docs/install-test.md</code>）。
+  </p>
+</div>
+
+<div class="paths">
+  <!-- 错路 -->
+  <div class="col bad">
+    <div class="col-hd"><b>✕ 直觉路径</b><span class="t">exit 0，但不报错地坏了</span></div>
+    <div class="col-bd">
+      <div class="step"><span class="dot">1</span>
+        <div class="sh">直接建一个新 profile</div>
+        <div class="sb">名字随便起，看起来跟正常一样。</div>
+        <pre>dsh plugin --profile myfish add link:/abs/path/packages/dsh-life</pre>
+        <div class="out">✓ exit 0 · Done in 445ms —— 看起来成功了</div>
+      </div>
+      <div class="step"><span class="dot">2</span>
+        <div class="sh">启动</div>
+        <pre>dsh --profile myfish</pre>
+        <div class="out">✕ 命令挂起，180 秒无输出 —— 没有报错，只是什么都不发生</div>
+      </div>
+      <div class="step"><span class="dot">3</span>
+        <div class="sh">查 dump-config 才发现</div>
+        <div class="sb">bundle 里只有 <code>dsh-base</code> + <code>dsh-life</code>。
+          它像一个装好了的 profile，但一名成员都没有。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 正路 -->
+  <div class="col good">
+    <div class="col-hd"><b>✓ 正确顺序</b><span class="t">先有真 profile，再装插件</span></div>
+    <div class="col-bd">
+      <div class="step"><span class="dot">1</span>
+        <div class="sh">先从一个真实模板建 profile</div>
+        <div class="sb"><code>web</code> 模板才有界面与 <code>schedule</code>（自主唤醒的底座）。</div>
+        <pre>dsh --profile myfish --from-default-profile web --dump-config</pre>
+      </div>
+      <div class="step"><span class="dot">2</span>
+        <div class="sh">再把插件装进去</div>
+        <div class="sb">会打印一句 peer 依赖警告 —— <b>可以忽略</b>：插件零自有依赖。</div>
+        <pre>dsh plugin --profile myfish add link:/abs/path/packages/dsh-life</pre>
+      </div>
+      <div class="step"><span class="dot">3</span>
+        <div class="sh">确认装上了</div>
+        <pre>dsh --profile myfish --dump-config | grep -c dsh-life</pre>
+        <div class="out">✓ ≥1 就对</div>
+      </div>
+      <div class="step"><span class="dot">4</span>
+        <div class="sh">启动 —— 它开始生活</div>
+        <div class="sb"><code>$DSH_HOME/life/default/</code> 下出现身份与账本。</div>
+        <div class="out">✓ macOS 上实测走到了「生命真的诞生」</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cmp">
+  <div class="cmp-hd">裸 profile 到底缺什么（实测 dump-config 对比）</div>
+  <div class="cmp-row head"><div>服务</div><div>裸 profile</div><div>web 模板</div></div>
+  <div class="cmp-row"><div class="svc">agent</div><div class="no">✕ 缺</div><div class="yes">✓</div></div>
+  <div class="cmp-row"><div class="svc">llm</div><div class="no">✕ 缺</div><div class="yes">✓</div></div>
+  <div class="cmp-row"><div class="svc">system-prompt</div><div class="no">✕ 缺</div><div class="yes">✓</div></div>
+  <div class="cmp-row"><div class="svc">tool-bash</div><div class="no">✕ 缺</div><div class="yes">✓</div></div>
+  <div class="cmp-row hi"><div class="svc">schedule（自主唤醒的底座）</div><div class="no">✕ 缺</div><div class="yes">✓</div></div>
+</div>
+
+<div class="facts">
+  <div class="fact"><div class="v">3.2s</div><div class="k">clone<br>第一步实测耗时</div></div>
+  <div class="fact"><div class="v">445ms</div><div class="k">装插件<br><b>成功也 exit 0（所以看不出坏）</b></div></div>
+  <div class="fact"><div class="v">180s</div><div class="k">裸 profile 启动后<br><b>挂起无输出</b></div></div>
+  <div class="fact"><div class="v">2</div><div class="k">轮实测<br>Windows 6 步 + macOS 一次走到出生</div></div>
+</div>
+
+<div class="flow">
+  <div class="flow-hd">装好之后，它的一天怎么转起来（这一层与安装无关，但决定它会不会死）</div>
+  <div class="chain">
+    <div class="st"><div class="n">启动</div><div class="h">读盘复原</div>
+      <div class="d">不是新建，是<b>接着过</b>。生命周期与身份从 <code>life/&lt;lifeId&gt;/</code> 读回。</div></div>
+    <div class="st"><div class="n">每轮</div><div class="h">注入有界快照</div>
+      <div class="d">13 个字段 / 690 字节封顶 —— <b>不随寿命增长</b>。</div></div>
+    <div class="st"><div class="n">轮结束</div><div class="h">写盘 + 布防</div>
+      <div class="d">原子写；再向 <code>schedule</code> 补一个一次性闹钟。</div></div>
+    <div class="st"><div class="n">到点</div><div class="h">自己醒来</div>
+      <div class="d">进程不在也会在下次启动补投 —— <b>这就是它不靠人叫</b>。</div></div>
+  </div>
+</div>
+
+<div class="tail">
+  <div class="did">
+    <h3>这张图证明什么</h3>
+    <ul>
+      <li><b>陷阱是实测出来的，不是推测</b>：<code>docs/install-test.md</code> 里有每一步的真实输出，
+        包括 445ms 成功、180 秒挂起、以及 dump-config 的缺失清单。</li>
+      <li><b>README 已经按这个实测改过</b>：「不要跳过第一步」那段警告就是这次实测的产物。</li>
+      <li><b>正确路径走通过</b>：macOS 上一次实测跑到了 identity/ledger 落盘、day-report 读得出来。</li>
+    </ul>
+  </div>
+  <div class="not">
+    <h3>这张图没有证明什么</h3>
+    <ul>
+      <li><b>只在两台机器上验过</b>（Windows 与 macOS 各一次）。没有做过陌生人的真实测试 ——
+        <code>PRODUCT.md §9.3</code> 要的「找一个不写代码的人全程只看文档」还没做。</li>
+      <li><b>没覆盖 Linux</b>，也没覆盖不同 dsh 版本。</li>
+      <li><b>「180 秒挂起」只测了一次</b>，不同机器可能表现不同。</li>
+      <li><b>没验证它连续跑几天的表现</b>：安装成功不等于养得住。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tail" style="grid-template-columns:1fr;padding-top:0">
+  <div>
+    <h3>怎么复算</h3>
+    <ul>
+      <li><code>docs/install-test.md</code> —— 逐步骤实测记录（含两轮：Windows / macOS）</li>
+      <li><code>docs/release.md</code> —— 发布路径与独立 DSH_HOME 的跑法</li>
+      <li>完整技术方案：<a href="MEMORY.md">docs/MEMORY.md</a></li>
+    </ul>
+  </div>
+</div>
+
+</div></div>
+</body>
+</html>
