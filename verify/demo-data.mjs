@@ -177,6 +177,42 @@ check('the shipped artefact exists and is valid JSON',
       : `已检查 ${pages.map((p) => path.relative(REPO, p)).join(', ')}，都没有引用`)
 }
 
+// ---------- 8. 不许把手抄的终端输出粘回落地页 ----------
+//
+// 这一节原本就是一段手抄的终端输出，抄完就过期了（写着「账本 90 条」，
+// 实际 132 条）。改法是把容器留空、由 JS 现场渲染。所以断言反过来写：
+// **那个容器里不许预先塞 `<pre class="term">`** —— 有人再粘一段进去，这里就红。
+//
+// 只检查容器内部，不检查全文：页面别处（讲设计的段落）出现「账本」这个词是正常的。
+{
+  const page = path.join(REPO, 'docs', 'index.html')
+  let inner = null
+  if (fs.existsSync(page)) {
+    const html = fs.readFileSync(page, 'utf8')
+    // 容器不是嵌套 div，所以第一个 `</div>` 就是它的结尾（脚本里的模板字符串
+    // 不会出现在这段 HTML 里 —— 它们在后面的 <script> 里）。
+    const start = html.indexOf('<div id="life-days">')
+    const end = start < 0 ? -1 : html.indexOf('</div>', start)
+    if (start >= 0 && end > start) inner = html.slice(start, end)
+  }
+  check('落地页的那块容器是空的（数据现场渲染，而不是预先塞一段手抄的输出）',
+    inner !== null && !/<pre\b/.test(inner) && !/<table\b/.test(inner),
+    inner === null ? '找不到 <div id="life-days">' : `容器内 ${inner.length} 字符，未发现预置表格/终端块`)
+}
+
+// 落地页也不许再出现那批「已经过期的手抄数字」——它们是这段历史的证据，
+// 留一个就等于留了一个错。
+{
+  const page = path.join(REPO, 'docs', 'index.html')
+  const stale = ['账本 90 条', '132 项', '13 个工具', '7 个状态文件', '186 项']
+  const bad = []
+  if (fs.existsSync(page)) {
+    const html = fs.readFileSync(page, 'utf8')
+    for (const s of stale) if (html.includes(s)) bad.push(s)
+  }
+  check('落地页里没有留下会过期的旧数字', bad.length === 0, bad.join(', ') || `${stale.length} 个旧值已扫`)
+}
+
 fs.rmSync(tmp, { recursive: true, force: true })
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
