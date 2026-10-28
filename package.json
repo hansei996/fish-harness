@@ -5,15 +5,21 @@
   "description": "数字生命 Harness：在 DeepSeek Harness 之上把 Agent 养起来。",
   "type": "module",
   "scripts": {
-    "verify": "node verify/smoke.mjs && node verify/day-report.mjs && node verify/life-week.mjs && node verify/ui.mjs && node verify/publish.mjs && node verify/e2e-tools.mjs",
+    "verify": "node verify/smoke.mjs && node verify/day-report.mjs && node verify/demo-data.mjs && node verify/life-week.mjs && node verify/ui.mjs && node verify/publish.mjs && node verify/e2e-tools.mjs && node verify/claims.mjs",
     "verify:smoke": "node verify/smoke.mjs",
     "verify:day-report": "node verify/day-report.mjs",
+    "verify:demo-data": "node verify/demo-data.mjs",
     "verify:life-week": "node verify/life-week.mjs",
     "verify:ui": "node verify/ui.mjs",
     "verify:publish": "node verify/publish.mjs",
     "verify:pack": "node verify/pack-install.mjs",
     "verify:e2e": "node verify/e2e-tools.mjs",
+    "verify:claims": "node verify/claims.mjs",
+    "facts": "node tools/facts.mjs",
+    "facts:write": "node tools/facts.mjs --write",
+    "facts:check": "node tools/facts.mjs --check",
     "day-report": "node tools/day-report.mjs",
+    "demo-data": "node tools/demo-data.mjs",
     "life-week": "node tools/life-week.mjs"
   },
   "license": "MIT"

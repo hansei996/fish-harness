@@ -101,6 +101,25 @@ jobs:
         run: |
           node verify/day-report.mjs 2>&1 | tee verify-day-report.log
 
+      # demo-data：对外页面（docs/index.html、docs/scenarios.html）上的数字全部
+      # 由 docs/assets/life-demo.json 渲染，这一套断言那份产物与当前实现一致。
+      # 它不需要 dsh，但**必须**两个平台都跑：产物里含按本地日历日切分的日期，
+      # 跨平台差异（时区、换行）正是它最容易出事的地方。
+      - name: Verify — demo data
+        id: demodata
+        continue-on-error: true
+        run: |
+          node verify/demo-data.mjs 2>&1 | tee verify-demo-data.log
+
+      # claims：文档里那些「必须等于实测」的数字，以及不许回流的旧值。
+      # 它自己会调 tools/facts.mjs 重新量一遍并逐字比对生成块 ——
+      # 所以它必须跑在其它套件**之后**：项数是它要比对的事实之一。
+      - name: Verify — claims
+        id: claims
+        continue-on-error: true
+        run: |
+          node verify/claims.mjs 2>&1 | tee verify-claims.log
+
       # life-week 同样不需要 dsh：它把七天压缩跑完，用的是生产的 store/choose/wake。
       # 它是「连续七天」这个说法的证据（PRODUCT.md §6 阶段 A），所以必须每平台都跑 ——
       # 跨平台差异（路径、时区）正是它最容易出事的地方。
@@ -145,19 +164,33 @@ jobs:
           set -euo pipefail
           node verify/e2e-tools.mjs 2>&1 | tee verify-e2e.log
 
-      # 汇总 dsh / node 版本、七套结果与输出尾部：写 step summary + verify-report.md，
-      # 并作为 job 的最终闸门（七套都 success 才放行）。
+      # 数字纪律：证明文档里的数字与代码/真跑一致。
+      # 它必须排在所有套件之后 —— 它要读它们的真实项数来比对生成块。
+      # 放在 Windows 上也跑，正是因为它拦的是一类跨平台看不出来的东西（手抄的数字）。
+      - name: Verify — claims
+        id: claims
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node verify/claims.mjs 2>&1 | tee verify-claims.log
+
+      # 汇总 dsh / node 版本、各套结果与输出尾部：写 step summary + verify-report.md，
+      # 并作为 job 的最终闸门（全部 success 才放行）。
       - name: Report and gate
         if: always()
         env:
           MATRIX_OS: ${{ matrix.os }}
           SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
           DAYREPORT_OUTCOME: ${{ steps.dayreport.outcome }}
+          DEMODATA_OUTCOME: ${{ steps.demodata.outcome }}
+          CLAIMS_OUTCOME: ${{ steps.claims.outcome }}
           LIFEWEEK_OUTCOME: ${{ steps.lifeweek.outcome }}
           UI_OUTCOME: ${{ steps.ui.outcome }}
           PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           PACK_OUTCOME: ${{ steps.pack.outcome }}
+          CLAIMS_OUTCOME: ${{ steps.claims.outcome }}
         run: node .github/scripts/ci-report.mjs
 
       - name: Upload verify logs
@@ -168,11 +201,14 @@ jobs:
           path: |
             verify-smoke.log
             verify-day-report.log
+            verify-demo-data.log
+            verify-claims.log
             verify-life-week.log
             verify-ui.log
             verify-publish.log
             verify-e2e.log
             verify-pack.log
+            verify-claims.log
             verify-report.md
           if-no-files-found: ignore
           retention-days: 7

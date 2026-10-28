@@ -2,13 +2,18 @@
 
 五套验证：`smoke`、`day-report`、`life-week` 只依赖本地文件；`e2e` 与 `pack` 需要**真的 dsh**，不是 mock：
 
-| 套件 | 查什么 | 本机实测 |
+<!-- facts:verify-table -->
+| 套件 | 查什么 | 本机实测（合计 212 项） |
 |---|---|---|
-| `verify/smoke.mjs` | 存储不变量/装载 + 自主唤醒 + 10 项 7 天模拟 soak + 活动选择器（固定时钟与随机数，不需要真 dsh） | 68/68 通过 |
-| `verify/day-report.mjs` | 22 项「它的一天」报告工具：翻译对不对、该省的是否省了、缺数据崩不崩（不需要真 dsh） | 22/22 通过 |
-| `verify/life-week.mjs` | 16 项「连跑七天」：每天都有活动或明确休息、不超预算、时间不倒流、失败留下下一步、承诺兑现、同种子同结果（不需要真 dsh） | 16/16 通过 |
-| `verify/e2e-tools.mjs` | 17 项端到端：真 dsh 装载插件、13 个工具可见、身份/账本落盘、无 schedule 时降级、web 模板确实带 schedule | 17/17 通过 |
-| `verify/pack-install.mjs` | 9 项发布路径：`pnpm pack` 的 tarball 文件清单、装进全新 profile 能否激活 | 9/9 通过 |
+| `verify/smoke.mjs` | 70 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性）（需要真 dsh） | 70/70 通过 |
+| `verify/day-report.mjs` | 28 项：当天报告工具（不需要真 dsh） | 28/28 通过 |
+| `verify/demo-data.mjs` | 17 项：对外页面引用的那份数据产物与实现一致（含时区稳定性）（不需要真 dsh） | 17/17 通过 |
+| `verify/life-week.mjs` | 16 项：连跑七天（不需要真 dsh） | 16/16 通过 |
+| `verify/ui.mjs` | 28 项：界面那半边的包清单 / 桩 loader / host 路由 / 私密不外泄（不需要真 dsh） | 28/28 通过 |
+| `verify/publish.mjs` | 27 项：发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）（不需要真 dsh） | 27/27 通过 |
+| `verify/e2e-tools.mjs` | 17 项：真实 dsh 端到端（需要真 dsh） | 17/17 通过 |
+| `verify/pack-install.mjs` | 9 项：打出来的包能不能装进 profile 并激活（需要真 dsh） | 9/9 通过 |
+<!-- /facts:verify-table -->
 
 唤醒部分的验证结论与**没验到什么**见 [`docs/wake-verification.md`](../docs/wake-verification.md)。
 更慢、需要真实 web profile 的「真的醒一次」检查在 [`verify/live/`](live/README.md)（opt-in，不在 CI 里）。

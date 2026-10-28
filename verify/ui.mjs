@@ -17,7 +17,8 @@ import { resolveDshBin } from './dsh-bin.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const PLUGIN = path.join(REPO, 'packages', 'dsh-life')
-const HOME = process.env.VERIFY_DSH_HOME || path.join(os.tmpdir(), 'dsh-life-ui-home')
+// 带随机后缀，否则与并发的另一份 verify 互删目录（见 verify/smoke.mjs 同处的说明）。
+const HOME = process.env.VERIFY_DSH_HOME || fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-life-ui-'))
 process.env.DSH_HOME = HOME
 
 const results = []

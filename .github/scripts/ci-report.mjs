@@ -41,11 +41,19 @@ function dshVersion () {
 const suites = [
   { name: 'smoke', file: 'verify-smoke.log', outcome: process.env.SMOKE_OUTCOME },
   { name: 'day report', file: 'verify-day-report.log', outcome: process.env.DAYREPORT_OUTCOME },
+  // demo-data 守着「对外页面上的数字没有过期」：它是 docs/assets/life-demo.json
+  // 与当前实现是否一致的闸门。放在 day-report 旁边 —— 两者都不需要 dsh，都便宜。
+  { name: 'demo data', file: 'verify-demo-data.log', outcome: process.env.DEMODATA_OUTCOME },
+  // claims 守的是「文档里的数字不许手抄、不许回流成旧值」。它要真跑其它套件
+  // 来数项数，所以放在最后 —— 前面挂了它也会跟着报出来，正好说明因果。
+  { name: 'claims', file: 'verify-claims.log', outcome: process.env.CLAIMS_OUTCOME },
   { name: 'life week', file: 'verify-life-week.log', outcome: process.env.LIFEWEEK_OUTCOME },
   { name: 'ui', file: 'verify-ui.log', outcome: process.env.UI_OUTCOME },
   { name: 'publish', file: 'verify-publish.log', outcome: process.env.PUBLISH_OUTCOME },
   { name: 'e2e', file: 'verify-e2e.log', outcome: process.env.E2E_OUTCOME },
   { name: 'pack', file: 'verify-pack.log', outcome: process.env.PACK_OUTCOME },
+  // claims 排最后：它读的正是前面那些套件的项数，用来证明文档里的数字没漂。
+  { name: 'claims', file: 'verify-claims.log', outcome: process.env.CLAIMS_OUTCOME },
 ].map((suite) => ({ ...suite, outcome: suite.outcome || 'unknown' }))
 const os = process.env.MATRIX_OS || process.env.RUNNER_OS || 'unknown'
 

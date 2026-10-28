@@ -271,6 +271,20 @@
   .term .bad{color:var(--warn)}
   .term .good{color:var(--ok)}
   .term .start{color:var(--blue-d)}
+  /* 真实数据渲染出来的那几天：切换按钮 */
+  .days{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 12px}
+  .days button{
+    font:inherit; font-size:13px; padding:5px 11px; cursor:pointer;
+    background:var(--card); color:var(--ink-2);
+    border:1px solid var(--line); border-radius:999px;
+  }
+  .days button[aria-pressed="true"]{
+    background:var(--blue-d); color:#fff; border-color:var(--blue-d);
+  }
+  .data-status{
+    font-size:13.5px; color:var(--ink-3); margin:10px 0 0;
+  }
+  .data-status.bad{color:var(--warn)}
 
   footer{padding:50px 0 72px; border-top:1px solid var(--line-2); color:var(--ink-3); font-size:14px}
   footer .wrap{display:flex; gap:18px; flex-wrap:wrap; align-items:center}
@@ -658,54 +672,49 @@
       第一天的它本来就什么都没有。
     </p>
 
-    <pre class="term"><span class="dim">  大肥鱼的一周 · 7 天 · 账本 90 条</span>
-<span class="ends">  ──────────────────────────────────────────────</span>
-<span class="start">  2026-10-27</span>
-    08:00  <span class="start">◦ 大肥鱼出生了</span>
-    08:00    答应了一件事：把《地底 38 层》的打法写进自己的笔记（2026-10-29 前）
-    09:15  ▸ 开始：看看「机械键盘手感」的更新（因为 只观察过 1 次，值得多看一眼）
-    10:29  <span class="bad">· 没做成：资料对不上，记下来换个来源｜证据 save:aaf500</span>
-    10:29  <span class="bad">→ 留下了明天要做的事：换个打法再试一次「机械键盘手感」</span>
-    13:18  <span class="good">✓ 做成了：看看「像素矿工小品」的更新｜证据 link:8f936a</span>
-    14:47  ○ 选了休息 —— 今天没有非做不可的事
-    18:55  ▸ 开始：把《地底 38 层》的打法写进自己的笔记
-    19:52  <span class="good">✓ 兑现了一件事：把《地底 38 层》的打法写进自己的笔记</span>
-      ── 自己醒 6 次 · 起 5 件事 · 成 4 · 败 1 · 休息 1
+    <!--
+      这一段不写死在 HTML 里：它由 docs/assets/life-demo.json 现场渲染，
+      那份数据是 `node tools/demo-data.mjs` 跑出来的（里面每一步都来自
+      tools/life-week.mjs 与 tools/day-report.mjs 的真实输出）。
 
-<span class="start">  2026-10-28</span>
-    08:02  ▸ 开始：看看「像素矿工小品」的更新（因为 置信度是 0.79，已经观察过 3 次，可以继续）
-    10:21  ○ 选了休息 —— 今天没有非做不可的事
-    15:35  ▸ 开始：看看「像素矿工小品」的更新（因为 置信度是 0.91，已经观察过 4 次）
-      ── 自己醒 6 次 · 起 2 件事 · 成 2 · 休息 4
+      为什么必须这样：这里原本是一段手抄的终端输出，而它已经过期了 ——
+      抄的时候写着「账本 90 条」，实际是 132 条（因为「自己醒了几次」
+      当时读了一个不存在的字段，唤醒记录根本没进账本）。页面继续展示
+      旧数字，而没有任何东西会红。verify/demo-data.mjs 现在守着这条。
 
-<span class="ends">  ──────────────────────────────────────────────</span>
-<span class="dim">  第七天它是什么样：</span>
-    兴趣 像素矿工小品  <span class="good">0.95</span>（观察 17 次，来源 experience）
-    兴趣 机械键盘手感 <span class="good">0.95</span>（观察 12 次，来源 experience）
-    承诺：兑现 1 件，还欠 0 件</pre>
+      没有 JS 时下面会显示一句「需要脚本」，而不是显示一段可能是旧的内容。
+    -->
+    <div id="life-days">
+      <p class="data-status">这里本该显示它真实的一周。需要允许脚本 —— 直接看原始数据：
+        <a href="assets/life-demo.json">assets/life-demo.json</a>，
+        或用 <code>node tools/life-week.mjs</code> 自己跑一遍。</p>
+    </div>
 
-    <div class="cards" style="margin-top:20px">
+    <!--
+      这三张卡片的数字不再手写。它们由 docs/assets/life-demo.json 现场算出来：
+      兴趣的起点/终值/观察次数、那次失败留下的下一步到底有没有被接上、
+      最安静的那一天是什么样。手写过一次就已经过期过一次了。
+      没有 JS 时卡片不显示，而不是显示一组可能是旧的数字。
+    -->
+    <div class="cards" id="week-cards" style="margin-top:20px" hidden>
       <div class="card">
         <h3>第二天的它，接着第一天</h3>
-        <p>第 1 天 10:29 留下「换个打法再试一次」，<strong>那一步真的留在状态里</strong>，
-           下一次醒来读自己的状态时看得见。这就是「因果链」而不是「每天随机起一个」。</p>
+        <p id="card-chain"></p>
       </div>
       <div class="card">
         <h3>兴趣是被经历推上去的</h3>
-        <p>「像素矿工小品」从出生档案里的 <strong>0.55</strong>，经过 17 次真实经历长到 <strong>0.95</strong>，
-           每一次都带来源。不是第一天就写死的人设。</p>
+        <p id="card-interest"></p>
       </div>
       <div class="card">
         <h3>它有安静的日子</h3>
-        <p>第 2 天只起了 2 件事、休息 4 次。这一天<strong>看起来什么都没发生</strong>，
-           但它是正常的 —— 而且这条记录照样在，不藏。</p>
+        <p id="card-quiet"></p>
       </div>
     </div>
 
     <figure class="hero-demo" style="margin-top:22px">
       <div class="frame">
         <video autoplay muted loop playsinline preload="metadata" poster="assets/scene-oneweek.png"
-               aria-label="它的一周演示：第 1 天的失败如何变成第 2 天的下一步，兴趣如何被 17 次经历推上去">
+               aria-label="它的一周演示：第 1 天的一次失败如何被记成下一步并被接着做完，兴趣如何被多次真实经历推上去">
           <source src="assets/oneweek.mp4" type="video/mp4">
           <img src="assets/scene-oneweek.png" alt="它的一周（静态首帧）">
         </video>
@@ -916,11 +925,15 @@
     <p class="sub">这份进度表按实际跑过的结果写，不是按计划写。<strong>做不到的地方直接标出来。</strong></p>
 
     <div class="rows">
-      <div class="row"><span class="n">生命层：身份、兴趣、承诺、账本<span>5 个文件 2438 行，零自有依赖，13 个工具，7 个状态文件</span></span><span class="pill done">已完成</span></div>
+      <!-- facts:life-size -->
+      <div class="row"><span class="n">生命层：身份、兴趣、承诺、账本<span>9 个宿主文件 5010 行（含客户端半身 176 行），零自有依赖，17 个工具，8 个状态文件</span></span><span class="pill done">已完成</span></div>
+<!-- /facts:life-size -->
       <div class="row"><span class="n">自主唤醒与活动选择器<span>自己醒来、在有限候选里选活动、按预算与作息约束</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">「它的一天」可读报告<span>把机器账本渲染成人话，失败照实说、结论带证据（就是上面那一屏）</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">连跑七天（「它的一周」）<span>生产的 store / choose / wake，七天压缩跑完；当场抓出三件单日看不见的问题</span></span><span class="pill done">已完成</span></div>
-      <div class="row"><span class="n">验证：132 项全绿<span>存储不变量 · 当天报告 · 连跑七天 · 真实 dsh 端到端 · 打包安装</span></span><span class="pill done">已完成</span></div>
+      <!-- facts:verify-count -->
+      <div class="row"><span class="n">验证：212 项全绿<span>存储不变量 · 当天报告 · 连跑七天 · 界面注册 · 发布线 · 真实 dsh 端到端 · 打包安装</span></span><span class="pill done">已完成</span></div>
+<!-- /facts:verify-count -->
       <div class="row"><span class="n">连续 7 天真实运行<span>七天生活骨架已验证，但「真实跑」要等有模型的运行 —— 模拟证明不了「模型会照它过日子」</span></span><span class="pill part">进行中</span></div>
       <div class="row"><span class="n">界面<span>七页可交互原型已就绪，尚未做成真实插件视图</span></span><span class="pill part">原型</span></div>
       <div class="row"><span class="n">发布到社交平台<span>设计完整（含幂等与对账），尚未接真实平台</span></span><span class="pill todo">未开始</span></div>
@@ -949,6 +962,179 @@
     </span>
   </div>
 </footer>
+
+<script>
+/* ============================================================================
+   把它真实的一周渲染出来。
+
+   数据来自 docs/assets/life-demo.json —— `node tools/demo-data.mjs` 的产物，
+   里面每天的内容就是 tools/day-report.mjs 在那一跑的原始输出。页面上这一段
+   以前是手抄的，抄完就过期了（写着「账本 90 条」，实际 132 条）。所以这里
+   改成现场渲染：数据变了，页面跟着变；数据没了，页面说没了，而不是继续
+   展示上一次的旧数字。
+
+   诚实优先级高于好看：
+     · 取不到数据 → 明说取不到，并给出自己跑一遍的命令；
+     · 数据里缺某个字段 → 那一行不显示，而不是补一个 0；
+     · 「没成」永远是「没成」，不美化。
+   ========================================================================= */
+(function () {
+  const host = document.getElementById('life-days')
+  if (!host) return
+
+  // 表情与颜色一律由 tone 决定，和终端视图（tools/day-report.mjs）同一套口径，
+  // 这样页面上读到的东西和命令行跑出来的是同一件事，不会各说各话。
+  const mark = (tone) => tone === 'good' ? '✓'
+    : tone === 'warn' ? '·'
+    : tone === 'doing' ? '▸'
+    : tone === 'start' ? '◦'
+    : tone === 'promise' ? '◇'
+    : ' '
+
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  const cls = (tone) => tone === 'good' ? 'good' : tone === 'warn' ? 'bad' : ''
+
+  function renderDay (data, index) {
+    const d = data.dayReports[index]
+    const s = d.stats || {}
+    const lines = []
+
+    lines.push(`<span class="dim">  ${esc(data.life.name)}的一周 · ${data.dayReports.length} 天 · 账本 ${data.ledgerEntries} 条 · 种子 ${data.seed}</span>`)
+    lines.push('<span class="ends">  ' + '─'.repeat(46) + '</span>')
+    lines.push(`<span class="start">  ${esc(d.day)}</span>`)
+
+    // 唤醒不进时间线：一天醒六次会把真正发生的事情淹掉。它只进底部的计数 ——
+    // 和 `node tools/day-report.mjs` 的做法一致。
+    for (const e of (d.events || [])) {
+      if (!e.time || !e.text) continue
+      const tone = cls(e.tone)
+      const body = tone ? `<span class="${tone}">${esc(e.text)}</span>` : esc(e.text)
+      lines.push(`    ${esc(e.time)}  ${mark(e.tone)} ${body}`)
+    }
+
+    lines.push('')
+    lines.push('<span class="ends">  ' + '─'.repeat(46) + '</span>')
+    const bits = []
+    if (s.activitiesStarted) bits.push(`起了 ${s.activitiesStarted} 件事`)
+    if (s.activitiesDone) bits.push(`做成 ${s.activitiesDone} 件`)
+    if (s.activitiesFailed) bits.push(`没成 ${s.activitiesFailed} 件`)
+    // 唤醒次数是个真数字（不是 null、不是补 0）。这一条曾经是静默坏的：
+    // 旧实现读了一个不存在的字段，于是这一行永远不显示。
+    if (typeof s.wakes === 'number' && s.wakes > 0) bits.push(`自己醒来 ${s.wakes} 次`)
+    lines.push(`  今天：${bits.length ? esc(bits.join(' · ')) : '没什么活动'}`)
+    if (s.turns) lines.push(`  对话往返 ${s.turns} 次（不计入上面）`)
+    if (d.tomorrow) lines.push(`  明天大概会：${esc(d.tomorrow)}`)
+
+    return '<pre class="term">' + lines.join('\n') + '</pre>'
+  }
+
+  function render (data) {
+    const which = Math.min(Number(host.dataset.day || 0), data.dayReports.length - 1)
+    const buttons = '<div class="days">' + data.dayReports.map((d, i) =>
+      `<button type="button" data-i="${i}" aria-pressed="${i === which}">${esc(d.day)}</button>`,
+    ).join('') + '</div>'
+
+    // 「它证明了什么 / 没证明什么」随数据一起走。没有这一段，上面那些数字
+    // 会被读成「它已经这样生活了」。
+    const honest = '<p class="data-status">这份日志<b>没有调用模型</b>（选活动的是排序器），'
+      + '七天也是压缩跑的；<b>对外发布还没接通</b>。它证明的是「生活的骨架成不成立」，'
+      + '不是「模型会不会照这个骨架过日子」。'
+      + '生成命令：<code>node tools/demo-data.mjs</code>。</p>'
+
+    host.innerHTML = buttons + renderDay(data, which) + honest
+    renderCards(data)
+
+    host.querySelectorAll('.days button').forEach((b) => {
+      b.addEventListener('click', () => {
+        host.dataset.day = b.dataset.i
+        render(data)
+        // 重渲染会替换掉按钮，焦点会掉到 body 上；键盘用户会因此迷路。
+        const again = host.querySelector(`.days button[data-i="${b.dataset.i}"]`)
+        if (again) again.focus()
+      })
+    })
+  }
+
+  /**
+   * 三张卡片里的数字全部由数据算出来，一个字都不许手写。
+   *
+   * 之前这三张是写死的，而且已经过期了：写着「从 0.55 长到 0.95、17 次经历」，
+   * 而实际那份数据是 0.6→0.95、17 次。让它在浏览器里算，是为了让「数据变了
+   * 页面没跟上」这件事不可能发生 —— md 可以忘，代码不会。
+   */
+  function renderCards (data) {
+    const box = document.getElementById('week-cards')
+    if (!box) return
+    const days = data.dayReports
+    const all = days.flatMap((d) => d.events || [])
+
+    // 卡片一：那次失败留下的下一步，到底有没有被接上。
+    // 这是这个产品最有名的一句话（「留下一个明天要做的事」），所以它必须
+    // 拿真实数据说话，而不是拿一句形容词。
+    const failed = all.find((e) => e.kind === 'activity-end' && e.tone === 'warn' && e.next && e.next.what)
+    const taken = failed
+      ? all.find((e) => e.kind === 'activity-start' && e.text && e.text.includes('接着做')
+          && failed.next.what.includes(e.text.replace(/^开始：/, '').replace(/（因为[\s\S]*$/, '')
+            .replace(/^接着做「/, '').replace(/」$/, '').slice(0, 12)))
+      : null
+    const chain = document.getElementById('card-chain')
+    if (chain) {
+      chain.innerHTML = failed
+        ? `第 1 天失败之后，它给自己留下一步「${esc(failed.next.what)}」——`
+          + (taken
+            ? `<strong>当天就被接上了</strong>（${esc(taken.time)} 开始、做成）。`
+            : '这一步' + (days.some((d) => (d.events || []).some((e) => e.text && e.text.includes('接着做')))
+              ? '<strong>后来被接上了</strong>。'
+              : '在随后几天里还挂着 —— <strong>没被接上，页面也如实说没被接上</strong>。'))
+          + '这就是因果链，而不是「每天随机起一个」。'
+        : '这七天里没有出现失败，所以这条链没有被走到。'
+    }
+
+    // 卡片二：兴趣怎么长上来的。起点、终点、观察次数都来自数据。
+    const top = (data.interests || []).slice().sort((a, b) => (b.observations || 0) - (a.observations || 0))[0]
+    const first = all.find((e) => e.kind === 'interest' && top && e.text && e.text.includes(top.topic))
+    const interest = document.getElementById('card-interest')
+    if (interest) {
+      const born = first ? (first.text.match(/=\s*([\d.]+)/) || [])[1] : null
+      interest.innerHTML = top
+        ? `「${esc(top.topic)}」从出生档案里主人给的 <strong>${esc(born || '?')}</strong>，`
+          + `经过 <strong>${top.observations}</strong> 次真实经历长到 <strong>${top.confidence}</strong>，`
+          + '每一次都带来源。不是第一天就写死的人设。'
+        : '这份数据里还没有兴趣记录。'
+    }
+
+    // 卡片三：最安静的那一天。用「事件最少」来选，而不是写死「第 2 天」。
+    const quiet = days.slice().sort((a, b) => (a.events || []).length - (b.events || []).length)[0]
+    const q = document.getElementById('card-quiet')
+    if (q && quiet) {
+      const started = quiet.stats?.activitiesStarted || 0
+      const done = quiet.stats?.activitiesDone || 0
+      q.innerHTML = `${esc(quiet.day)} 只起了 <strong>${started}</strong> 件事、做成 ${done} 件。`
+        + '这一天<strong>看起来什么都没发生</strong>，但它是正常的 —— 而且这条记录照样在，不藏。'
+    }
+    box.hidden = false
+  }
+
+  fetch('assets/life-demo.json', { cache: 'no-cache' })
+    .then((r) => {
+      if (!r.ok) throw new Error('HTTP ' + r.status)
+      return r.json()
+    })
+    .then((data) => {
+      if (!data || !Array.isArray(data.dayReports) || !data.dayReports.length) {
+        throw new Error('数据里没有逐日记录')
+      }
+      render(data)
+    })
+    .catch((err) => {
+      host.innerHTML = '<p class="data-status bad">取不到 assets/life-demo.json（' + esc(err.message)
+        + '）。这一节不显示任何数字，而不是显示上一次跑出来的旧数字。'
+        + '自己跑一遍：<code>node tools/demo-data.mjs</code>。</p>'
+    })
+})()
+</script>
 
 </body>
 </html>

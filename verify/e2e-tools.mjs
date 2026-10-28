@@ -28,7 +28,9 @@ try {
   console.error(`\n${err.message}\n`)
   process.exit(1)
 }
-const HOME = process.env.E2E_DSH_HOME || path.join(os.tmpdir(), 'dsh-life-e2e-home')
+// 带随机后缀：e2e 是最贵的一套，也是并发互踩最容易被看见的一套
+// （固定名字时并发跑会出现 `dsh composes a new profile ...` 失败）。
+const HOME = process.env.E2E_DSH_HOME || fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-life-e2e-'))
 const PLUGIN = path.join(REPO, 'packages', 'dsh-life')
 
 fs.rmSync(HOME, { recursive: true, force: true })
