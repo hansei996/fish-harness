@@ -21,7 +21,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
 | [`tools/`](tools/) | 四个工具：`day-report` 把账本渲染成人能读的「它的一天」；`life-week` 把七天压缩跑完，产出「它的一周」；`demo-data` 把那一周导出成对外页面引用的数据；`facts` 量出文档里不许手抄的那些数字 |
 <!-- facts:verify-summary -->
-| [`verify/`](verify/) | 11套共 **246 项**；另有一条 opt-in 的真实唤醒检查（3 项） |
+| [`verify/`](verify/) | 12套共 **268 项**；另有一条 opt-in 的真实唤醒检查（3 项） |
 <!-- /facts:verify-summary -->
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
@@ -31,6 +31,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`docs/SCENARIOS.md`](docs/SCENARIOS.md) | **落地剧本**：三个场景的逐时刻动作，每个动作标 `[实]`/`[缺]`，并附「怎么核对」的判据 |
 | [`docs/index.html`](docs/index.html) | **对外页面**：单页静态站点，GitHub Pages 直接从 `docs/` 发布 |
 | [`docs/scenarios.html`](docs/scenarios.html) | **三个落地场景的详版原型**：4 幕 × 6 拍，可点走，每拍标「已实现 / 设想」 |
+| [`docs/framework.html`](docs/framework.html) | **一张总图**：代码模块 + 技术框架 + 磁盘画在一次 —— dsh 自带什么、我们挂在哪些扩展点、九个模块谁 import 谁、写到哪 |
 | [`docs/memory-architecture.html`](docs/memory-architecture.html) | **技术架构总图**：dsh 的模块与生命层的模块画在一起，标出 6 个真实接线点 |
 | [`docs/module-graph.html`](docs/module-graph.html) | **模块依赖图**：9 个模块谁 import 谁，哪些是纯函数（可脱离 dsh 单跑） |
 | [`docs/install-path.html`](docs/install-path.html) | **开箱即用路径**：正确顺序 vs 会静默失败的陷阱，附裸 profile 缺的服务清单 |
@@ -40,7 +41,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`docs/wake-e2e.md`](docs/wake-e2e.md) | 真实 web profile 下一次真实唤醒的实测记录 |
 | [`docs/ci.md`](docs/ci.md) | CI 的固定项与理由 |
 <!-- facts:verify-workflow -->
-| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍11套 verify（smoke / day-report / demo-data / life-week / ui / publish / e2e / pack / landing / market / scenarios） |
+| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍12套 verify（smoke / day-report / demo-data / life-week / ui / publish / e2e / pack / landing / market / scenarios / framework） |
 <!-- /facts:verify-workflow -->
 
 ---
@@ -400,7 +401,7 @@ outbox.json       发布草稿与回执 · 幂等键 · 三档修剪（committed
 ## 验证
 
 <!-- facts:verify-headline -->
-11套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。合计 **246 项**：存储/策略/soak 70 + 当天报告 28 + 数据产物 18 + 七天连续 16 + 界面 28 + 发布线 27 + 真实 dsh 端到端 17 + 打包安装 9。
+12套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。合计 **268 项**：存储/策略/soak 70 + 当天报告 28 + 数据产物 18 + 七天连续 16 + 界面 28 + 发布线 27 + 真实 dsh 端到端 17 + 打包安装 9。
 <!-- /facts:verify-headline -->
 
 <!-- facts:verify-commands -->
@@ -416,6 +417,7 @@ DSH_BIN=<dsh bin> node verify/pack-install.mjs    # 9 项 · 打出来的包能�
 node verify/landing.mjs                           # 17 项 · 落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）
 node verify/market.mjs                            # 5 项 · 市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）
 node verify/scenarios.mjs                         # 11 项 · 落地剧本的每个引用都真实存在，且「未实现」的标记与 STORY.md 口径一致
+node verify/framework.mjs                         # 22 项 · 技术总图（docs/framework.html）上画的 import 边 / 挂载 API / 生成块里的数字全部对着源码核（离线口径；装了 dsh 时手动跑可多核 dsh 包规模 3 条）
 DSH_BIN=<dsh bin> node verify/live/wake-live.mjs  # 可选 · 真实 web profile 的一次真实唤醒（先体检安装）
 # 另外：node verify/claims.mjs 核对文档里这些数字有没有过期
 # （它不在上面的项数里 —— 它数的就是这些项数，不能自己数自己）

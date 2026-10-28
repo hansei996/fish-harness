@@ -3,7 +3,7 @@
 五套验证：`smoke`、`day-report`、`life-week` 只依赖本地文件；`e2e` 与 `pack` 需要**真的 dsh**，不是 mock：
 
 <!-- facts:verify-table -->
-| 套件 | 查什么 | 本机实测（合计 246 项） |
+| 套件 | 查什么 | 本机实测（合计 268 项） |
 |---|---|---|
 | `verify/smoke.mjs` | 70 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性）（需要真 dsh） | 70/70 通过 |
 | `verify/day-report.mjs` | 28 项：当天报告工具（不需要真 dsh） | 28/28 通过 |
@@ -16,6 +16,7 @@
 | `verify/landing.mjs` | 17 项：落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）（不需要真 dsh） | 17/17 通过 |
 | `verify/market.mjs` | 5 项：市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）（不需要真 dsh） | 5/5 通过 |
 | `verify/scenarios.mjs` | 11 项：落地剧本的每个引用都真实存在，且「未实现」的标记与 STORY.md 口径一致（不需要真 dsh） | 11/11 通过 |
+| `verify/framework.mjs` | 22 项：技术总图（docs/framework.html）上画的 import 边 / 挂载 API / 生成块里的数字全部对着源码核（离线口径；装了 dsh 时手动跑可多核 dsh 包规模 3 条）（不需要真 dsh） | 22/22 通过 |
 | `verify/claims.mjs` | 文档里的数字有没有过期（它数的就是上面这些项数，所以不计入合计） | 见 `node verify/claims.mjs` |
 <!-- /facts:verify-table -->
 
