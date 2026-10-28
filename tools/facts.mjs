@@ -297,7 +297,10 @@ export const BLOCKS = [
       if (!facts.verify) throw new Error('verify-headline 需要 --suites 真跑的结果')
       const n = facts.verify.suites.length
       const zh = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'][n] || String(n)
-      const sn = (name) => (facts.verify.suites.find((s) => s.name === name) || {}).count || '?'
+      const sn = (name) => {
+        const s = facts.verify.suites.find((x) => x.name === name) || {}
+        return s.skipped ? '未跑' : (s.count ?? '?')
+      }
       const per = `存储/策略/soak ${sn('smoke')} + 当天报告 ${sn('day-report')} + 数据产物 ${sn('demo-data')}`
         + ` + 七天连续 ${sn('life-week')} + 界面 ${sn('ui')} + 发布线 ${sn('publish')}`
         + ` + 真实 dsh 端到端 ${sn('e2e')} + 打包安装 ${sn('pack')}`
@@ -321,8 +324,11 @@ export const BLOCKS = [
         const role = SUITE_ROLES[s.name]
         const prefix = role.needsDsh ? 'DSH_BIN=<dsh bin> ' : ''
         const cmd = `${prefix}node ${s.file}`
+        // 自己跳过的套件（这台机器缺工具）不写「null 项」—— 那会被读成
+        // 「这套没有断言」。写成「本机未跑」，并说明为什么。
+        const what = s.skipped ? `${role.what}（本机未跑：缺工具）` : `${s.count} 项 · ${role.what}`
         // 命令要留一列再写注释；DSH_BIN 那几条前缀很长，用 50 才能都对齐。
-        return `${cmd.padEnd(50)}# ${s.count} 项 · ${role.what}`
+        return `${cmd.padEnd(50)}# ${what}`
       })
       lines.push(
         'DSH_BIN=<dsh bin> node verify/live/wake-live.mjs'.padEnd(50) +
@@ -389,7 +395,7 @@ export const BLOCKS = [
         '| --- | --- | --- | --- |',
         ...rows.map(([name, file, what, dsh]) => {
           const s = byName.get(name)
-          const cell = s.skipped ? '**—**（本机无浏览器）' : `**${s.count}**`
+          const cell = s.skipped ? '**—**（本机未跑）' : `**${s.count}**`
           return `| \`${file}\` | ${cell} | ${what} | ${dsh ? '是' : '否'} |`
         }),
         '| `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |',
@@ -419,6 +425,9 @@ export const BLOCKS = [
       const rows = Object.keys(fileOf).map((name) => {
         const s = byName.get(name)
         const role = SUITE_ROLES[name]
+        if (s.skipped) {
+          return `| \`${fileOf[name]}\` | 本机未跑（缺浏览器等工具）：${role.what} | — |`
+        }
         return `| \`${fileOf[name]}\` | ${s.count} 项：${role.what}${role.needsDsh ? '（需要真 dsh）' : '（不需要真 dsh）'} | ${s.passed}/${s.total} 通过${s.ok ? '' : ' ⚠'} |`
       })
       return [

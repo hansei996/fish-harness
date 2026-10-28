@@ -43,14 +43,18 @@ const skip = (label, detail = '') => console.log(`SKIP  ${label}${detail ? ` —
 
 // ---- 找到 Playwright（找不到就跳过，不当成失败）----------------------------
 async function loadChromium () {
+  // 依次尝试，第一个能 import 出 chromium 的就用：
+  //   1. `PLAYWRIGHT_PATH` —— 显式指定，CI 与开发机都用得上；
+  //   2. 仓库自己的 node_modules —— CI 里 `npm i -D playwright` 的情形；
+  //   3. `npx playwright` 留在 npm 缓存里的那份 —— 开发机上最常见的形态；
+  //   4. 裸包名 —— 交给 node 自己按父目录解析。
   const candidates = [
-    // 显式指过去（CI 里可以这么装一个；本机也可以）。
     process.env.PLAYWRIGHT_PATH,
-    // 本机用 npx 跑过 playwright 时留下的那份 —— 开发机的常态。
+    path.join(REPO, 'node_modules/playwright/index.mjs'),
+    path.join(REPO, 'packages/dsh-life/node_modules/playwright/index.mjs'),
     ...(process.env.HOME ? [
       path.join(process.env.HOME, '.npm/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs'),
     ] : []),
-    // 直接依赖（如果仓库或父目录装过）。这个名字不是路径，import 会按包解析。
     'playwright',
   ].filter(Boolean)
 
@@ -61,7 +65,8 @@ async function loadChromium () {
       // ERR_UNSUPPORTED_ESM_URL_SCHEME。有意思的是，抓到这个的是仓库自己的
       // 那条断言（verify/day-report.mjs 里扫动态 import 的那条），
       // 说明那条检查值它的价。
-      const spec = c.startsWith('/') ? c : path.resolve(REPO, c)
+      // 裸包名（'playwright'）交给 node 解析；路径必须过 pathToFileURL。
+      const spec = c.includes('/') ? path.resolve(REPO, c) : c
       const mod = await import(pathToFileURL(spec).href)
       const chromium = mod.chromium || mod.default?.chromium
       if (chromium) return chromium

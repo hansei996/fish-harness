@@ -48,6 +48,18 @@ jobs:
         with:
           node-version: 24
 
+      # Playwright + Chromium：`verify/landing.mjs` 需要它做像素级验证。
+      #
+      # 为什么值得在 CI 里装一个浏览器（约 30–60s）：不装的话那一套会自己 SKIP
+      # （`0/0`），而 SKIP 会让「合计多少项」随环境变 —— 生成块里的合计在 CI 上
+      # 与本地不同，`verify/claims.mjs` 就报假红。而且那正是这套要补的空白：
+      # 浏览器只在开发机上跑，等于「像素级没验」这句话在 CI 上依然成立。
+      #
+      # 失败不阻断：装不上就退化成 SKIP，其余套件照跑（缺工具不该被读成页面坏了）。
+      - name: Install Playwright Chromium (for landing pixel checks)
+        continue-on-error: true
+        run: npx --yes playwright@1.49.1 install --with-deps chromium
+
       - name: Show tool versions
         run: |
           node --version
