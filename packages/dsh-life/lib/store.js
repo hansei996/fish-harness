@@ -612,15 +612,42 @@ export class LifeStore {
     activity.lastFinished = finished
     // The recorded next step is the hand-off to the next wake. A failed attempt
     // keeps whatever it wrote; an explicit `next` always wins.
-    activity.next = next && typeof next === 'object' && typeof next.what === 'string' && next.what.trim()
-      ? { what: next.what.trim(), why: typeof next.why === 'string' ? next.why : '', at: this.nowIso() }
-      : null
+    //
+    // Two ways the hand-off can be destroyed, and the second one hid for a
+    // while — a real seven-day run produced **zero** 接着做「X」 starts even
+    // though `choose.js` implements that branch and this field was being
+    // written:
+    //
+    //   1. finishing the recorded step itself must clear it (below);
+    //   2. finishing *anything else* must NOT — and this used to write `null`
+    //      unconditionally. `startActivity` had already been taught to preserve
+    //      a pending step ("one wake-up that chose to rest destroyed the
+    //      hand-off for good"), and then this line undid that one step later.
+    //      Unfinished business has to stay unfinished until it is taken.
+    if (next && typeof next === 'object' && typeof next.what === 'string' && next.what.trim()) {
+      activity.next = { what: next.what.trim(), why: typeof next.why === 'string' ? next.why : '', at: this.nowIso() }
+    } else if (activity.next && sameStep(activity.next.what, finished.what)) {
+      // The step that just finished *was* the recorded next step, so it is done
+      // with. Compared with the same loose matcher `startActivity` uses, because
+      // the chooser re-phrases the step (接着做「X」 / 再试一次「X」) when it hands
+      // it to the model — an exact match would never fire.
+      activity.next = null
+    }
     activity.updatedAt = this.nowIso()
     writeJsonAtomic(this.files.activity, activity)
     // Evidence belongs in the ledger too: it is the append-only record the day
     // report and any later reconciliation read. It used to be written only to
     // activity.json, so the one durable, ordered trace of what happened dropped
     // the very thing the evidence rule (PLAN.md §3.3) depends on.
+    //
+    // `next` belongs there for the same reason, and it was missing for longer.
+    // The hand-off to the next wake is the most quoted behaviour of this
+    // product ("留下一个明天要继续的事", PRODUCT.md §4.2), yet it lived only in
+    // activity.json — which is "now", not history. Two consequences:
+    // `tools/day-report.mjs` could not show it at all, and once a later start
+    // consumed the field (startActivity clears it) the causal chain was gone
+    // from the record entirely. The state file may hold only the *pending* step;
+    // the ledger has to remember that one was ever recorded.
     this.appendLedger({
       kind: 'activity-end',
       detail: {
@@ -629,6 +656,9 @@ export class LifeStore {
         outcome,
         note,
         evidence: finished.evidence,
+        ...(next && typeof next === 'object' && typeof next.what === 'string' && next.what.trim()
+          ? { next: { what: next.what.trim(), why: typeof next.why === 'string' ? next.why : '' } }
+          : {}),
       },
     })
     return finished

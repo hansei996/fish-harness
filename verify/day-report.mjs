@@ -42,11 +42,24 @@ const store = new LifeStore({ home: HOME, lifeId: 'demo' })
 store.ensure({ name: '大肥鱼', species: 'whale', seeds: ['懒'] })
 store.recordInterest({ topic: '挖矿类小品', confidence: 0.8, source: 'experience' })
 store.startActivity({ what: '练第 38 层', why: '昨天挂了两次' })
-store.finishActivity({ outcome: 'failed', evidence: ['save:38'], note: '没补药水' })
+store.finishActivity({
+  outcome: 'failed',
+  evidence: ['save:38'],
+  note: '没补药水',
+  next: { what: '先去补给站买药水', why: '上次就是耗死的' },
+})
 const cmt = store.makeCommitment({ what: '写进技能经验', dueAt: '2026-10-28' })
 store.settleCommitment({ id: cmt.id, status: 'done', evidence: 'note' })
 store.startActivity({ what: '写段子草稿', why: '挂得有节奏' })
 store.finishActivity({ outcome: 'done', evidence: ['draft:1'] })
+// 唤醒：账本是唯一可回放的记录，所以唤醒次数必须能从账本数出来。
+// 这一行是被下面那条断言抓出来的 bug 的反面 —— 旧实现读 `wake.deliveries`
+// （这个字段从不存在，真实字段是 lastMessageIds），于是 wakes 恒为 null、
+// 「自己醒来 N 次」那行永远不显示，而**没有任何东西报错**。
+store.noteWake({ sessionId: 's', messageId: 'w-1', at: new Date() })
+store.appendLedger({ kind: 'wake', detail: { messageId: 'w-1', sessionId: 's' } })
+store.noteWake({ sessionId: 's', messageId: 'w-2', at: new Date() })
+store.appendLedger({ kind: 'wake', detail: { messageId: 'w-2', sessionId: 's' } })
 for (let i = 0; i < 5; i++) store.appendLedger({ kind: 'turn', detail: { sessionId: 's', turn: i } })
 const today = localDay(new Date().toISOString())
 function localDay (iso) {
@@ -62,6 +75,8 @@ check('translates activity start into a sentence with its reason',
   human.out.includes('开始：练第 38 层') && human.out.includes('昨天挂了两次'))
 check('shows the failure with its evidence',
   human.out.includes('没做成') && human.out.includes('证据 save:38'))
+check('a failure also shows the step it left for tomorrow',
+  human.out.includes('先去补给站买药水'), '失败留下的下一步（PRODUCT.md §4.2）')
 check('shows the success distinctly', human.out.includes('做成了'))
 check('translates interest with confidence and source',
   human.out.includes('挖矿类小品') && human.out.includes('0.8') && human.out.includes('经历'))
@@ -70,7 +85,14 @@ check('summarises the day rather than listing everything raw',
   human.out.includes('起了 2 件事') && human.out.includes('做成 1 件') && human.out.includes('没成 1 件'))
 check('counts turns separately from activities',
   human.out.includes('对话往返 5 次'))
+check('counts wake-ups from the ledger, not from a wake.json field that does not exist',
+  human.out.includes('自己醒来 2 次'), 'ledger 里有两条 kind:wake')
+check('does not print the wake line when there were none',
+  !human.out.includes('自己醒来 0 次'), '0 次不该占一行')
 check('suggests what tomorrow holds', human.out.includes('明天大概会'))
+check('tomorrow prefers the hand-off it wrote itself over a vague interest',
+  human.out.includes('记着要做：先去补给站买药水'),
+  '失败留下的下一步是最具体的信号，不能被「兴趣最高的方向」盖住')
 check('does not leak raw event kinds into the human view',
   !/(activity-start|activity-end|commitment-settled)/.test(human.out))
 
@@ -84,8 +106,12 @@ check('--json carries structured events with tone',
   parsed.events.some((e) => e.kind === 'activity-end' && e.tone === 'warn'))
 check('--json keeps evidence as data, not prose',
   parsed?.events.some((e) => Array.isArray(e.evidence) && e.evidence.includes('save:38')))
+check('--json exposes the hand-off as data too, so a page can render it',
+  parsed?.events.some((e) => e.next && e.next.what === '先去补给站买药水'))
 check('--json reports the same stats as the human view',
   parsed?.stats?.activitiesStarted === 2 && parsed?.stats?.turns === 5)
+check('--json reports wakes as a number, never null, when the ledger has wake rows',
+  parsed?.stats?.wakes === 2, `wakes=${JSON.stringify(parsed?.stats?.wakes)}`)
 
 // ---------- 3. degenerate inputs ----------
 const empty = await run(['--life', 'demo', '--date', '2020-01-01'])

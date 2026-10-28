@@ -173,15 +173,27 @@ function describe (row) {
         : '结束了'
       const why = d.note ? `：${d.note}` : ''
       const proof = ev.length ? `｜证据 ${ev.join('、')}` : ''
+      // 失败留下的「下一步」也要显示出来：那是第二天能接上的原因
+      // （docs/PRODUCT.md §4.2），而这个产品最被引用的一句话就是它。
+      // 只显示「没做成」而不显示「它给自己留了什么」，等于把因果链砍掉一半。
+      const handoff = d.next && typeof d.next === 'object' && d.next.what
+        ? `｜留下：${d.next.what}`
+        : ''
       return {
         kind: 'activity-end', tone: d.outcome === 'done' ? 'good' : 'warn',
-        text: `${outcome}${why}${proof}`,
+        text: `${outcome}${why}${proof}${handoff}`,
         evidence: ev,
+        next: d.next && typeof d.next === 'object' ? { what: d.next.what, why: d.next.why || '' } : null,
       }
     }
 
     case 'turn':
       return { kind: 'turn', tone: 'noise', text: null } // 不展示，只计数
+
+    // 唤醒也进账本（lib/index.js 在 schedule 投递时写 kind:'wake'）。
+    // 它不进时间线：一天醒六次会把真正发生的事情淹掉；它只进底部的计数。
+    case 'wake':
+      return { kind: 'wake', tone: 'noise', text: null }
 
     default:
       return { kind: k || 'unknown', tone: 'noise', text: null }
@@ -228,9 +240,16 @@ function buildDay (args, day) {
     .filter((c) => c.status === 'open')
 
   // 「明天想做什么」——按优先级取第一个能解释的来源，而不是编一句话。
+  //
+  // 失败留下的下一步排在最前（仅次于「现在正在做」）：它是它自己写下的、
+  // 最具体的一句，比「承诺」和「兴趣最高的方向」都更接近「明天会做什么」。
+  // 这一段原本没有读 `activity.next`，于是日志里最该被看见的那条因果链
+  // （今天没成 → 明天接着做）在页面上反而不出现。
   let tomorrow = null
   if (activity && activity.current) {
     tomorrow = `还在进行：${activity.current.what}`
+  } else if (activity && activity.next && activity.next.what) {
+    tomorrow = `记着要做：${activity.next.what}`
   } else if (openCommitments.length) {
     tomorrow = `答应过还没做：${openCommitments[0].what}`
   } else if (traits && Array.isArray(traits.interests) && traits.interests.length) {
@@ -238,7 +257,16 @@ function buildDay (args, day) {
     tomorrow = `最可能接着做：${top.topic}`
   }
 
-  const awake = (wake && Array.isArray(wake.deliveries)) ? wake.deliveries.filter((d) => localDay(d.at || d.time) === day).length : null
+  // 唤醒次数从**账本**数，不从 wake.json 数。
+  //
+  // 这里原本读的是 `wake.deliveries` —— 一个不存在的字段（wake.json 里存的是
+  // `lastMessageIds`，一串消息 id，没有时间戳，跨天还会被截到最近 20 条）。
+  // 后果是 wakes 恒为 null，而 null 被下面的渲染跳过，于是「自己醒来 N 次」
+  // 这一行**永远不会显示**，也没有任何东西报错。是 verify/day-report.mjs 的
+  // 断言把它逼出来的。
+  //
+  // 账本才是唯一可回放的记录（kind:'wake' 带 messageId），所以数它。
+  const awake = rows.filter((r) => r.kind === 'wake').length
 
   return {
     day,

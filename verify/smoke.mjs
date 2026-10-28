@@ -27,7 +27,11 @@ try {
   console.error(`\n${err.message}\n`)
   process.exit(1)
 }
-const HOME = process.env.VERIFY_DSH_HOME || path.join(os.tmpdir(), 'dsh-life-verify-home')
+// 默认目录必须带随机后缀：这个仓库里同时有多个 agent/进程在跑 verify，
+// 固定名字 + 开头 rmSync 会让两个并发进程互相把对方的目录删掉。
+// 实测过：并发跑两次 e2e，一次 16/17（`dsh composes a new profile from the
+// shipped headless template` 失败）。用 mkdtempSync 之后两边都 17/17。
+const HOME = process.env.VERIFY_DSH_HOME || fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-life-verify-'))
 
 // Hermetic. The plugin resolves its data directory from DSH_HOME, so set it in
 // this process as well as in spawned children; otherwise a developer's real
@@ -175,6 +179,23 @@ check('the finished activity keeps its outcome and evidence',
     snapshotNext === '换成 SPI 再试一次',
     `next=${JSON.stringify(written)}; snapshot=${JSON.stringify(snapshotNext)}`)
 
+  // ...and it must be in the **ledger**, not only in activity.json.
+  //
+  // The ledger is the one append-only, replayable trace of what happened; the
+  // state files hold only "now". A hand-off recorded solely in activity.json is
+  // invisible to anything that reads history — tools/day-report.mjs could not
+  // show "it left itself a step for tomorrow", which is the single most quoted
+  // behaviour of this product (docs/PRODUCT.md §4.2). It also means the causal
+  // chain would vanish from the record the moment a later start cleared the
+  // field, i.e. exactly when someone would want to look it up.
+  {
+    const ends = store.readLedger({ limit: 0, kind: 'activity-end' })
+    const last = ends[ends.length - 1]
+    check('a recorded next step reaches the ledger, not just activity.json',
+      last && last.detail && last.detail.next && last.detail.next.what === '换成 SPI 再试一次',
+      `ledger detail.next=${JSON.stringify(last && last.detail && last.detail.next)}`)
+  }
+
   // Unfinished business must survive doing something else in between. The first
   // version cleared `next` on *any* start, so one wake-up that chose to rest
   // destroyed the hand-off for good — the exact opposite of §4.2. It is cleared
@@ -185,6 +206,22 @@ check('the finished activity keeps its outcome and evidence',
     survived && survived.what === '换成 SPI 再试一次',
     `next=${JSON.stringify(survived)}`)
   store.finishActivity({ outcome: 'done', evidence: ['note:1'] })
+
+  // ...and it must still be there *after* that other thing finishes.
+  //
+  // This survived a `startActivity` but not the `finishActivity` that followed:
+  // finishing without an explicit `next` wrote `activity.next = null`
+  // unconditionally. The hand-off then lived for at most one wake-up, which is
+  // why a real seven-day run contained **zero** 接着做「X」 starts even though
+  // the branch was implemented and the field was being written. `startActivity`
+  // had the care to preserve it; `finishActivity` undid that one step later.
+  // Unfinished business has to stay unfinished until it is actually taken.
+  {
+    const stillThere = store.readActivity().next
+    check('a recorded next step also survives finishing something else (it is unfinished business, not a one-wake note)',
+      stillThere && stillThere.what === '换成 SPI 再试一次',
+      `next=${JSON.stringify(stillThere)}`)
+  }
 
   // ...and is cleared once it is actually carried out. Loose matching on
   // purpose: the chooser re-phrases the step as 接着做「X」/ 再试一次「X」.

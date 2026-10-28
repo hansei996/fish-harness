@@ -214,8 +214,19 @@ function runWake ({ store, now, random, seenFailures, log }) {
   const today = dayKeyOf(now)
   const countToday = wake.dayKey === today ? wake.countToday : 0
 
-  // 记账：真实系统里由 schedule 投递触发（store.noteWake 幂等）。
-  store.noteWake({ sessionId: 'week', messageId: `week-${now.getTime()}`, at: now })
+  // 记账：真实系统里由 schedule 投递触发（store.noteWake 幂等），
+  // 并且 index.js 在同一处会往账本补一条 kind:'wake'（见 lib/index.js 的
+  // user/message 分支）。两件事必须一起做。
+  //
+  // 这里原本只调了 noteWake、没写账本那一行 —— 于是「自己醒了几次」只存在于
+  // 这个模拟器的日志里，任何**读账本**的视图（tools/day-report.mjs）都数不到，
+  // 两个视图对同一件事实给出不同答案。是 verify/day-report.mjs 的断言把它逼出来的：
+  // 账本是唯一可回放的记录，凡是「发生过」的事都必须落在那儿。
+  const messageId = `week-${now.getTime()}`
+  const noted = store.noteWake({ sessionId: 'week', messageId, at: now })
+  if (noted.counted) {
+    store.appendLedger({ kind: 'wake', detail: { messageId, sessionId: 'week' } })
+  }
 
   const ranked = rankCandidates({
     now,
