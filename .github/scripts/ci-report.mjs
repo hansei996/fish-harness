@@ -55,6 +55,10 @@ const suites = [
   { name: 'scenarios', file: 'verify-scenarios.log', outcome: process.env.SCENARIOS_OUTCOME },
   // framework 守的是总览图（docs/framework.html）：图上的边与数必须与源码一致。
   { name: 'framework', file: 'verify-framework.log', outcome: process.env.FRAMEWORK_OUTCOME },
+  // video 守的是视频发布线：标注、核验、批准绑定文件字节。
+  { name: 'video', file: 'verify-video.log', outcome: process.env.VIDEO_OUTCOME },
+  // 入库的视频物证是否还带着当前规则的标识（物证不许过期）。
+  { name: 'video evidence', file: 'verify-video-evidence.log', outcome: process.env.VIDEOEVIDENCE_OUTCOME },
   // claims 守的是「文档里的数字不许手抄、不许回流成旧值」。它读的正是前面那些
   // 套件的项数，所以**只出现一次，且排在最后** —— 两处一样的条目曾经让这个
   // workflow 与这份报告各有一份重复（一个人加的、另一个人也加了），

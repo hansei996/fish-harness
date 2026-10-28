@@ -21,7 +21,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
 | [`tools/`](tools/) | 四个工具：`day-report` 把账本渲染成人能读的「它的一天」；`life-week` 把七天压缩跑完，产出「它的一周」；`demo-data` 把那一周导出成对外页面引用的数据；`facts` 量出文档里不许手抄的那些数字 |
 <!-- facts:verify-summary -->
-| [`verify/`](verify/) | 12套共 **269 项**；另有一条 opt-in 的真实唤醒检查（3 项） |
+| [`verify/`](verify/) | 13套共 **306 项**；另有一条 opt-in 的真实唤醒检查（3 项） |
 <!-- /facts:verify-summary -->
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
@@ -41,7 +41,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`docs/wake-e2e.md`](docs/wake-e2e.md) | 真实 web profile 下一次真实唤醒的实测记录 |
 | [`docs/ci.md`](docs/ci.md) | CI 的固定项与理由 |
 <!-- facts:verify-workflow -->
-| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍12套 verify（smoke / day-report / demo-data / life-week / ui / publish / e2e / pack / landing / market / scenarios / framework） |
+| [`.github/workflows/verify.yml`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍13套 verify（smoke / day-report / demo-data / life-week / ui / publish / e2e / pack / landing / market / scenarios / framework / video） |
 <!-- /facts:verify-workflow -->
 
 ---
@@ -349,15 +349,16 @@ node tools/day-report.mjs --json              # 供程序消费（带 tone 与 e
 | --- | --- | --- |
 | `lib/choose.js` | 703 | 活动选择器：七项加权、理由与明细、休息恒存；时钟可注入、无随机 |
 | `lib/compliance.js` | 118 | 内容标识：显式 + 隐式、「没有 strip 函数」的硬闸 |
-| `lib/config.js` | 287 | 零依赖 Standard Schema 校验器（唤醒 / 选择器 / 发布） |
-| `lib/index.js` | 1590 | 插件入口：注册 17 个工具、注入上下文、监听会话事件、向 `schedule` 布防、发布线接线 |
-| `lib/outbox.js` | 849 | 发布状态机：`draft → checked → approved → sending → confirmed / unconfirmed / failed`、幂等键、三档修剪 |
+| `lib/config.js` | 313 | 零依赖 Standard Schema 校验器（唤醒 / 选择器 / 发布） |
+| `lib/index.js` | 1861 | 插件入口：注册 17 个工具、注入上下文、监听会话事件、向 `schedule` 布防、发布线接线 |
+| `lib/outbox.js` | 914 | 发布状态机：`draft → checked → approved → sending → confirmed / unconfirmed / failed`、幂等键、三档修剪 |
 | `lib/store.js` | 737 | 生命状态机：三档变量、承诺、关系、账本、唤醒绑定、outbox；原子落盘 |
-| `lib/telegram.js` | 133 | Telegram 适配器（假 fetch 可测、错误里擦 token、平台不可反查就照实说） |
+| `lib/telegram.js` | 238 | Telegram 适配器（文本 + 视频上传；假 fetch 可测、错误里擦 token、平台不可反查就照实说） |
 | `lib/ui.js` | 179 | Host 半身：`/life/state.json` 现读真实状态，私密内容不出 Host |
+| `lib/video.js` | 428 | 视频标注：每帧烧显式标识 + 容器写隐式标识，并**回读首帧像素**证明它真的烧进去了；没有 ffmpeg 就拒绝，绝不发原片 |
 | `lib/wake.js` | 238 | 唤醒策略纯函数：静默区间、`every ± jitter`、不跳日夹取、明日兜底；随机量可注入 |
 | `client/life-overview.js` | 176 | 浏览器半身：手写 lazy-CJS、只 `require('react')`、零构建 |
-| **合计** | **5010** | 9 个宿主文件 + 1 个客户端文件，零自有依赖 |
+| **合计** | **5905** | 10 个宿主文件 + 1 个客户端文件，零自有依赖 |
 <!-- /facts:file-table -->
 
 **为什么零自有依赖**：插件会被装进 npm CLI 或内置 Electron 运行时，两者依赖解析根不同。只用 Node 内置模块，才能保证在两种环境下都加载得起来。
@@ -401,7 +402,7 @@ outbox.json       发布草稿与回执 · 幂等键 · 三档修剪（committed
 ## 验证
 
 <!-- facts:verify-headline -->
-12套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。合计 **269 项**：存储/策略/soak 70 + 当天报告 28 + 数据产物 18 + 七天连续 16 + 界面 28 + 发布线 27 + 真实 dsh 端到端 17 + 打包安装 9。
+13套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。合计 **306 项**：存储/策略/soak 70 + 当天报告 28 + 数据产物 18 + 七天连续 16 + 界面 28 + 发布线 40 + 真实 dsh 端到端 17 + 打包安装 9。
 <!-- /facts:verify-headline -->
 
 <!-- facts:verify-commands -->
@@ -411,13 +412,14 @@ node verify/day-report.mjs                        # 28 项 · 当天报告工具
 node verify/demo-data.mjs                         # 18 项 · 对外页面引用的那份数据产物与实现一致（含时区稳定性）
 node verify/life-week.mjs                         # 16 项 · 连跑七天
 node verify/ui.mjs                                # 28 项 · 界面那半边的包清单 / 桩 loader / host 路由 / 私密不外泄
-node verify/publish.mjs                           # 27 项 · 发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）
+node verify/publish.mjs                           # 40 项 · 发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs       # 17 项 · 真实 dsh 端到端
 DSH_BIN=<dsh bin> node verify/pack-install.mjs    # 9 项 · 打出来的包能不能装进 profile 并激活
-node verify/landing.mjs                           # 17 项 · 落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）
+node verify/landing.mjs                           # 19 项 · 落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）
 node verify/market.mjs                            # 5 项 · 市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）
 node verify/scenarios.mjs                         # 11 项 · 落地剧本的每个引用都真实存在，且「未实现」的标记与 STORY.md 口径一致
 node verify/framework.mjs                         # 23 项 · 技术总图（docs/framework.html）上画的 import 边 / 挂载 API / 生成块里的数字全部对着源码核（离线口径；装了 dsh 时手动跑可多核 dsh 包规模 3 条）
+node verify/video.mjs                             # 22 项 · 视频发布线：每帧烧标识 + 容器隐式标识 + 回读首帧像素证明真的烧进去了；批准绑定文件字节（换文件拦得住）
 DSH_BIN=<dsh bin> node verify/live/wake-live.mjs  # 可选 · 真实 web profile 的一次真实唤醒（先体检安装）
 # 另外：node verify/claims.mjs 核对文档里这些数字有没有过期
 # （它不在上面的项数里 —— 它数的就是这些项数，不能自己数自己）
@@ -498,6 +500,7 @@ DSH_BIN=<dsh bin> node verify/live/wake-live.mjs  # 可选 · 真实 web profile
 - **活动选择是排序器给的候选，不是命令。** `lib/choose.js` 把承诺紧迫度、兴趣、未完成事项、技能、探索加成和切换成本算成一份**带理由**的短名单（`休息` 永远在名单里、分数固定 0.35），只在唤醒轮注入（≤600 字符）。它还不会自己「学会」该偏好什么——权重是手写的，没有从经历里回归出参数。**模型是否照短名单行动也没验过。**
 - **真实 7 天无人干预仍未跑过。** 策略层用确定性模拟覆盖了「不跳日、不落静默、不超预算、跨天重置」这些不变量；真实长跑、真实凭据下的行为没测。会话归档会掐断唤醒（dsh `schedule` 的语义），归档策略还没定。
 - **`wakeEnabled: false` / `paused: true` 不撤销已排的闹钟**，只停止继续布防。
+- **视频发布没在真实平台上跑过。** 标注与核验在**真 ffmpeg** 上验过（`verify/video.mjs`：烧标识 + 回读首帧像素 + 「未标注素材必须被拒」的反例），上传路径在假 fetch 上验过 multipart 与摘要校验；但一次真实上传都没有。未验的还有：非 H.264 源、超 50MB、平台侧**重编码之后标识是否仍可见**（这是最可能出问题的一项 —— 平台转码可能改变画面）。
 - **发布线没在真实平台上跑过。** 状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷全部有断言，但**一次真实 Telegram 都没发过**（测试全是假 transport / 假 fetch）；**真实 Web 的批准弹窗也没点过**（e2e 是 headless，只能覆盖 `unavailable` 失败关闭）。跨进程并发与 `sending` 落盘后被 kill 的崩溃窗口未实测。
 - **加密钥不是安全边界。** token 不进模型上下文、不进账本/日志，但 dsh 官方明说 agent 工具进程与用户同 OS 用户；真正挡住「模型自发发帖」的是 approval + 工具边界。
 - **界面只验到「注册与数据」这一层，像素级没验。** 没有可驱动浏览器：我们证明了它进 boot manifest、被 shell 取到、在桩 loader 里注册成功并产出元素，以及 `/life/state.json` 返回真实状态；**没证明它被真的画出来**。`settings.section` 还是盲注册（slot props 契约看不到，已 try/catch 兜住）。

@@ -933,8 +933,40 @@
       <div>
         <b>这是规划图，不是已经接通了八个平台。</b>
         画的是「发出去会长什么样」，用来检查同一个形象与内容在各平台是否都成立。
-        现在的发布线只做了 Telegram 适配器的骨架（<a href="https://github.com/hansei996/fish-harness/blob/main/docs/PLAN.md">PLAN.md</a> §7.3），
+        现在的发布线接的是 Telegram（文本 + 视频上传），
         <strong>一次真实发送都还没跑过</strong> —— 所以这些是画出来的界面，不是截图。
+      </div>
+    </div>
+
+    <h3 style="margin-top:34px">视频不是只有机位 —— 它得先合规</h3>
+    <p class="muted" style="margin-bottom:14px">
+      动态可以是视频。但按《人工智能生成合成内容标识办法》，<strong>视频要在起始画面加显著标识</strong>（§4(4)），
+      而且<strong>隐式标识要写进文件元数据</strong>（§5）。所以视频这条路多一步、且不能省：
+      先标注、再核验，两个都过了才允许进入起草。
+      核验不是看 ffmpeg 的退出码 —— 是<strong>解码第一帧、比对像素</strong>，证明那行字真的烧进去了。
+    </p>
+    <figure class="hero-demo" style="margin-top:6px">
+      <div class="frame">
+        <img src="assets/video-label-frame0.png" alt="标注后的视频第一帧：画面左下角有「—— AI 生成 · 内容编号 post-20261028-a7f3」的标识框"
+             style="display:block;width:100%;height:auto">
+        <figcaption class="cap">
+          <span>第一帧 · 由 <code>showcase/bake-video-label.mjs</code> 用生产代码现场生成</span>
+          <span class="sp"><a href="assets/video-label-demo.mp4">下载这段 mp4 →</a></span>
+        </figcaption>
+      </div>
+    </figure>
+
+    <div class="note" style="margin-top:16px">
+      <span class="ic">✓</span>
+      <div>
+        <b>这张图是物证，不是示意图。</b>
+        它是<code>lib/video.js</code>对一段原始素材跑完标注之后的<strong>真实第一帧</strong>：
+        显式标识烧在画面上，隐式标识写在容器元数据里（<code>marker=dsh-life;synthetic=1;provider=dsh-life;contentId=…</code>）。
+        <code>verify/video.mjs</code>会回读这两样的每一处，并附带一个反例 ——
+        <strong>拿没标注的素材必须被拒</strong>。没有这个反例，「核验通过」只能证明检查会点头。
+        <br><br>
+        <strong>还没验的：</strong>一次真实上传都没有过；平台<strong>转码之后标识是否仍然可见</strong>也未验
+        （这是最可能出问题的一项）。
       </div>
     </div>
 
@@ -968,13 +1000,13 @@
 
     <div class="rows">
       <!-- facts:life-size -->
-      <div class="row"><span class="n">生命层：身份、兴趣、承诺、账本<span>9 个宿主文件 5010 行（含客户端半身 176 行），零自有依赖，17 个工具，8 个状态文件</span></span><span class="pill done">已完成</span></div>
+      <div class="row"><span class="n">生命层：身份、兴趣、承诺、账本<span>10 个宿主文件 5905 行（含客户端半身 176 行），零自有依赖，18 个工具，8 个状态文件</span></span><span class="pill done">已完成</span></div>
 <!-- /facts:life-size -->
       <div class="row"><span class="n">自主唤醒与活动选择器<span>自己醒来、在有限候选里选活动、按预算与作息约束</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">「它的一天」可读报告<span>把机器账本渲染成人话，失败照实说、结论带证据（就是上面那一屏）</span></span><span class="pill done">已完成</span></div>
       <div class="row"><span class="n">连跑七天（「它的一周」）<span>生产的 store / choose / wake，七天压缩跑完；当场抓出三件单日看不见的问题</span></span><span class="pill done">已完成</span></div>
       <!-- facts:verify-count -->
-      <div class="row"><span class="n">验证：269 项全绿<span>存储不变量 · 当天报告 · 连跑七天 · 界面注册 · 发布线 · 真实 dsh 端到端 · 打包安装</span></span><span class="pill done">已完成</span></div>
+      <div class="row"><span class="n">验证：306 项全绿<span>存储不变量 · 当天报告 · 连跑七天 · 界面注册 · 发布线 · 真实 dsh 端到端 · 打包安装</span></span><span class="pill done">已完成</span></div>
 <!-- /facts:verify-count -->
       <div class="row"><span class="n">连续 7 天真实运行<span>七天生活骨架已验证，但「真实跑」要等有模型的运行 —— 模拟证明不了「模型会照它过日子」</span></span><span class="pill part">进行中</span></div>
       <div class="row"><span class="n">界面<span>七页可交互原型已就绪，尚未做成真实插件视图</span></span><span class="pill part">原型</span></div>

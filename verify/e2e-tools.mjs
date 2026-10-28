@@ -127,7 +127,12 @@ if (fs.existsSync(probeOut)) {
   const lifeSection = (captured.sections || []).find((s) => /life/.test(s.name || ''))
   check('the life context reached the assembled system prompt', Boolean(lifeSection), lifeSection ? lifeSection.name : 'not found')
   const lifeTools = (captured.tools || []).filter((t) => /^life_/.test(t.name || ''))
-  check('all life tools are visible to the model', lifeTools.length === 17, `${lifeTools.length} tools`)
+  // 从源码数定义了几个工具，比「注册给模型的 == 定义的」。写死数字的话，
+  // 每加一个工具这条都会红，而它真正要守的是「dsh 里能看到全部工具」。
+  const declared = [...fs.readFileSync(path.join(PLUGIN, 'lib', 'index.js'), 'utf8')
+    .matchAll(/name: '(life_[a-z_]+)'/g)].length
+  check('all declared life tools are visible to the model', lifeTools.length === declared,
+    `${lifeTools.length} visible / ${declared} declared`)
   check('tool schemas reach the model with descriptions',
     lifeTools.every((t) => typeof t.description === 'string' && t.description.length > 20))
 } else {

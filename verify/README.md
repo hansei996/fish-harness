@@ -3,20 +3,21 @@
 五套验证：`smoke`、`day-report`、`life-week` 只依赖本地文件；`e2e` 与 `pack` 需要**真的 dsh**，不是 mock：
 
 <!-- facts:verify-table -->
-| 套件 | 查什么 | 本机实测（合计 269 项） |
+| 套件 | 查什么 | 本机实测（合计 306 项） |
 |---|---|---|
 | `verify/smoke.mjs` | 70 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性）（需要真 dsh） | 70/70 通过 |
 | `verify/day-report.mjs` | 28 项：当天报告工具（不需要真 dsh） | 28/28 通过 |
 | `verify/demo-data.mjs` | 18 项：对外页面引用的那份数据产物与实现一致（含时区稳定性）（不需要真 dsh） | 18/18 通过 |
 | `verify/life-week.mjs` | 16 项：连跑七天（不需要真 dsh） | 16/16 通过 |
 | `verify/ui.mjs` | 28 项：界面那半边的包清单 / 桩 loader / host 路由 / 私密不外泄（不需要真 dsh） | 28/28 通过 |
-| `verify/publish.mjs` | 27 项：发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）（不需要真 dsh） | 27/27 通过 |
+| `verify/publish.mjs` | 40 项：发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）（不需要真 dsh） | 40/40 通过 |
 | `verify/e2e-tools.mjs` | 17 项：真实 dsh 端到端（需要真 dsh） | 17/17 通过 |
 | `verify/pack-install.mjs` | 9 项：打出来的包能不能装进 profile 并激活（需要真 dsh） | 9/9 通过 |
-| `verify/landing.mjs` | 17 项：落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）（不需要真 dsh） | 17/17 通过 |
+| `verify/landing.mjs` | 19 项：落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）（不需要真 dsh） | 19/19 通过 |
 | `verify/market.mjs` | 5 项：市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）（不需要真 dsh） | 5/5 通过 |
 | `verify/scenarios.mjs` | 11 项：落地剧本的每个引用都真实存在，且「未实现」的标记与 STORY.md 口径一致（不需要真 dsh） | 11/11 通过 |
 | `verify/framework.mjs` | 23 项：技术总图（docs/framework.html）上画的 import 边 / 挂载 API / 生成块里的数字全部对着源码核（离线口径；装了 dsh 时手动跑可多核 dsh 包规模 3 条）（不需要真 dsh） | 23/23 通过 |
+| `verify/video.mjs` | 22 项：视频发布线：每帧烧标识 + 容器隐式标识 + 回读首帧像素证明真的烧进去了；批准绑定文件字节（换文件拦得住）（不需要真 dsh） | 22/22 通过 |
 | `verify/claims.mjs` | 文档里的数字有没有过期（它数的就是上面这些项数，所以不计入合计） | 见 `node verify/claims.mjs` |
 <!-- /facts:verify-table -->
 

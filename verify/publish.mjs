@@ -29,6 +29,12 @@ process.env.DSH_HOME = HOME
 fs.rmSync(HOME, { recursive: true, force: true })
 fs.mkdirSync(HOME, { recursive: true })
 
+/** 源码里定义了多少个 life_* 工具 —— 判据是「注册的 == 定义的」，不是一个写死的数。 */
+function declaredToolCount () {
+  const src = fs.readFileSync(path.join(REPO, 'packages', 'dsh-life', 'lib', 'index.js'), 'utf8')
+  return [...src.matchAll(/name: '(life_[a-z_]+)'/g)].length
+}
+
 const results = []
 const check = (label, ok, detail = '') => {
   results.push({ label, ok })
@@ -565,6 +571,8 @@ function publishFixture ({ lifeId, config = {}, withApproval = true }) {
   return { state, store }
 }
 const toolOf = (state, name) => state.tools.find((definition) => definition.name === name)
+/** sha256 of a buffer, same definition the video module uses. */
+const createHash = (await import('node:crypto')).createHash
 const seedChecked = (store, {
   contentId = 'post-1',
   text = '今天把第 38 层打过了，存档在 save:38',
@@ -602,7 +610,9 @@ const publishCall = (state, id) => toolOf(state, 'life_publish').execute(
   }
   const stored = fixture.store.findOutboxItem('post-outcomes')
   check('publish C1: rejected/cancelled/unavailable all send zero times, keep the record checked, and return distinguishable text',
-    fixture.state.tools.length === 17 &&
+    // 与源码里定义的工具数比，不写死一个数：加工具时这条不该红，
+    // 「注册漏了一个」才该红。
+    fixture.state.tools.length === declaredToolCount() &&
     fixture.state.warnings.length === 0 &&
     fixture.state.approvalRequests.length === 3 &&
     transport.calls.send.length === 0 &&
@@ -654,10 +664,10 @@ const publishCall = (state, id) => toolOf(state, 'life_publish').execute(
   seedChecked(fixture.store, { contentId: 'post-no-approval' })
   const result = await attemptAsync(() => publishCall(fixture.state, 'post-no-approval'))
   const stored = fixture.store.findOutboxItem('post-no-approval')
-  check('publish C3: without the approval service the tool fails with no-approval-channel, sends zero times, and the plugin still registers all 17 tools with no apply warning',
+  check('publish C3: without the approval service the tool fails with no-approval-channel, sends zero times, and the plugin still registers every declared tool with no apply warning',
     result.threw &&
     result.message.includes('life/publish-no-approval-channel') &&
-    fixture.state.tools.length === 17 &&
+    fixture.state.tools.length === declaredToolCount() &&
     fixture.state.warnings.length === 0 &&
     stored.status === 'checked',
     `error=${result.message}; tools=${fixture.state.tools.length}, warnings=${fixture.state.warnings.length}, ` +
@@ -746,6 +756,145 @@ const publishCall = (state, id) => toolOf(state, 'life_publish').execute(
     `confirmed detail keys=${detailKeys}, platformId=${confirmedDetail.platformId}, textLength=${confirmedDetail.textLength}; ` +
     `unconfirmed status/platformId=${unconfirmedDetail.status}/${unconfirmedDetail.platformId}; ` +
     `body leaked=${ledgerBodies.includes(secretBody)}`)
+}
+
+// ---------------------------------------------------------------------------
+// C7. 视频发布线：批准绑定的是**文件字节**，不是字幕
+// ---------------------------------------------------------------------------
+//
+// 这一段补的是「发布线最危险的一个洞」：如果内容版本只算字幕，那么主人点了
+// 「通过」之后换掉视频文件，批准照样生效 —— 主人同意的是**那一份字节**。
+// 所以这里断言三件事，每件都有对应的反例：
+//
+//   1. 发布前**重新哈希磁盘上的文件**；文件变了就拒绝，且不请求批准、不发送；
+//   2. 带媒体的记录，其内容版本包含文件摘要（改文件 = 改版本 = 旧批准作废）；
+//   3. 上传时**再核一次**摘要；不匹配就在发请求之前拒绝 —— 于是连 unconfirmed
+//      都不会产生（什么都没发出去）。
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-life-video-publish-'))
+  const videoFile = path.join(dir, 'clip.mp4')
+  fs.writeFileSync(videoFile, Buffer.from('pretend-this-is-a-labelled-mp4'))
+
+  const videoOutbox = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'outbox.js')).href)
+  const videoModule = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'video.js')).href)
+  const digest = videoModule.fileDigest(videoFile)
+  const contentId = 'post-video-1'
+  const media = {
+    kind: 'video',
+    path: videoFile,
+    digest,
+    labelText: '—— AI 生成 · 内容编号 ' + contentId,
+    metadata: { marker: 'dsh-life', synthetic: '1', provider: 'dsh-life', contentId },
+    durationSec: 2,
+    sizeBytes: fs.statSync(videoFile).size,
+  }
+  const seedVideoChecked = (store, overrides = {}) => {
+    const labelOptions = { identityName: '大肥鱼', providerCode: 'dsh-life' }
+    const record = videoOutbox.createDraft({
+      contentId, text: '今天打了一局，录了下来', channel: 'tg', account: 'acct',
+      labelOptions, media: { ...media, ...overrides }, now: NOW,
+    })
+    const checked = videoOutbox.markChecked(record, { labelOptions, now: NOW })
+    return store.appendOutboxItem(checked).record
+  }
+
+  // (a) 基线：一切正常时，媒体原样送到 transport，并且内容版本含摘要。
+  {
+    const transport = fakeTransport()
+    const fixture = publishFixture({ lifeId: 'video-ok', config: { transport } })
+    const seeded = seedVideoChecked(fixture.store)
+    check('publish C7a: 带媒体的记录，内容版本包含文件摘要（与纯文本版本不同）',
+      seeded.media.digest === digest &&
+        seeded.contentVersion !== videoOutbox.contentVersionOf(seeded.text),
+      `version=${seeded.contentVersion}`)
+
+    fixture.state.approvalHandler = async () => 'allowed-once'
+    const result = await publishCall(fixture.state, contentId)
+    check('publish C7a: 批准通过后媒体随 candidate 一起发出（transport 收到了 media）',
+      result.ok === true && result.outcome === 'confirmed' &&
+        transport.calls.send.length === 1 &&
+        transport.calls.send[0].media && transport.calls.send[0].media.digest === digest,
+      `outcome=${result.outcome}, sends=${transport.calls.send.length}`)
+  }
+
+  // (b) **核心反例**：批准前文件被换掉 → 拒绝、零发送、零批准请求。
+  {
+    const transport = fakeTransport()
+    const fixture = publishFixture({ lifeId: 'video-swapped', config: { transport } })
+    seedVideoChecked(fixture.store)
+    // 伪造「有人把文件换了」：内容变了，记录里的摘要没变。
+    fs.writeFileSync(videoFile, Buffer.from('a DIFFERENT clip that was never labelled'))
+    fixture.state.approvalHandler = async () => 'allowed-once'
+    const result = await publishCall(fixture.state, contentId)
+    check('publish C7b: 发布前文件被替换 → 拒绝，零发送、零批准请求（批准绑定的是字节）',
+      result.ok === false && result.outcome === 'media-changed' &&
+        transport.calls.send.length === 0 &&
+        fixture.state.approvalRequests.length === 0,
+      `outcome=${result.outcome}, sends=${transport.calls.send.length}, approvals=${fixture.state.approvalRequests.length}`)
+    // 恢复，供后续用例继续。
+    fs.writeFileSync(videoFile, Buffer.from('pretend-this-is-a-labelled-mp4'))
+  }
+
+  // (c) 文件不见了也一样：不能因为「读不到」就当成通过。
+  {
+    const transport = fakeTransport()
+    const fixture = publishFixture({ lifeId: 'video-missing', config: { transport } })
+    const gone = path.join(dir, 'not-there.mp4')
+    seedVideoChecked(fixture.store, { path: gone, digest: digest })
+    fixture.state.approvalHandler = async () => 'allowed-once'
+    const result = await publishCall(fixture.state, contentId)
+    check('publish C7c: 视频文件不在了 → 拒绝，零发送、零批准请求（读不到 ≠ 通过）',
+      result.ok === false && result.outcome === 'media-missing' &&
+        transport.calls.send.length === 0 && fixture.state.approvalRequests.length === 0,
+      `outcome=${result.outcome}`)
+  }
+
+  // (d) 元数据被抹掉（内容编号对不上）也要拦 —— 摘要没变也可能标识不全。
+  {
+    const transport = fakeTransport()
+    const fixture = publishFixture({ lifeId: 'video-meta', config: { transport } })
+    seedVideoChecked(fixture.store, {
+      metadata: { marker: 'dsh-life', synthetic: '1', provider: 'dsh-life', contentId: 'somebody-else' },
+    })
+    fixture.state.approvalHandler = async () => 'allowed-once'
+    const result = await publishCall(fixture.state, contentId)
+    check('publish C7d: 隐式标识里的内容编号与记录不一致 → 拒绝，零发送',
+      result.ok === false && result.outcome === 'media-metadata-invalid' && transport.calls.send.length === 0,
+      `outcome=${result.outcome}`)
+  }
+
+  // (e) 上传时的最后一道：**在批准的等待窗口里**换掉文件（这才是真实的 TOCTOU 窗口 ——
+  // 主人看字幕、思考、点「通过」可能要好几分钟）。此时预检已经跑过，所以只有
+  // transport 自己再核一次摘要才拦得住。拦不住就会把一份没标注的文件发出去。
+  {
+    const transport = {
+      calls: { send: [] },
+      async send (candidate) {
+        this.calls.send.push(candidate)
+        const live = videoModule.fileDigest(candidate.media.path)
+        if (live !== candidate.media.digest) {
+          throw new Error('life/telegram-media-digest-mismatch: 文件与已批准的那一份不是同一份，拒绝上传')
+        }
+        return { platformId: 'tg:7' }
+      },
+    }
+    const fixture = publishFixture({ lifeId: 'video-late-swap', config: { transport } })
+    seedVideoChecked(fixture.store)
+    fixture.state.approvalHandler = async () => {
+      // 批准期间文件被替换 —— 预检已经过去了。
+      fs.writeFileSync(videoFile, Buffer.from('swapped while the keeper was deciding'))
+      return 'allowed-once'
+    }
+    const result = await publishCall(fixture.state, contentId)
+    const stored = fixture.store.findOutboxItem(contentId)
+    check('publish C7e: 批准等待期间文件被换 → 上传前拒绝 → unconfirmed（结果未知），绝不自动重发',
+      result.ok === false && result.outcome === 'unconfirmed' && stored.status === 'unconfirmed' &&
+        transport.calls.send.length === 1,
+      `outcome=${result.outcome}, record=${stored.status}, sends=${transport.calls.send.length}`)
+    fs.writeFileSync(videoFile, Buffer.from('pretend-this-is-a-labelled-mp4'))
+  }
+
+  fs.rmSync(dir, { recursive: true, force: true })
 }
 
 // ---------------------------------------------------------------------------
@@ -913,6 +1062,113 @@ const labelledForTelegram = compliance.labelContent({
     noFetchSend && noFetchSend.threw && noFetchSend.message.includes('life/telegram-fetch-unavailable'),
     `realFetchCalls=${realFetchCalls}, direct fetch( in source=${directFetchCalls.length}, ` +
     `http imports=${httpImports.length}, missing fetchImpl send=${noFetchSend ? noFetchSend.message : 'not attempted'}`)
+}
+
+// ---------------------------------------------------------------------------
+// D7. Telegram 视频上传：真的组了 multipart，而且上传前再核一次字节
+// ---------------------------------------------------------------------------
+//
+// 文本那条（D1）只看 JSON 体。视频这一条必须看 **multipart** —— 这也是最容易
+// 「看起来发了、其实发的是空体」的地方。所以这里断言：
+//   - 走的是 /sendVideo，不是 /sendMessage（发错端点会得到一个没有视频的消息）；
+//   - body 里真有文件字节，且 Content-Type 是 video/mp4；
+//   - caption 带显式标识（§4(4) 的「播放周边」那一半，与首帧烧字互补）；
+//   - 文件与记录的摘要不匹配时，**在发请求之前**就拒绝。
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-life-tg-video-'))
+  const clip = path.join(dir, 'clip.mp4')
+  // 一小段带高位字节的内容：如果实现把二进制当字符串处理，这些字节会变形，
+  // 而摘要校验正是抓这个的（这个坑在 video.js 里真的踩到过）。
+  const bytes = Buffer.concat([Buffer.from([0x00, 0x01, 0xff, 0xfe]), Buffer.alloc(64, 0xa5)])
+  fs.writeFileSync(clip, bytes)
+  const digest = createHash('sha256').update(bytes).digest('hex')
+  const caption = '—— AI 生成 · 内容编号 post-tg-video\n今天打了一局'
+  const candidate = {
+    contentId: 'post-tg-video', contentVersion: 'v', idempotencyKey: 'k',
+    channel: 'tg', account: '12345', text: caption, metadata: {},
+    media: { kind: 'video', path: clip, digest, sizeBytes: bytes.length, durationSec: 2 },
+  }
+
+  const requests = []
+  const transport = telegram.createTelegramTransport({
+    tokenEnv: 'TG_VIDEO_TOKEN',
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options })
+      return { ok: true, status: 200, async json () { return { ok: true, result: { message_id: 99 } } } }
+    },
+  })
+  process.env.TG_VIDEO_TOKEN = 'token-video-secret'
+  const sent = await transport.send(candidate)
+  const body = requests[0].options.body
+  const bodyText = Buffer.isBuffer(body) ? body.toString('latin1') : String(body)
+
+  check('telegram D7a: 视频走 /sendVideo（不是 /sendMessage），拿到 message_id',
+    sent.platformId === 'tg:99' && /\/sendVideo$/.test(requests[0].url),
+    `${requests[0].url.replace(/bot[^/]*/, 'bot…')} -> ${sent.platformId}`)
+
+  check('telegram D7a: body 是 multipart，含文件字节、文件名与 video/mp4',
+    Buffer.isBuffer(body) &&
+      /multipart\/form-data; boundary=/.test(requests[0].options.headers['content-type']) &&
+      bodyText.includes('name="video"; filename="clip.mp4"') &&
+      bodyText.includes('Content-Type: video/mp4') &&
+      body.includes(bytes),
+    `body=${Buffer.isBuffer(body) ? body.length + 'B' : typeof body}`)
+
+  // 用**字节**比，不要用 latin1 解码后的字符串比：caption 是 UTF-8，把 body 当
+  // latin1 读会把中文变成乱码，于是这条会红 —— 而红的原因是检查写错了，不是代码错了。
+  // （这个坑刚踩到过：同一个 body 的前两条断言过、这条不过。）
+  check('telegram D7a: caption 带上显式标识（播放周边那一半，与首帧烧字互补）',
+    body.includes(Buffer.from(caption, 'utf8')))
+
+  // 反例 1：文件被换过 → 必须**在发请求之前**拒绝，requests 保持不动。
+  {
+    const before = requests.length
+    fs.writeFileSync(clip, Buffer.from('a different file entirely'))
+    const swapped = await attemptAsync(() => transport.send(candidate))
+    check('telegram D7b: 上传前文件摘要不匹配 → 拒绝，且一个请求都没发出去',
+      swapped.threw && swapped.message.includes('digest-mismatch') && requests.length === before,
+      `threw=${swapped.threw}, requests+${requests.length - before}`)
+    fs.writeFileSync(clip, bytes)
+  }
+
+  // 反例 2：超过渠道上限 → 本地就拒，不发。
+  {
+    const before = requests.length
+    const tiny = telegram.createTelegramTransport({
+      tokenEnv: 'TG_VIDEO_TOKEN',
+      maxVideoBytes: 4,
+      fetchImpl: async () => { throw new Error('must not be called') },
+    })
+    const tooBig = await attemptAsync(() => tiny.send(candidate))
+    check('telegram D7c: 超过渠道大小上限 → 本地拒绝，一个请求都没发出去',
+      tooBig.threw && tooBig.message.includes('too-large') && requests.length === before,
+      String(tooBig.message).slice(0, 80))
+  }
+
+  // 反例 3：文件不存在 → 明确报缺文件，而不是发一个空视频。
+  {
+    const before = requests.length
+    const missing = await attemptAsync(() => transport.send({
+      ...candidate, media: { ...candidate.media, path: path.join(dir, 'nope.mp4') },
+    }))
+    check('telegram D7d: 文件不存在 → 明确拒绝（不会发一个空的视频）',
+      missing.threw && missing.message.includes('media-missing') && requests.length === before,
+      String(missing.message).slice(0, 80))
+  }
+
+  // 反例 4：transport 不能承载的媒体类型 → 拒绝，不静默降级成纯文字发布。
+  {
+    const before = requests.length
+    const unsupported = await attemptAsync(() => transport.send({
+      ...candidate, media: { ...candidate.media, kind: 'audio' },
+    }))
+    check('telegram D7e: 不支持的媒体类型 → 拒绝，不静默降级成纯文字发布',
+      unsupported.threw && unsupported.message.includes('media-unsupported') && requests.length === before,
+      String(unsupported.message).slice(0, 80))
+  }
+
+  delete process.env.TG_VIDEO_TOKEN
+  fs.rmSync(dir, { recursive: true, force: true })
 }
 
 // ---------------------------------------------------------------------------

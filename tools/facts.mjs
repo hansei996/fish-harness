@@ -273,6 +273,12 @@ export const SUITES = [
   // 而那个数取决于本机安装树的 peer 组合 —— 不固定口径，写进文档的项数就会
   // 随环境漂，`claims` 会报假红。理由与 market 那条一样，做法也一样。
   { name: 'framework', file: 'verify/framework.mjs', outcome: 'FRAMEWORK_OUTCOME', offlineArgs: ['--offline'] },
+  // video：视频发布线。它有一半要本机有 ffmpeg（真跑一遍标注 + 回读首帧像素），
+  // 而那一半**必须**跑 —— 它正是这一套的价值所在，跳过它等于什么都没验。
+  // 所以做法不是「没 ffmpeg 就跳过」，而是**把 ffmpeg 变成环境要求**：
+  // CI 里装（见 verify.yml 的 Install ffmpeg 步骤），本机跑验之前也装。
+  // 项数因此是稳定的 21，两端一致，claims 不会报假红。
+  { name: 'video', file: 'verify/video.mjs', outcome: 'VIDEO_OUTCOME' },
 ]
 
 /**
@@ -361,7 +367,8 @@ const FILE_ROLES = {
   'lib/wake.js': '唤醒策略纯函数：静默区间、`every ± jitter`、不跳日夹取、明日兜底；随机量可注入',
   'lib/config.js': '零依赖 Standard Schema 校验器（唤醒 / 选择器 / 发布）',
   'lib/compliance.js': '内容标识：显式 + 隐式、「没有 strip 函数」的硬闸',
-  'lib/telegram.js': 'Telegram 适配器（假 fetch 可测、错误里擦 token、平台不可反查就照实说）',
+  'lib/telegram.js': 'Telegram 适配器（文本 + 视频上传；假 fetch 可测、错误里擦 token、平台不可反查就照实说）',
+  'lib/video.js': '视频标注：每帧烧显式标识 + 容器写隐式标识，并**回读首帧像素**证明它真的烧进去了；没有 ffmpeg 就拒绝，绝不发原片',
   'lib/ui.js': 'Host 半身：`/life/state.json` 现读真实状态，私密内容不出 Host',
   'client/life-overview.js': '浏览器半身：手写 lazy-CJS、只 `require(\'react\')`、零构建',
 }
@@ -380,6 +387,7 @@ const SUITE_ROLES = {
   market: { needsDsh: false, what: '市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）' },
   scenarios: { needsDsh: false, what: '落地剧本的每个引用都真实存在，且「未实现」的标记与 STORY.md 口径一致' },
   framework: { needsDsh: false, what: '技术总图（docs/framework.html）上画的 import 边 / 挂载 API / 生成块里的数字全部对着源码核（离线口径；装了 dsh 时手动跑可多核 dsh 包规模 3 条）' },
+  video: { needsDsh: false, what: '视频发布线：每帧烧标识 + 容器隐式标识 + 回读首帧像素证明真的烧进去了；批准绑定文件字节（换文件拦得住）' },
 }
 
 export const BLOCKS = [

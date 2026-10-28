@@ -90,6 +90,27 @@ jobs:
         run: |
           node -e "const fs=require('node:fs'),p=require('node:path');const m=p.join(process.env.RUNNER_TEMP,'pw','node_modules','playwright','index.mjs');if(fs.existsSync(m)){fs.appendFileSync(process.env.GITHUB_ENV,'PLAYWRIGHT_PATH='+m+String.fromCharCode(10));console.log('PLAYWRIGHT_PATH='+m)}else{console.log('playwright module missing — landing will SKIP')}"
 
+      # ffmpeg/ffprobe：`verify/video.mjs` 要真跑标注与首帧比对。
+      #
+      # 与 Playwright 那一步同一个理由：不装的话那一套会少 8 项，
+      # 而「项数」是写进文档的结构事实 —— 少了它 claims 在 CI 上会报假红，
+      # 或者（更糟）我们为了让数字对上而把真验证降级成 SKIP。
+      # 失败不阻断：装不上时 video 会自己 SKIP 那半，其余套件照跑。
+      - name: Install ffmpeg (for video label checks)
+        continue-on-error: true
+        shell: bash
+        run: |
+          if command -v ffmpeg >/dev/null 2>&1; then
+            echo "ffmpeg already present: $(ffmpeg -version | head -1)"
+            exit 0
+          fi
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          else
+            choco install ffmpeg -y --no-progress || true
+          fi
+          command -v ffmpeg >/dev/null 2>&1 && ffmpeg -version | head -1 || echo "ffmpeg missing — video suite will skip its ffmpeg half"
+
       - name: Show tool versions
         run: |
           node --version
@@ -243,6 +264,32 @@ jobs:
           # 本机装了 dsh 时手动跑一次不带 flag 的，能多核三条。
           node verify/framework.mjs --offline 2>&1 | tee verify-framework.log
 
+      # video：视频发布线。一半是纯逻辑（注入假 runner），一半要真 ffmpeg：
+      # 标注一段短片，再**解码首帧比像素**证明标识真的烧进去了，并用「未标注的
+      # 素材」做反例。
+      #
+      # 这一半**不能**因为缺 ffmpeg 就跳过 —— 它正是这一套的价值：没有它，
+      # 「视频已经标注」就只是一句声称。所以 ffmpeg 是环境要求（见上面的安装步骤），
+      # 项数稳定在 21，本地与 CI 一致，claims 不会因为工具缺失而报假红。
+      # 入库的视频物证（docs/assets/video-label-demo.mp4）必须带着当前规则的隐式标识。
+      # 物证最危险的形态是「过期」：代码改了，文件还是旧的，而页面照旧拿它当证据。
+      # 单独跑一次 --check，坏掉的结论比混在 video 那套里更容易定位。
+      - name: Check shipped video evidence
+        id: videoevidence
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node showcase/bake-video-label.mjs --check 2>&1 | tee verify-video-evidence.log
+
+      - name: Verify — video
+        id: video
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node verify/video.mjs 2>&1 | tee verify-video.log
+
       - name: Verify — scenarios
         id: scenarios
         shell: bash
@@ -281,6 +328,8 @@ jobs:
           LANDING_OUTCOME: ${{ steps.landing.outcome }}
           MARKET_OUTCOME: ${{ steps.market.outcome }}
           SCENARIOS_OUTCOME: ${{ steps.scenarios.outcome }}
+          VIDEO_OUTCOME: ${{ steps.video.outcome }}
+          VIDEOEVIDENCE_OUTCOME: ${{ steps.videoevidence.outcome }}
           FRAMEWORK_OUTCOME: ${{ steps.framework.outcome }}
         run: node .github/scripts/ci-report.mjs
 
@@ -301,5 +350,7 @@ jobs:
             verify-pack.log
             verify-report.md
             verify-framework.log
+            verify-video.log
+            verify-video-evidence.log
           if-no-files-found: ignore
           retention-days: 7

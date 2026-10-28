@@ -96,7 +96,17 @@ mod.apply(fakeCtx, { lifeId: 'registration' })
 const warns = events.filter((e) => e.kind === 'warn')
 const toolNames = events.filter((e) => e.kind === 'tool').map((e) => e.name)
 check('plugin applies with no warnings', warns.length === 0, warns.map((w) => w.m).join('; '))
-check('registers the full life tool surface', toolNames.length === 17, `${toolNames.length} tools`)
+// 工具数从**源码**数出来，不写死。
+//
+// 写死过一个 17，加第 18 个工具（life_attach_video）时这条立刻红 —— 这没错，
+// 但红的原因是「数字过期」而不是「注册坏了」，两者要分开。判据应该是
+// 「注册出来的 == 源码里定义的」，那才是结构事实；数字本身会随功能增长。
+const declaredTools = [...fs.readFileSync(path.join(REPO, 'packages', 'dsh-life', 'lib', 'index.js'), 'utf8')
+  .matchAll(/name: '(life_[a-z_]+)'/g)].map((m) => m[1])
+check('registers the full life tool surface',
+  toolNames.length === declaredTools.length &&
+    declaredTools.every((n) => toolNames.includes(n)),
+  `${toolNames.length} registered / ${declaredTools.length} declared in source`)
 check('registers the plan-critical tools',
   ['life_whoami', 'life_start_activity', 'life_finish_activity', 'life_promise',
     'life_settle_commitment', 'life_identity_update', 'life_ledger', 'life_wake'].every((n) => toolNames.includes(n)))
@@ -614,7 +624,7 @@ setClock(10, 0)
 const degradedState = wakeCtx({ withSchedule: false })
 mod.apply(degradedState.root, { lifeId: 'wake-degraded' })
 const degradedShapeOk = degradedState.warnings.length === 0 &&
-  degradedState.tools.length === 17 &&
+  degradedState.tools.length === declaredTools.length &&
   degradedState.sections.length === 1
 degradedState.emit('session/event', sessionOf('degraded-session'), { type: 'turn/end', time: clockNow, data: { turn: 1 } })
 degradedState.emit('session/event', sessionOf('degraded-session'), { type: 'turn/end', time: clockNow, data: { turn: 2 } })

@@ -72,7 +72,7 @@ h1 em{font-style:normal;color:var(--life2)}
   white-space:nowrap;z-index:4;transform:translateX(-50%)}
 
 /* ===== 生命层 DAG ===== */
-.dag{position:relative;height:366px}
+.dag{position:relative;height:474px}
 .node{position:absolute;z-index:4;border-radius:10px;padding:9px 11px;
   border:1px solid var(--line2);background:#0c1220;box-shadow:0 10px 24px -20px #000}
 .node .fn{font-family:var(--mono);font-size:11.5px;font-weight:600;margin-bottom:3px;
@@ -174,7 +174,7 @@ h1 em{font-style:normal;color:var(--life2)}
   <h1>一张总图：<em>代码模块</em>、<em>技术框架</em>、<em>磁盘</em>，画在一次</h1>
   <p class="lead">
     这一张图从上往下是一条完整的链：<b>dsh 自带什么</b> → <b>我们挂在它的哪些扩展点上</b> →
-    <b>生命层的九个模块谁 import 谁、各自管什么</b> → <b>这些模块往磁盘上写什么</b>。
+    <b>生命层的十个模块谁 import 谁、各自管什么</b> → <b>这些模块往磁盘上写什么</b>。
     线全部是真的：模块之间的实线扫自源码的 <code>import</code>，指向 dsh 的虚线取自真实的公开 API 调用，
     指向磁盘的线取自 <code>writeJsonAtomic</code> 的调用点。数字由 <code>node tools/facts.mjs</code> 量出，不手抄。
   </p>
@@ -223,7 +223,7 @@ h1 em{font-style:normal;color:var(--life2)}
         <p class="gn">这 <b>7 个包</b>共给了我们 <b>5 个服务注入 + 2 个事件监听 + 2 个客户端 slot</b>，
           全部是公开扩展点，<b>没有一处改 dsh 核心</b>。每个框下面那行斜体就是真实 API。</p>
         <div class="pkg wired" id="p-loop"><div class="p">dsh-agent-loop</div>
-          <div class="n">跑轮次<em>ctx.tools.register() × 17</em></div></div>
+          <div class="n">跑轮次<em>ctx.tools.register() × 18</em></div></div>
         <div class="pkg wired" id="p-prompt"><div class="p">dsh-system-prompt</div>
           <div class="n">提示词装配<em>ctx.systemPrompt.section()</em></div></div>
         <div class="pkg wired" id="p-sched"><div class="p">dsh-schedule</div>
@@ -266,19 +266,19 @@ h1 em{font-style:normal;color:var(--life2)}
   <!-- ============ 带 3：生命层 ============ -->
   <div class="band" id="band-life">
     <span class="band-tag">Band 3 · 生命层（本仓库）<!-- facts:framework-size -->
-9 个宿主模块 4834 行 + 客户端半身 176 行
+10 个宿主模块 5729 行 + 客户端半身 176 行
 <!-- /facts:framework-size --></span>
     <div class="dag" id="dag">
       <svg id="dagwires" preserveAspectRatio="none"></svg>
 
       <span class="rowlabel" style="top:20px">入口 / 装配</span>
       <span class="rowlabel" style="top:208px">领域与 IO</span>
-      <span class="rowlabel" style="top:316px">纯函数底层</span>
+      <span class="rowlabel" style="top:306px">纯函数 / 媒体</span>
 
       <div class="node entry" id="n-index" style="left:470px;top:18px;width:390px">
         <div class="fn">index.js<span class="ln">1590 行 · 唯一装配点</span></div>
         <div class="rl">插件入口。<b>五个服务注入 + 两个事件监听 + 卸载反注册，全收在这一个文件里</b>；
-          其余八个模块不知道 dsh 存在。</div>
+          其余九个模块不知道 dsh 存在。</div>
         <div class="svc">tools · systemPrompt · schedule · approval · session/event · agent/inbox/claimed</div>
         <div class="diskout">写：ledger(turn / wake) · outbox(publish)</div>
       </div>
@@ -294,7 +294,7 @@ h1 em{font-style:normal;color:var(--life2)}
       </div>
       <div class="node domain" id="n-outbox" style="left:482px;top:206px;width:196px">
         <div class="fn">outbox.js<span class="ln">849 行</span></div>
-        <div class="rl">发布状态机。<b>不确定就不重发</b>；<code>committed</code> 永不裁剪。</div>
+        <div class="rl">发布状态机。<b>不确定就不重发</b>；<code>committed</code> 永不裁剪。内容版本<b>把媒体摘要算进去</b>。</div>
         <div class="diskout">经 store 写：outbox.json</div>
       </div>
       <div class="node io" id="n-ui" style="left:690px;top:206px;width:200px">
@@ -303,12 +303,17 @@ h1 em{font-style:normal;color:var(--life2)}
         <div class="svc">webServer 路由（headless 里不注册）</div>
       </div>
       <div class="node io" id="n-tg" style="left:902px;top:206px;width:176px">
-        <div class="fn">telegram.js<span class="ln">133 行</span></div>
-        <div class="rl">唯一真实渠道。token 只从环境变量读；<code>query()</code> 返回 <b>null</b>。</div>
+        <div class="fn">telegram.js<span class="ln">290 行</span></div>
+        <div class="rl">唯一真实渠道：文本 + <b>视频上传</b>。token 只从环境变量读；<code>query()</code> 返回 <b>null</b>。</div>
       </div>
       <div class="node local" id="n-config" style="left:1090px;top:206px;width:152px">
-        <div class="fn">config.js<span class="ln">287</span></div>
+        <div class="fn">config.js<span class="ln">313</span></div>
         <div class="rl">零依赖校验器（为兼容两种运行时手写）</div>
+      </div>
+
+      <div class="node io" id="n-video" style="left:690px;top:306px;width:200px">
+        <div class="fn">video.js<span class="ln">408 行</span></div>
+        <div class="rl">视频标注：每帧烧显式标识 + 容器写隐式标识，<b>回读首帧像素</b>证明真烧进去了。没有 ffmpeg 就拒绝，绝不发原片。</div>
       </div>
 
       <div class="node leaf" id="n-wake" style="left:274px;top:314px;width:196px">
@@ -416,7 +421,7 @@ h1 em{font-style:normal;color:var(--life2)}
         <code>schedule</code> · <code>approval</code> · <code>webServer</code>）加两个事件监听
         （<code>session/event</code> · <code>agent/inbox/claimed</code>），再加客户端两个 slot。
         <b>没有一处改 dsh 核心</b>，所以 dsh 升级不会把我们改坏。</li>
-      <li><b>模块之间的线是真的</b>：9 个模块的 <b>11 条 import</b> 扫自源码，
+      <li><b>模块之间的线是真的</b>：<b>10 个模块</b>的 <b>12 条 import</b> 扫自源码，
         四个纯函数模块（choose / wake / compliance / config）<b>不 import 任何 IO</b> ——
         七天长跑能压成 0.1 秒就是靠这个。</li>
       <li><b>写盘只有一个口</b>：8 个状态文件的每一次写入都经过 <code>store.js</code> 的
@@ -464,7 +469,7 @@ h1 em{font-style:normal;color:var(--life2)}
   // ---- 生命层内部：真实 import 边（扫自 packages/dsh-life） ----------------
   var EDGES = [
     ['index','store'],['index','choose'],['index','outbox'],
-    ['index','ui'],['index','tg'],['index','config'],['index','wake'],
+    ['index','ui'],['index','tg'],['index','config'],['index','wake'],['index','video'],
     ['store','wake'],['store','outbox'],
     ['outbox','comp'],
     ['ui','wake']

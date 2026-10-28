@@ -191,7 +191,19 @@ try {
         state.firstCard.slice(0, 90))
 
       // 手抄过的旧值不许出现在页面上 —— 它已经过期过一次（见 index.html 该节注释）。
+      // 视频物证：页面引用的两个资产必须真的在，否则会显示破图 ——
+      // 而破图在截图里看起来只像「加载慢」，不像「文件没进仓库」。
+      const bodyHtml = await page.evaluate(() => document.body.innerHTML)
+      const videoAssets = ['assets/video-label-frame0.png', 'assets/video-label-demo.mp4']
+      const missingAssets = videoAssets.filter((rel) => !fs.existsSync(path.join(DOCS, rel)))
+      check('视频物证的两个文件都在 docs/assets 里',
+        missingAssets.length === 0,
+        missingAssets.length ? `缺：${missingAssets.join(', ')}` : videoAssets.join(' + '))
+      check('落地页引用了视频物证（第一帧图 + mp4）',
+        videoAssets.every((rel) => bodyHtml.includes(rel)))
+
       const bodyText = await page.evaluate(() => document.body.innerText)
+      // 手抄过的旧值不许出现在页面上 —— 它已经过期过一次（见 index.html 该节注释）。
       check('页面上没有那段已经过期的旧终端输出（「账本 90 条」）',
         !bodyText.includes('账本 90 条'),
         bodyText.includes('账本 90 条') ? '旧数字又回来了' : '已确认不存在')

@@ -101,11 +101,11 @@ check('页面文案里的 import 条数与实测一致',
 // 检查最容易骗过自己的方式。
 const NUMERIC_CLAIMS = [
   { label: '工具数', re: /ctx\.tools\.register\(\)\s*×\s*(\d+)/, real: facts.tools.count },
-  { label: '工具数（文案）', re: /register\(\)\s*×\s*(\d+)/, real: facts.tools.count },
+  { label: '工具数（文案）', re: /register\(\)\s*×\s*(?:<b>)?(\d+)/, real: facts.tools.count },
   { label: '状态文件数', re: /写：全部\s*(\d+)\s*个状态文件/, real: facts.stateFiles.count },
   { label: '状态文件数（文案）', re: /(\d+)\s*个状态文件的每一次写入/, real: facts.stateFiles.count },
   { label: '账本 kind 数', re: /只追加\s*<em>(\d+)\s*种 kind/, real: facts.ledgerKinds.count },
-  { label: '模块数', re: /(\d+)\s*个模块的/, real: facts.code.hostFiles },
+  { label: '模块数', re: /(\d+)\s*个模块(?:<\/b>)?的/, real: facts.code.hostFiles },
   { label: '模块数（带标题）', re: /(\d+)\s*个宿主模块/, real: facts.code.hostFiles },
 ]
 for (const c of NUMERIC_CLAIMS) {

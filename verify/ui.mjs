@@ -195,7 +195,13 @@ const headlessCtx = {
 plugin.apply(headlessCtx, { lifeId: 'headless-ui' })
 const warns = events.filter((e) => e.kind === 'warn')
 check('headless boot applies with zero warnings', warns.length === 0, warns.map((w) => w.m).join('; '))
-check('the model-facing tool surface is unchanged (17 tools)', headlessTools.length === 17, `${headlessTools.length} tools`)
+// 工具数从源码数，不写死：判据是「headless profile 下注册的 == 源码里定义的」。
+// 写死一个数的话，每加一个工具这条都会红，而红的原因是「数字过期」不是「headless 少了东西」。
+const declaredTools = [...fs.readFileSync(path.join(PLUGIN, 'lib', 'index.js'), 'utf8')
+  .matchAll(/name: '(life_[a-z_]+)'/g)].length
+check('the model-facing tool surface matches the source (no tool lost in a headless profile)',
+  headlessTools.length === declaredTools,
+  `${headlessTools.length} registered / ${declaredTools} declared`)
 check('a headless composition registers no UI route at all', route === routeBeforeHeadless,
   route === routeBeforeHeadless ? 'no registration attempted' : 'a route appeared')
 

@@ -137,12 +137,13 @@
 | **自主唤醒（自己过一天）** | ✅ 每轮 `turn/end` 向 dsh `schedule` 补一个一次性闹钟；抖动 / 静默时段 / 每日预算由生命层实现（dsh 的 `ScheduleCreateRequest` 没有这三项）；唤醒轮的系统提示词会声明「这一轮是你自己醒来的」，并附一份 ≤600 字符的候选短名单 | 见 §10.2 决策门：**策略与接口已验证（含 7 天确定性 soak），连续 7 天真实运行仍未做** |
 | **活动选择器（候选排序）** | ✅ `lib/choose.js`：`承诺紧迫度 + 兴趣匹配 + 未完成事项 + 探索加成 - 成本 - 风险 - 切换损耗`，每条候选带理由与七项明细；「休息」固定 0.35 且永远在名单里 | 权重是手写的，没有从经历里回归参数；模型是否照短名单行动未验 |
 | **「它的一天」可读报告** | ✅ `tools/day-report.mjs`：把 `ledger.jsonl` 渲染成人话（失败照实说、结论带证据、对话往返单独计数），`--json` 供程序消费；行为测试 22 项已进 CI | 无 |
+| **视频发布（标注 + 核验）** | ✅ `lib/video.js`：每帧烧显式标识（含起始画面，标识办法 §4(4)）+ 容器元数据写隐式标识（§5 三项必填）；`verify/video.mjs` 用**真 ffmpeg** 跑一遍并**解码首帧比像素**证明标识真烧进去了（含「未标注素材必须被拒」的反例）；批准绑定**文件字节**（发布前重哈希 + 上传时再核，`verify/publish.mjs` C7 段） | **一次真实平台上传都没有过**；未验：H.265/AV1 等非 H.264 源、超 50MB、时长上限、平台侧转码后标识是否仍可见（平台可能重编码） |
 | **发布对账（回执、幂等、不盲目重发）** | ✅ `lib/outbox.js` 状态机（`draft → checked → approved → sending → confirmed / unconfirmed / failed`）+ 幂等键 + 内容版本绑定 + 三档修剪（committed 永不丢）；`lib/compliance.js` 标识硬闸（**没有 strip 函数**）；`life_publish` 走 dsh `approval`，只认 `allowed-once`，批准后**重算摘要**防 TOCTOU；`lib/telegram.js` 适配器（假 fetch 可测、错误擦 token）。`verify/publish.mjs` 26 项 | **一次真实 Telegram 都没发过**；真实 Web 批准弹窗未点过；跨进程并发与 `sending` 崩溃窗口未实测 |
 | **界面实体（一屏）** | ✅ `lib/ui.js` 的 `/life/state.json` **现读**真实状态 + `client/life-overview.js` 手写 lazy-CJS（零构建、只 `require('react')`）；headless 里不注册 | **像素级未验证**；`settings.section` 是盲注册（已 try/catch） |
 | **安装门槛实测（代理版）** | ✅ `docs/install-test.md`：抓到一个静默失败——自己起 profile 名字会得到**裸 profile**（无 agent/llm/schedule），鱼装上了却不动且不报错；README 已改成「先 `--from-default-profile web`」三步 | 不是真人实测；npm 发布后要重做 |
 
 <!-- facts:plan-code-size -->
-**代码规模**：9 个 host 文件 + 1 个 client 文件，5010 行（`choose.js` 703 / `compliance.js` 118 / `config.js` 287 / `index.js` 1590 / `outbox.js` 849 / `store.js` 737 / `telegram.js` 133 / `ui.js` 179 / `wake.js` 238 / `life-overview.js` 176），零自有依赖，17 个工具，5 个服务挂载点 + 2 个会话事件 + 客户端 2 个 slot，8 个状态文件。
+**代码规模**：10 个 host 文件 + 1 个 client 文件，5905 行（`choose.js` 703 / `compliance.js` 118 / `config.js` 313 / `index.js` 1861 / `outbox.js` 914 / `store.js` 737 / `telegram.js` 238 / `ui.js` 179 / `video.js` 428 / `wake.js` 238 / `life-overview.js` 176），零自有依赖，18 个工具，5 个服务挂载点 + 2 个会话事件 + 客户端 2 个 slot，8 个状态文件。
 <!-- /facts:plan-code-size -->
 
 ### 规划说了但还没做
@@ -621,7 +622,14 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 
 内容来源可以是游戏失误、阶段进步、网上发现、和主人的约定或兴趣变化，而不是批量改写热榜。
 
-首版选择图文，先不承担全自动短视频剪辑与多平台适配的成本。内容模块需要：
+首版图文优先；**视频只做「标注」这一段，不做自动剪辑**。区别很重要：剪辑是创作能力（可以晚点有），标注是法定义务（有视频就必须有）。所以视频这条线的范围是：
+
+- `lib/video.js`：把 Agent 自己产出的原始片段变成**可发布的合规产物** —— 每一帧烧显式标识（含起始画面，§4(4)）、容器元数据写隐式标识（§5：生成合成属性 / 提供者编码 / 内容编号）；
+- **核验是回读像素，不是看退出码**：解码首帧、与被标注前的素材比对标识区域，证明那行字真的烧进去了。ffmpeg 返回 0 而画面上什么都没有，是最可能的失败形态；
+- **批准绑定文件字节**：内容版本把媒体摘要算进去；发布前重新哈希磁盘上的文件；上传时再核一次。换掉视频文件不能复用旧批准（`verify/publish.mjs` 的 C7 段，含「批准等待期间被换」这一天）；
+- 没有 ffmpeg 就**明确拒绝**，不发原片。
+
+内容模块还需要：
 
 - 声线与表达一致，但允许话少、失败、自嘲，不要求每条都精彩。
 - 记录素材来源、使用权与事实依据，避免把转载伪装成亲历。
@@ -787,7 +795,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 ### 11.1 代码级：已实现，可复现
 
 <!-- facts:plan-verify-table -->
-实测 **269 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
+实测 **306 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |
@@ -796,13 +804,13 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 | `verify/demo-data.mjs` | **18** | 对外页面引用的数据产物与实现一致；含「换时区结论不变」与「篡改能被发现」 | 否 |
 | `verify/life-week.mjs` | **16** | 连跑七天（压缩时钟，复用生产的 store/choose/wake） | 否 |
 | `verify/ui.mjs` | **28** | 界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归 | 否 |
-| `verify/publish.mjs` | **27** | 发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation | 否 |
-| `verify/landing.mjs` | **17** | 落地页与场景原型在真 Chromium 里的像素级验证（三档视口、无溢出、无 JS 错误、数据真的渲染出来）；缺浏览器则跳过 | 否 |
+| `verify/publish.mjs` | **40** | 发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation | 否 |
+| `verify/landing.mjs` | **19** | 落地页与场景原型在真 Chromium 里的像素级验证（三档视口、无溢出、无 JS 错误、数据真的渲染出来）；缺浏览器则跳过 | 否 |
 | `verify/e2e-tools.mjs` | **17** | 真 dsh 端到端：组合 profile → `dsh plugin` 安装 → 启动 → 断言运行系统实际产出 | 是 |
 | `verify/pack-install.mjs` | **9** | `pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身） | 是 |
 | `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |
 
-12套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[`.github/workflows/verify.yml`](../.github/workflows/verify.yml)）。
+13套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[`.github/workflows/verify.yml`](../.github/workflows/verify.yml)）。
 **项数与合计都是真跑出来的**（`node tools/facts.mjs` 量、`node verify/claims.mjs` 拦），不再手写。
 <!-- /facts:plan-verify-table -->
 
