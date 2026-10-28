@@ -13,6 +13,7 @@
 | `verify/publish.mjs` | 27 项：发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）（不需要真 dsh） | 27/27 通过 |
 | `verify/e2e-tools.mjs` | 17 项：真实 dsh 端到端（需要真 dsh） | 17/17 通过 |
 | `verify/pack-install.mjs` | 9 项：打出来的包能不能装进 profile 并激活（需要真 dsh） | 9/9 通过 |
+| `verify/claims.mjs` | 文档里的数字有没有过期（它数的就是上面这些项数，所以不计入合计） | 见 `node verify/claims.mjs` |
 <!-- /facts:verify-table -->
 
 唤醒部分的验证结论与**没验到什么**见 [`docs/wake-verification.md`](../docs/wake-verification.md)。

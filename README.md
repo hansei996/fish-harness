@@ -408,6 +408,8 @@ node verify/publish.mjs                           # 27 项 · 发布状态机 / 
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs       # 17 项 · 真实 dsh 端到端
 DSH_BIN=<dsh bin> node verify/pack-install.mjs    # 9 项 · 打出来的包能不能装进 profile 并激活
 DSH_BIN=<dsh bin> node verify/live/wake-live.mjs  # 可选 · 真实 web profile 的一次真实唤醒（先体检安装）
+# 另外：node verify/claims.mjs 核对文档里这些数字有没有过期
+# （它不在上面的项数里 —— 它数的就是这些项数，不能自己数自己）
 ```
 <!-- /facts:verify-commands -->
 

@@ -124,7 +124,14 @@ export function measureCodeFacts () {
   }
 }
 
-/** 七套 verify 的名字、文件、以及各自在 CI 里的 outcome 变量。 */
+/**
+ * 各套 verify 的名字、文件、以及各自在 CI 里的 outcome 变量。
+ *
+ * `claims` **不在**这个表里，而且不能进来：它自己会调用 `measureSuiteCounts()`
+ * 来核对「文档里的项数」，把它算进被数的集合就是递归。它由 verify/claims.mjs
+ * 与 CI 单独跑，并在 verify/README 的表里以显式的一行（不带项数）出现 ——
+ * 少一行比多一个自指的循环好。
+ */
 export const SUITES = [
   { name: 'smoke', file: 'verify/smoke.mjs', outcome: 'SMOKE_OUTCOME' },
   { name: 'day-report', file: 'verify/day-report.mjs', outcome: 'DAYREPORT_OUTCOME' },
@@ -307,6 +314,8 @@ export const BLOCKS = [
       lines.push(
         'DSH_BIN=<dsh bin> node verify/live/wake-live.mjs'.padEnd(50) +
         '# 可选 · 真实 web profile 的一次真实唤醒（先体检安装）',
+        '# 另外：node verify/claims.mjs 核对文档里这些数字有没有过期',
+        '# （它不在上面的项数里 —— 它数的就是这些项数，不能自己数自己）',
       )
       return ['```sh', ...lines, '```'].join('\n')
     },
@@ -365,6 +374,7 @@ export const BLOCKS = [
         `| 套件 | 查什么 | 本机实测（合计 ${v.total} 项） |`,
         '|---|---|---|',
         ...rows,
+        '| `verify/claims.mjs` | 文档里的数字有没有过期（它数的就是上面这些项数，所以不计入合计） | 见 `node verify/claims.mjs` |',
       ].join('\n')
     },
   },

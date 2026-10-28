@@ -11,6 +11,7 @@
     "对外发布未实现 —— 页面里它「发了内容」的部分目前停在草稿"
   ],
   "seed": 20261027,
+  "timezone": "Asia/Shanghai",
   "daysRequested": 7,
   "ledgerEntries": 131,
   "ledgerKinds": [

@@ -108,19 +108,38 @@ walk(data)
 check('no volatile fields (temp paths, random record ids) leak into the artefact',
   volatile.length === 0, volatile.slice(0, 3).join(', ') || '已扫全量')
 
-// ---------- 5. 时区不能改变结论 ----------
-// 页面上写的是「2026-10-20 那天它做了什么」。如果这个日期随运行机器的时区漂移，
-// 页面在某些读者那里就是错的。day-report 用的是本地日历日，所以这里必须确认
-// 「换一个 TZ，产物仍然字节级相同」—— 出生时刻是固定的绝对时刻。
-const tzOut = path.join(tmp, 'tz.json')
-const tzRun = await run(['--out', tzOut, '--quiet'], { TZ: 'UTC' })
-check('generating under TZ=UTC still works', tzRun.code === 0, tzRun.err.trim().slice(0, 80))
-// 生成脚本自己会把出生时刻固定成绝对时刻，所以日期序列不该变；
-// 若变了，说明脚本依赖了运行机器的当前时间，页面必须跟着改。
-const tzData = JSON.parse(fs.readFileSync(tzOut, 'utf8'))
-check('the day sequence does not depend on the machine timezone',
-  tzData.dayReports.map((d) => d.day).join(',') === data.dayReports.map((d) => d.day).join(','),
-  `${tzData.dayReports[0]?.day} … ${tzData.dayReports.at(-1)?.day}`)
+// ---------- 5. 产物不能依赖运行机器的时区 ----------
+//
+// 这一条最初只比了「日期序列」，于是漏掉了一次真实的 CI 失败：出生时刻写成
+// 无时区的 `2026-10-20T08:00:00`，在东八区解析成 00:00Z、在 UTC runner 上解析成
+// 08:00Z —— `bornAt` 差 8 小时，日期看着还一样，产物却**不是同一份**，`--check`
+// 在 CI 上红、本机全绿。
+//
+// 所以现在比的是**整份产物**，而且不只看 UTC：跑三个时区（含一个跨日期线的），
+// 任何一个与基准字节级不同就说明有东西绑在了本机时区上。
+{
+  const zones = ['UTC', 'America/New_York', 'Asia/Shanghai']
+  const differs = []
+  for (const tz of zones) {
+    const out = path.join(tmp, `tz-${tz.replace(/[^a-z]/gi, '')}.json`)
+    const r = await run(['--out', out, '--quiet'], { TZ: tz })
+    if (r.code !== 0) { differs.push(`${tz}: 生成失败（${r.err.trim().slice(0, 60)}）`); continue }
+    if (fs.readFileSync(out, 'utf8') !== ta) {
+      // 指出第一个不同的字段值，而不是只说「不一样」。
+      const other = JSON.parse(fs.readFileSync(out, 'utf8'))
+      const diff = []
+      for (const key of ['bornAt', 'ledgerEntries', 'seed']) {
+        if (JSON.stringify(other[key]) !== JSON.stringify(data[key])) diff.push(`${key}: ${JSON.stringify(data[key])} → ${JSON.stringify(other[key])}`)
+      }
+      const dayDiff = other.dayReports.findIndex((d, i) => d.day !== data.dayReports[i]?.day)
+      if (dayDiff >= 0) diff.push(`第 ${dayDiff + 1} 天不同：${other.dayReports[dayDiff].day}`)
+      differs.push(`${tz}: ${diff.join('; ') || '内容不同但顶层字段一致'}`)
+    }
+  }
+  check('the whole artefact is byte-identical under UTC, New York and Shanghai (nothing is bound to the runner timezone)',
+    differs.length === 0,
+    differs.length ? differs.join(' | ') : `${zones.length} 个时区一致`)
+}
 
 // ---------- 6. 入库的那份必须与实现一致（等价于 --check）----------
 const shippedRun = await run(['--check'])

@@ -36,8 +36,31 @@ const DAY_REPORT = path.join(REPO, 'tools', 'day-report.mjs')
 const LIFE_ID = 'week'
 const DEFAULT_OUT = path.join(REPO, 'docs', 'assets', 'life-demo.json')
 
-// 出生时刻固定：不固定的话「第 1 天」会跟着运行当天漂，产物就没法 diff。
-const PINNED_BORN = '2026-10-20T08:00:00'
+// 出生时刻固定，而且**必须带时区偏移**：不固定的话「第 1 天」会跟着运行当天漂，
+// 产物就没法 diff；不带时区的话「本机跑出来的产物」与 CI 跑出来的不是同一份 ——
+// 无偏移的 `2026-10-20T08:00:00` 在东八区被解析成 00:00Z、在 UTC runner 上被解析
+// 成 08:00Z，于是 `bornAt` 差 8 小时，`--check` 在 CI 上红而本机全绿。
+//
+// 这是这个仓库记过好几次的那类 bug（「本机通过、CI 变红」），所以修法不是
+// 「CI 上重新生成一遍」，是让这一刻成为一个**绝对时刻**：+08:00 是它出生地的
+// 时区，与演示里所有本地时间（09:15 醒来等）保持一致。
+const PINNED_BORN = '2026-10-20T08:00:00+08:00'
+
+/**
+ * 生成时必须钉住时区。
+ *
+ * 生命层的「一天」是**本地日历日**：静默时段（23:00–08:00）、每日唤醒预算、
+ * day-report 的按天切分，全部按运行机器的本地时区算。这是对的 —— 对一个真人
+ * 来说「今天」当然是他的本地今天。但它带来一个后果：同一段绝对时间，在 UTC 与
+ * 在纽约跑出来的日子不一样（在纽约甚至会把第 1 天推到前一天）。
+ *
+ * 所以产物要可复现，就必须像出生时刻一样，把**时区本身**也钉住。这里选 +08:00：
+ * 与出生时刻同一个时区，也就与演示里所有本地时间（09:15 醒来等）一致。
+ *
+ * 这是被 CI 抓出来的：那个版本只钉了出生时刻，于是 `--check` 在 UTC runner 上红、
+ * 本机全绿，账本条数 131/128/134 三种。
+ */
+const PINNED_TZ = 'Asia/Shanghai'
 
 function parseArgs (argv) {
   const out = { out: DEFAULT_OUT, days: 7, seed: 20261027, check: false, quiet: false }
@@ -72,9 +95,11 @@ const USAGE = `demo-data — 把「它的一周」导出成可入库、可 diff 
 // ---------------------------------------------------------------- 编排
 
 const runJson = (script, args, env = {}) => {
+  // 钉住 TZ 与 LANG/LC_ALL：前者决定「哪一天」，后者决定 Node 的默认编码与
+  // 日期本地化。两者都要在子进程里显式给出，产物才不依运行机器而变。
   const out = execFileSync(process.execPath, [script, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: { ...process.env, TZ: PINNED_TZ, ...env },
     maxBuffer: 64 * 1024 * 1024,
   })
   return JSON.parse(out)
@@ -107,14 +132,14 @@ function build (args) {
     const week = runJson(LIFE_WEEK, [
       '--home', home, '--days', String(args.days),
       '--seed', String(args.seed), '--born', PINNED_BORN, '--json',
-    ])
+    ], { TZ: PINNED_TZ })
 
     // 2) 对每一天调一次 day-report —— 也就是「用户第二天真正看到的那层」。
     //    日列表从账本里取，而不是从 week.days 推：两边来源不同，一旦不一致
     //    应该表现为「这里少一天」，而不是被这里悄悄对齐掉。
-    const listed = runJson(DAY_REPORT, ['--life', LIFE_ID, '--all', '--json'], { DSH_HOME: home })
+    const listed = runJson(DAY_REPORT, ['--life', LIFE_ID, '--all', '--json'], { DSH_HOME: home, TZ: PINNED_TZ })
     const days = listed.days.map((day) =>
-      runJson(DAY_REPORT, ['--life', LIFE_ID, '--date', day, '--json'], { DSH_HOME: home }))
+      runJson(DAY_REPORT, ['--life', LIFE_ID, '--date', day, '--json'], { DSH_HOME: home, TZ: PINNED_TZ }))
 
     return stripVolatile({
       generatedBy: 'node tools/demo-data.mjs',
@@ -131,6 +156,9 @@ function build (args) {
         '对外发布未实现 —— 页面里它「发了内容」的部分目前停在草稿',
       ],
       seed: args.seed,
+      // 记下这份产物是按哪个时区生成的 —— 页面上的「08:00 醒了」只有这样才是
+      // 一个确定的说法，而不是「看你从哪儿打开」。
+      timezone: PINNED_TZ,
       daysRequested: args.days,
       ledgerEntries: week.ledgerEntries,
       ledgerKinds: week.ledgerKinds,
