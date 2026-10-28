@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开源计划：从「能跑」到「别人能装」</title>
+<style>
+:root{
+  color-scheme: dark;
+  --ink:#eef3ff; --ink2:#95a4c7; --ink3:#5a688a; --ink4:#39435e;
+  --bg:#05070d; --panel:#0a0f1a; --line:#18203a; --line2:#232d47;
+  --life:#4f86ff; --life2:#a8c8ff;
+  --ok:#4ade80; --warm:#ffb765; --bad:#f87171; --vio:#a78bfa;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:13.5px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.scroller{overflow-x:auto;padding:22px 18px 30px}
+.board{width:1250px;margin:0 auto}
+.head{padding:34px 0 0}
+.kicker{font-size:11px;letter-spacing:.24em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;margin-bottom:12px}
+h1{font-size:26px;line-height:1.22;letter-spacing:-.03em;margin:0 0 9px;font-weight:700}
+h1 em{font-style:normal;color:var(--life2)}
+.lead{color:var(--ink2);font-size:13px;margin:0;max-width:88em;line-height:1.72}
+.lead b{color:var(--ink)}
+
+/* ===== 阻断条 ===== */
+.blocker{margin-top:20px;border:1px solid rgba(248,113,113,.45);border-radius:14px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(248,113,113,.09),rgba(248,113,113,.02))}
+.blocker-hd{padding:13px 17px;border-bottom:1px solid rgba(248,113,113,.3);
+  display:flex;align-items:baseline;gap:10px}
+.blocker-hd b{font-size:14px;color:#fca5a5}
+.blocker-hd .tag{margin-left:auto;font-family:var(--mono);font-size:10px;color:#fca5a5;
+  border:1px solid rgba(248,113,113,.4);border-radius:999px;padding:2px 9px}
+.blocker-bd{padding:15px 17px}
+.blocker-bd p{margin:0 0 11px;font-size:12.5px;color:#e8c5c5;line-height:1.7}
+.blocker-bd p:last-child{margin-bottom:0}
+.blocker-bd b{color:#fff}
+.code{background:#0b0f19;border:1px solid var(--line2);border-radius:8px;padding:9px 11px;
+  font-family:var(--mono);font-size:10.5px;line-height:1.6;overflow-x:auto;color:#b9c6de;margin:9px 0}
+.code .hl{color:#fca5a5}
+
+/* ===== 阶段 ===== */
+.phases{margin-top:22px;display:flex;flex-direction:column;gap:13px}
+.ph{border:1px solid var(--line2);border-radius:13px;background:var(--panel);overflow:hidden}
+.ph-hd{display:flex;align-items:center;gap:11px;padding:12px 16px;border-bottom:1px solid var(--line2);
+  background:linear-gradient(180deg,rgba(255,255,255,.02),transparent)}
+.ph-hd .n{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;
+  font-family:var(--mono);font-size:11px;font-weight:700;flex:none}
+.ph.p1 .ph-hd .n{background:rgba(79,134,255,.15);color:var(--life2);border:1px solid rgba(79,134,255,.4)}
+.ph.p2 .ph-hd .n{background:rgba(167,139,250,.15);color:var(--vio);border:1px solid rgba(167,139,250,.4)}
+.ph.p3 .ph-hd .n{background:rgba(74,222,128,.15);color:var(--ok);border:1px solid rgba(74,222,128,.4)}
+.ph-hd b{font-size:13.5px}
+.ph-hd .st{margin-left:auto;font-family:var(--mono);font-size:10px;padding:2px 9px;border-radius:999px;border:1px solid}
+.ph.p1 .ph-hd .st{color:var(--life2);border-color:rgba(79,134,255,.45)}
+.ph.p2 .ph-hd .st{color:var(--vio);border-color:rgba(167,139,250,.45)}
+.ph.p3 .ph-hd .st{color:var(--ok);border-color:rgba(74,222,128,.45)}
+.ph-bd{padding:14px 16px 16px}
+.task{display:grid;grid-template-columns:20px 1fr auto;gap:11px;align-items:start;
+  padding:9px 0;border-bottom:1px dashed var(--line2)}
+.task:last-child{border-bottom:0;padding-bottom:0}
+.task .box{width:15px;height:15px;border-radius:4px;border:1px solid var(--line2);margin-top:2px;
+  display:grid;place-items:center;font-size:9px;color:var(--ok)}
+.task.done .box{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.45)}
+.task .tt{font-size:12px;font-weight:600;margin-bottom:3px}
+.task .td{font-size:11px;color:var(--ink2);line-height:1.6}
+.task .td code{font-family:var(--mono);font-size:10px;background:#0d1220;border:1px solid var(--line2);
+  border-radius:3px;padding:0 4px;color:var(--life2)}
+.task .wm{font-family:var(--mono);font-size:10px;color:var(--ink3);white-space:nowrap;padding-top:2px}
+.task.blocked .tt{color:#fca5a5}
+.task.blocked .box{border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.1)}
+
+/* ===== 门 ===== */
+.gates{margin-top:22px;border:1px solid var(--line2);border-radius:13px;overflow:hidden}
+.gates-hd{padding:11px 16px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+  border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink3)}
+.gate-row{display:grid;grid-template-columns:230px 1fr 130px;gap:1px;background:var(--line2)}
+.gate-row>div{background:var(--panel);padding:11px 15px;font-size:11.5px}
+.gate-row.head>div{background:#0d1322;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink3);padding:8px 15px}
+.gate-row .k{font-size:12px;font-weight:600}
+.gate-row .k em{font-style:normal;display:block;font-family:var(--mono);font-size:10px;
+  color:var(--ink3);margin-top:3px;font-weight:400}
+.gate-row .d{color:var(--ink2)}
+.gate-row .d code{font-family:var(--mono);font-size:10px;background:#0d1220;border:1px solid var(--line2);
+  border-radius:3px;padding:0 4px;color:var(--life2)}
+.gate-row .s{font-family:var(--mono);font-size:11px}
+.gate-row .s.ok{color:var(--ok)} .gate-row .s.no{color:var(--warm)}
+
+/* ===== 名字候选 ===== */
+.names{margin-top:22px;border:1px solid var(--line2);border-radius:13px;overflow:hidden}
+.names-hd{padding:11px 16px;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+  border-bottom:1px solid var(--line2);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink3)}
+.nm{display:grid;grid-template-columns:220px 1fr 110px;gap:1px;background:var(--line2)}
+.nm>div{background:var(--panel);padding:10px 15px;font-size:11.5px}
+.nm .n{font-family:var(--mono);font-size:11.5px;color:var(--ink)}
+.nm .w{color:var(--ink2)}
+.nm .v{font-family:var(--mono);font-size:11px;text-align:right}
+.nm .v.free{color:var(--ok)} .nm .v.taken{color:var(--bad)}
+
+.tail{margin:30px 0 0;padding:0 0 48px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.tail h3{font-size:10px;letter-spacing:.2em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;font-weight:500;margin:0 0 11px}
+.tail ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.tail li{font-size:11.5px;color:var(--ink2);line-height:1.62;padding-left:14px;position:relative}
+.tail li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%}
+.tail .did li::before{background:var(--ok)}
+.tail .not li::before{background:var(--warm)}
+.tail li b{color:var(--ink)}
+.tail code{font-family:var(--mono);font-size:10px;color:var(--ink2);
+  background:#0d1220;border:1px solid var(--line2);border-radius:3px;padding:0 4px}
+a{color:var(--life2)}
+</style>
+</head>
+<body>
+<div class="scroller"><div class="board">
+
+<div class="head">
+  <div class="kicker">Open-source plan · 2026-10-28</div>
+  <h1>开源计划：从「能跑」到「别人能装」<em>—— 但先有一个必须先解决的名字冲突</em></h1>
+  <p class="lead">
+    打包与安装这两关<b>已经自动化并在 CI 里跑</b>（<code>verify/pack-install.mjs</code> 9/9）。
+    真正挡在发布前面的是另外两件事：<b>包名在公开 npm 上已被占用</b>，
+    以及<b>这台机器上的 npm 指向内网镜像</b>。
+    三个阶段、五道门，全部标注了当前状态。
+  </p>
+</div>
+
+<div class="blocker">
+  <div class="blocker-hd"><b>▲ 发布前的阻断项：名字与生态位置都已经被占了</b>
+    <span class="tag">必须先解决</span></div>
+  <div class="blocker-bd">
+    <p><b>① 包名。</b><code>dsh-life</code> 在公开 npm 上已存在，维护者不是我们：</p>
+    <div class="code">$ curl -sS https://registry.npmjs.org/dsh-life
+存在！latest <span class="hl">1.0.0</span>  维护者 <span class="hl">['mofashi']</span>  首发 2026-10-27
+描述：DSH 插件「AI生命」：按《数字生命》v1.1 实现。记忆分两条轴——L1–L6 记忆层……
+keywords: ['dsh','dsh-plugin','ai-life','memory','recall','forgetting-curve']</div>
+    <p><b>同一天发布、同一个方向、连「身份档案」都在描述里。</b>我们发不出去，
+      而且 <code>MARKET.md §六</code> 原来写的「这一格没人占」已被推翻。</p>
+    <p><b>② 生态位置。</b>复核发现单点都有人做了 —— 跨会话记忆 7 家以上、
+      主动唤醒有 <code>dsh-proactive</code> 与 <code>@proactive-agent</code>、
+      连「大肥鱼」这个形象都被 <code>dsh-pet</code>（4627 星）用了，从 8 月就在做。</p>
+    <p><b>③ 本机 registry。</b><code>npm config get registry</code> 返回
+      <code>https://bnpm.byted.org/</code>（内网镜像）。直接 <code>npm publish</code> 会发到内网去。</p>
+  </div>
+</div>
+
+<div class="phases">
+
+  <!-- 阶段 1 -->
+  <div class="ph p1">
+    <div class="ph-hd"><span class="n">1</span><b>把发布路径变成可重复的</b>
+      <span class="st">已自动化，不用凭据</span></div>
+    <div class="ph-bd">
+      <div class="task done"><span class="box">✓</span>
+        <div><div class="tt">打包产物自动核对</div>
+          <div class="td">从 <code>package.json</code> 的 <code>files</code> 推导该有哪些文件，漏了就报文件名；
+            断言 <code>cordis.patch.yml</code> 在包根（dsh bundle patch 的路径要求）。</div></div>
+        <span class="wm">verify/pack-install</span></div>
+      <div class="task done"><span class="box">✓</span>
+        <div><div class="tt">tarball 真装进全新 profile 并激活</div>
+          <div class="td"><code>link:</code> 安装不会解析 <code>peerDependencies</code> ——
+            只有真装一次 tarball 才暴露问题。这套覆盖了它。</div></div>
+        <span class="wm">9/9 通过</span></div>
+      <div class="task done"><span class="box">✓</span>
+        <div><div class="tt">进 CI，ubuntu + windows 各一遍</div>
+          <div class="td">推之前就会红，不用等到手动发布才发现包漏了文件。</div></div>
+        <span class="wm">.github/workflows</span></div>
+      <div class="task"><span class="box"></span>
+        <div><div class="tt">补：发布后自动验证</div>
+          <div class="td">发布之后应自动跑一次真装，确认不是发了个坏包 ——
+            这是「陌生人第一步」那条断言的自然延伸。</div></div>
+        <span class="wm">待做</span></div>
+    </div>
+  </div>
+
+  <!-- 阶段 2 -->
+  <div class="ph p2">
+    <div class="ph-hd"><span class="n">2</span><b>决定叫什么、站在哪</b>
+      <span class="st">需要人判断</span></div>
+    <div class="ph-bd">
+      <div class="task blocked"><span class="box">!</span>
+        <div><div class="tt">先读 <code>mofashi/dsh-life</code> 是什么</div>
+          <div class="td">三种可能，处理完全不同：<b>巧合同名</b>（换名继续）／
+            <b>同一批人</b>（认领续发）／<b>真竞争者</b>（重新定位差异，
+            像 <code>MARKET.md §八</code> 对 OpenClaw 那样）。<b>做这步之前不要改名、不要发布。</b></div></div>
+        <span class="wm">阻断后续</span></div>
+      <div class="task blocked"><span class="box">!</span>
+        <div><div class="tt">确认剩下的组合差异是否真没人做</div>
+          <div class="td">活动选择 / 证据规则+可回放账本 / 发布生命周期 / 三档状态机 / 养不死的工程定义 ——
+            目前是<b>按关键词搜索</b>得出的「未见」，不是一家家读完确认的。</div></div>
+        <span class="wm">假设待验证</span></div>
+      <div class="task"><span class="box"></span>
+        <div><div class="tt">改包名（两处 + README）</div>
+          <div class="td"><code>packages/dsh-life/package.json</code> 的 <code>name</code>，
+            加根 README 与包 README 里的安装命令。</div></div>
+        <span class="wm">3 处</span></div>
+    </div>
+  </div>
+
+  <!-- 阶段 3 -->
+  <div class="ph p3">
+    <div class="ph-hd"><span class="n">3</span><b>发布，并让陌生人真的装得上</b>
+      <span class="st">需要公网凭据</span></div>
+    <div class="ph-bd">
+      <div class="task"><span class="box"></span>
+        <div><div class="tt">用公网 registry 登录</div>
+          <div class="td">显式指定，绕开本机的内网镜像：
+            <code>npm login --registry https://registry.npmjs.org/</code></div></div>
+        <span class="wm">需凭据</span></div>
+      <div class="task"><span class="box"></span>
+        <div><div class="tt">发布</div>
+          <div class="td"><code>npm publish --registry https://registry.npmjs.org/</code>。
+            注意：若最终仍用 <code>dsh-life</code>，0.1.0 低于已存在的 1.0.0 会被拒（需 <code>--tag</code>，
+            且用不了 latest）。换名字没有这个问题。</div></div>
+        <span class="wm">需凭据</span></div>
+      <div class="task"><span class="box"></span>
+        <div><div class="tt">发布后改回 README 的安装命令</div>
+          <div class="td">把 <code>link:</code> 那段换回 <code>dsh plugin add &lt;新包名&gt;</code>，
+            并删掉「还没发布」的提示。</div></div>
+        <span class="wm">2 处</span></div>
+      <div class="task"><span class="box"></span>
+        <div><div class="tt">陌生人演练（真正的验收）</div>
+          <div class="td">找<b>一个不写代码的人</b>，从零装到「它开始生活」，
+            全程只允许看文档、记录卡在哪一步。已有的是两台机器上的自测，那不是陌生人。</div></div>
+        <span class="wm">PRODUCT §9.3</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="gates">
+  <div class="gates-hd">五道门（发布前必须全绿）</div>
+  <div class="gate-row head"><div>门</div><div>验什么</div><div>当前</div></div>
+  <div class="gate-row"><div class="k">打包完整<em>verify/pack-install</em></div>
+    <div class="d">tarball 里的文件与 <code>files</code> 声明一致；<code>cordis.patch.yml</code> 在包根</div>
+    <div class="s ok">✓ 通过</div></div>
+  <div class="gate-row"><div class="k">装得上并激活<em>同一套</em></div>
+    <div class="d">装进全新 profile 后 boot，断言生命真的被创建（<code>identity.json</code> 落盘）</div>
+    <div class="s ok">✓ 通过</div></div>
+  <div class="gate-row"><div class="k">名字可用<em>registry.npmjs.org</em></div>
+    <div class="d"><code>dsh-life</code> 已被占用；候选 <code>dsh-living</code> / <code>dsh-digital-life</code> / <code>fish-harness</code> 可用</div>
+    <div class="s no">✕ 阻断</div></div>
+  <div class="gate-row"><div class="k">README 步骤可跑<em>陌生人视角</em></div>
+    <div class="d">每一行命令都不能是红的 —— r 曾经第一行就是 <code>ERR_PNPM_FETCH_404</code></div>
+    <div class="s no">部分</div></div>
+  <div class="gate-row"><div class="k">陌生人演练<em>不写代码的人</em></div>
+    <div class="d">从零装到「它开始生活」，只允许看文档</div>
+    <div class="s no">未做</div></div>
+</div>
+
+<div class="names">
+  <div class="names-hd">包名候选（实测于 registry.npmjs.org）</div>
+  <div class="nm"><div class="n">dsh-life</div><div class="w">已被 <code>mofashi</code> 占用，1.0.0，同方向</div><div class="v taken">✕ 占用</div></div>
+  <div class="nm"><div class="n">dsh-fish</div><div class="w">已被 <code>dushaobindoudou</code> 占用（0.0.1，9 月）</div><div class="v taken">✕ 占用</div></div>
+  <div class="nm"><div class="n">dsh-living</div><div class="w">贴近 dsh-* 命名，语义是「活着的」而不是「一条命」</div><div class="v free">✓ 可用</div></div>
+  <div class="nm"><div class="n">dsh-digital-life</div><div class="w">语义直接，但偏长</div><div class="v free">✓ 可用</div></div>
+  <div class="nm"><div class="n">fish-harness</div><div class="w">与仓库同名，便于对应</div><div class="v free">✓ 可用</div></div>
+</div>
+
+<div class="tail">
+  <div class="did">
+    <h3>这一版计划证明了什么</h3>
+    <ul>
+      <li><b>打包与安装两关是真的过了</b>：<code>verify/pack-install.mjs</code> 9/9，
+        15 files / 15 promised，进 CI 双平台。这不是纸面计划。</li>
+      <li><b>阻断项是实测出来的</b>：包名占用、形象被用、生态位被占，都取自
+        <code>registry.npmjs.org</code> 与 GitHub 的真实响应，不是推测。</li>
+      <li><b>本机 registry 指向内网</b>：这一点在旧文档里没有，实测才发现 ——
+        直接发布会上错 registry。</li>
+    </ul>
+  </div>
+  <div class="not">
+    <h3>这一版计划没有证明什么</h3>
+    <ul>
+      <li><b>「没人同时占」是假设</b>：按关键词搜出来的，不是一家家读完确认的。</li>
+      <li><b>没读 <code>mofashi/dsh-life</code> 的实现</b>：不知道重合到什么程度。
+        在做完这步之前，改名与发布都不应该发生。</li>
+      <li><b>没有 changelog / release notes 机制。</b></li>
+      <li><b>陌生人演练完全没做</b> —— 而这才是「别人能装」的唯一验收。</li>
+      <li><b>没有考虑「合作」这条路</b>：如果 <code>mofashi</code> 在解决同一问题，
+        与它合并或协作可能比另起一个名字更好。这一步需要人来判断。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tail" style="grid-template-columns:1fr;padding-top:0">
+  <div>
+    <h3>怎么复算</h3>
+    <ul>
+      <li><code>node verify/pack-install.mjs</code> —— 两关的自动化验收</li>
+      <li><code>curl -sS https://registry.npmjs.org/&lt;name&gt;</code> —— 名字是否可用，权威来源</li>
+      <li><code>npm config get registry</code> —— 本机发布目标（当前是内网）</li>
+      <li>逐步骤实测记录：<a href="release.md">docs/release.md</a> ·
+        生态复核：<a href="MARKET.md">docs/MARKET.md §五之二</a></li>
+    </ul>
+  </div>
+</div>
+
+</div></div>
+</body>
+</html>
