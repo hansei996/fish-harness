@@ -144,6 +144,7 @@ export const SUITES = [
   // landing 需要一个有 Chromium 的 Playwright。CI 里没有就自己 SKIP（0/0），
   // 所以把它放进表里是安全的 —— 它不会因为缺浏览器而把流水线弄红。
   { name: 'landing', file: 'verify/landing.mjs', outcome: 'LANDING_OUTCOME' },
+  { name: 'market', file: 'verify/market.mjs', outcome: 'MARKET_OUTCOME' },
 ]
 
 /**
@@ -245,6 +246,7 @@ const SUITE_ROLES = {
   e2e: { needsDsh: true, what: '真实 dsh 端到端' },
   pack: { needsDsh: true, what: '打出来的包能不能装进 profile 并激活' },
   landing: { needsDsh: false, what: '落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）' },
+  market: { needsDsh: false, what: '市场调研文档的结构与诚实性（数字三态标注、证伪条件、没有编造）' },
 }
 
 export const BLOCKS = [
@@ -272,8 +274,7 @@ export const BLOCKS = [
     file: 'README.md',
     render: (facts) => {
       if (!facts.verify) throw new Error('verify-summary 需要 --suites 真跑的结果')
-      const n = facts.verify.suites.length
-      const zh = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'][n] || String(n)
+      const zh = cn(facts.verify.suites.length)
       return `| [\`verify/\`](verify/) | ${zh}套共 **${facts.verify.total} 项**；另有一条 opt-in 的真实唤醒检查（3 项） |`
     },
   },
@@ -283,8 +284,7 @@ export const BLOCKS = [
     file: 'README.md',
     render: (facts) => {
       if (!facts.verify) throw new Error('verify-workflow 需要 --suites 真跑的结果')
-      const n = facts.verify.suites.length
-      const zh = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'][n] || String(n)
+      const zh = cn(facts.verify.suites.length)
       const names = facts.verify.suites.map((s) => s.name).join(' / ')
       return `| [\`.github/workflows/verify.yml\`](.github/workflows/verify.yml) | ubuntu + windows 各跑一遍${zh}套 verify（${names}） |`
     },
@@ -295,8 +295,7 @@ export const BLOCKS = [
     file: 'README.md',
     render: (facts) => {
       if (!facts.verify) throw new Error('verify-headline 需要 --suites 真跑的结果')
-      const n = facts.verify.suites.length
-      const zh = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'][n] || String(n)
+      const zh = cn(facts.verify.suites.length)
       const sn = (name) => {
         const s = facts.verify.suites.find((x) => x.name === name) || {}
         return s.skipped ? '未跑' : (s.count ?? '?')
@@ -387,6 +386,7 @@ export const BLOCKS = [
         ['life-week', 'verify/life-week.mjs', '连跑七天（压缩时钟，复用生产的 store/choose/wake）', false],
         ['ui', 'verify/ui.mjs', '界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归', false],
         ['publish', 'verify/publish.mjs', '发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation', false],
+        ['landing', 'verify/landing.mjs', '落地页与场景原型在真 Chromium 里的像素级验证（三档视口、无溢出、无 JS 错误、数据真的渲染出来）；缺浏览器则跳过', false],
         ['e2e', 'verify/e2e-tools.mjs', '真 dsh 端到端：组合 profile → `dsh plugin` 安装 → 启动 → 断言运行系统实际产出', true],
         ['pack', 'verify/pack-install.mjs', '`pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身）', true],
       ]
@@ -405,7 +405,7 @@ export const BLOCKS = [
         '',
         table,
         '',
-        `${['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'][facts.verify.suites.length]}套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[\`.github/workflows/verify.yml\`](../.github/workflows/verify.yml)）。`,
+        `${cn(facts.verify.suites.length)}套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[\`.github/workflows/verify.yml\`](../.github/workflows/verify.yml)）。`,
         `**项数与合计都是真跑出来的**（\`node tools/facts.mjs\` 量、\`node verify/claims.mjs\` 拦），不再手写。`,
       ].join('\n')
     },
@@ -539,6 +539,16 @@ function uncommittedMeasuredFiles () {
 }
 
 /** 把 CRLF 归一成 LF。生成与比对都必须走它，否则 Windows 上会假红。 */
+/**
+ * 中文数字（一到十），超出就退回阿拉伯数字。
+ *
+ * 为什么不能只有一张 1..10 的表：套件数已经涨到 11 —— 表里查不到，模板就渲染出
+ * `undefined 套`。抓到它的是 `assertRenderable`（写进文档前会拒绝 null/undefined），
+ * 于是失败从「文档里多了一个 undefined」变成「一条说得清的断言」。
+ */
+const CN_NUM = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+const cn = (n) => CN_NUM[n] ?? String(n)
+
 const normalizeEol = (text) => text.replace(/\r\n/g, '\n')
 
 const MARK = (name) => ({ open: `<!-- facts:${name} -->`, close: `<!-- /facts:${name} -->` })

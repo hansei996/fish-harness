@@ -179,6 +179,16 @@ jobs:
           set -euo pipefail
           node verify/landing.mjs 2>&1 | tee verify-landing.log
 
+      # 市场调研文档的结构与诚实性：三态标注、证伪条件、不许编造数字。
+      # 不需要 dsh、不需要网络（它查的是文档自己的形态，不是再去抓一遍）。
+      - name: Verify — market
+        id: market
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node verify/market.mjs 2>&1 | tee verify-market.log
+
       # claims：文档里那些「必须等于实测」的数字，以及不许回流的旧值。
       # 它自己会调 tools/facts.mjs 重新量一遍并逐字比对生成块，所以**必须排在最后**：
       # 各套的项数正是它要比对的事实之一。
@@ -207,6 +217,7 @@ jobs:
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           PACK_OUTCOME: ${{ steps.pack.outcome }}
           LANDING_OUTCOME: ${{ steps.landing.outcome }}
+          MARKET_OUTCOME: ${{ steps.market.outcome }}
         run: node .github/scripts/ci-report.mjs
 
       - name: Upload verify logs

@@ -728,6 +728,21 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 
 自主唤醒做完之后，「它自己醒来、自己选活动、自己收尾」这条链已经通了。**剩下的缺口里，发布和界面各自挡着一个「能不能给人看」的问题。**
 
+> **2026-10-28 更新：这两条线的状态已经不是「要做」，而是「做完了但没接真东西」。**
+> 发布线的状态机、标识硬闸、逐条批准、对账、Telegram 适配器都已实现并有 27 项验证
+> （`verify/publish.mjs`）——**但一次真实 Telegram 都没发过**（没有凭据）。
+> 界面线的 `life/state.json` 路由与客户端半身已实现（`verify/ui.mjs` 28 项），
+> 像素级也验了（`verify/landing.mjs`）；**但七页原型还没落成真实的插件视图**。
+> 所以这一节下面写的是「当时的判断」，保留它是因为判断本身仍然成立 ——
+> 只是现在**卡在同一个地方：要接真实世界，就得有真实凭据与真实账号。**
+> 现状的权威口径见 `node tools/facts.mjs`，不要从这一节推。
+
+> **市场调研补上的一个判断**（`MARKET.md` §三 的能力矩阵）：矩阵七格里，
+> 「**外部副作用幂等**」与「**内容标识合规**」两格，**上面所有对标物都是「无」** ——
+> 不是它们做不到，是它们**没有外部副作用**（模拟不出沙盒、陪伴不真发帖、
+> 记忆层不碰平台）。**这两格是代码已经写好的，而它们是这条路唯一抄不到的东西。**
+> 所以发布线的价值不是「又一个渠道」，是**它是这两格唯一能被验证的地方**。
+
 **为什么这两条并列第一**：
 
 - 唤醒做完之前，它是一条**有能力但没有生活**的命。
@@ -772,7 +787,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 ### 11.1 代码级：已实现，可复现
 
 <!-- facts:plan-verify-table -->
-实测 **230 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
+实测 **240 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |
@@ -786,7 +801,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 | `verify/pack-install.mjs` | **9** | `pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身） | 是 |
 | `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |
 
-九套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[`.github/workflows/verify.yml`](../.github/workflows/verify.yml)）。
+十套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[`.github/workflows/verify.yml`](../.github/workflows/verify.yml)）。
 **项数与合计都是真跑出来的**（`node tools/facts.mjs` 量、`node verify/claims.mjs` 拦），不再手写。
 <!-- /facts:plan-verify-table -->
 
