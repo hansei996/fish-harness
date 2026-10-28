@@ -3,285 +3,312 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>记忆层：一张图讲清它怎么跨对话活着</title>
+<title>记忆层架构总图</title>
 <style>
 :root{
   color-scheme: dark;
-  --ink:#eef3ff; --ink2:#95a4c7; --ink3:#5a688a;
+  --ink:#eef3ff; --ink2:#95a4c7; --ink3:#5a688a; --ink4:#3d4864;
   --bg:#05070d; --panel:#0a0f1a; --line:#18203a; --line2:#232d47;
-  --dead1:#1b2338; --dead2:#141b2c;
-  --life:#4f86ff; --life2:#a8c8ff; --warm:#ffb765; --ok:#4ade80;
+  --dsh:#7c8aa8; --dshbg:#131a2b;
+  --life:#4f86ff; --life2:#a8c8ff;
+  --ok:#4ade80; --warm:#ffb765; --vio:#a78bfa;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
-body{font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+body{font:14px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
   -webkit-font-smoothing:antialiased}
-.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
 
-/* ============ 头部 ============ */
-header{padding:66px 0 40px}
-.kicker{font-size:11.5px;letter-spacing:.24em;color:var(--ink3);font-family:var(--mono);
-  text-transform:uppercase;margin-bottom:18px}
-h1{font-size:clamp(26px,3.4vw,44px);line-height:1.16;letter-spacing:-.03em;margin:0 0 14px;font-weight:700}
+/* 整图可横向滚动 —— 大图不压缩 */
+.scroller{overflow-x:auto;padding:26px 20px 34px}
+.board{width:1220px;margin:0 auto;position:relative}
+/* 窄屏：整图可横向滚动，而不是把页面撑破 */
+@media(max-width:1260px){
+  .scroller{overflow-x:auto}
+  .head,.legend,.tail{width:auto;max-width:1220px}
+}
+@media(max-width:1000px){
+  .head,.legend,.tail{width:auto}
+  .tail{grid-template-columns:1fr}
+}
+
+.head{width:1220px;max-width:100%;margin:0 auto;padding:44px 4px 0}
+.kicker{font-size:11px;letter-spacing:.24em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;margin-bottom:14px}
+h1{font-size:30px;line-height:1.2;letter-spacing:-.03em;margin:0 0 10px;font-weight:700}
 h1 em{font-style:normal;color:var(--life2)}
-.sub{color:var(--ink2);font-size:15px;margin:0;max-width:52em;line-height:1.8}
-.sub b{color:var(--ink)}
+.lead{color:var(--ink2);font-size:13.5px;margin:0;max-width:70em;line-height:1.75}
+.lead b{color:var(--ink)}
 
-/* ============ 图的主体 ============ */
-.diagram{border:1px solid var(--line);border-radius:18px;background:var(--panel);
-  padding:0;overflow:hidden;margin-top:30px}
+/* ============ 三段式：dsh / 生命层 / 磁盘 ============ */
+.plane{border:1px solid var(--line);border-radius:14px;position:relative}
+.plane-tag{position:absolute;left:14px;top:-9px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;background:var(--bg);padding:0 9px;color:var(--ink3)}
 
-/* --- 第一段：时间轴 --- */
-.tl{padding:30px 28px 24px;border-bottom:1px solid var(--line);
-  background:linear-gradient(180deg,rgba(79,134,255,.035),transparent)}
-.tl-hd{font-size:11.5px;letter-spacing:.18em;color:var(--ink3);font-family:var(--mono);
-  text-transform:uppercase;margin-bottom:20px}
-.row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.sealed{height:62px;border-radius:9px;position:relative;overflow:hidden;
-  background:linear-gradient(165deg,var(--dead1),var(--dead2));border:1px solid var(--line2);
-  box-shadow:inset 0 -12px 20px -12px #000}
-.sealed::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;
-  background:repeating-linear-gradient(115deg,#2b3550 0 6px,#1b2338 6px 12px)}
-.sealed i{position:absolute;left:10px;height:3px;border-radius:2px;background:#28334e;display:block}
-.sealed i:nth-child(1){top:13px;width:56%}
-.sealed i:nth-child(2){top:23px;width:38%;opacity:.7}
-.sealed i:nth-child(3){top:33px;width:62%;opacity:.45}
-.sealed i:nth-child(4){top:43px;width:28%;opacity:.28}
-.cap{display:flex;align-items:baseline;gap:7px;margin-top:9px;font-size:11px;font-family:var(--mono)}
-.cap .no{color:var(--ink3)} .cap .end{color:#8a5252;margin-left:auto}
+/* --- dsh 平面 --- */
+.plane-dsh{background:var(--dshbg);border-color:#26314c;padding:22px 20px 18px}
+.dsh-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}
+.dsh-svc{border:1px dashed #35405e;border-radius:10px;padding:11px 12px;background:rgba(255,255,255,.016)}
+.dsh-svc .t{font-size:12.5px;font-weight:600;color:#c3cddf;margin-bottom:5px;
+  display:flex;align-items:center;gap:6px}
+.dsh-svc .t i{width:6px;height:6px;border-radius:50%;background:var(--dsh);flex:none;display:block}
+.dsh-svc .d{font-size:11px;color:var(--ink3);line-height:1.55}
+.dsh-svc .api{font-family:var(--mono);font-size:10px;color:#8fa0bd;margin-top:6px;
+  padding-top:6px;border-top:1px dashed #2b3550}
 
-.cable{position:relative;height:80px;margin-top:16px}
-.cable .rail{position:absolute;left:0;right:0;top:34px;height:6px;border-radius:3px;
-  background:linear-gradient(90deg,#0f1626,#16203a 40%,#0f1626)}
-.cable .live{position:absolute;left:0;top:34px;height:6px;border-radius:3px;width:100%;
-  background:linear-gradient(90deg,#2d5fd0,var(--life) 45%,var(--life2));
-  box-shadow:0 0 12px 1px rgba(79,134,255,.7),0 0 34px 6px rgba(79,134,255,.28)}
-.cable .jw{position:absolute;top:25px;width:40px;height:40px;transform:translateX(-50%);
-  display:grid;place-items:center}
-.cable .j{width:22px;height:22px;border-radius:50%;
-  background:radial-gradient(circle,var(--life2),var(--life) 62%,transparent 74%);
-  box-shadow:0 0 16px 4px rgba(79,134,255,.75)}
-.cable .lbl{position:absolute;left:0;top:58px;font-size:12px;color:var(--life2);font-family:var(--mono)}
-.cable .lbl b{color:#fff;font-weight:600}
-.cable .drop{position:absolute;top:-14px;width:1px;height:50px;
-  background:linear-gradient(180deg,transparent,rgba(79,134,255,.45))}
+/* --- 连接区（垂直连线） --- */
+.link{height:52px;position:relative}
+/* 五条从 dsh 服务到插件模块的线 */
+.wires{position:absolute;inset:0}
+.wires svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.wire{stroke:var(--life);stroke-width:1.4;fill:none;opacity:.5}
+.wire-dash{stroke-dasharray:4 4;animation:dash 2.4s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-16}}
+.wire-lbl{position:absolute;font-family:var(--mono);font-size:9.5px;color:var(--ink4);
+  transform:translateX(-50%);white-space:nowrap;background:var(--bg);padding:0 4px}
 
-/* --- 第二段：一个完整循环（机制） --- */
-.cycle{padding:30px 28px 32px}
-.cyc-hd{font-size:11.5px;letter-spacing:.18em;color:var(--ink3);font-family:var(--mono);
-  text-transform:uppercase;margin-bottom:24px}
-.cyc-hd b{color:var(--ink2);letter-spacing:0;text-transform:none;font-family:inherit;font-size:13px;margin-left:10px}
-.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;align-items:stretch}
-@media(max-width:1000px){.steps{grid-template-columns:1fr;gap:12px}}
-.step{position:relative;padding:0 16px}
-.step:first-child{padding-left:0}
-.step:last-child{padding-right:0}
-/* 步骤之间的箭头 */
-.step+.step::before{content:"→";position:absolute;left:-7px;top:6px;color:var(--life);
-  font-size:14px;opacity:.65}
-@media(max-width:1000px){.step+.step::before{content:"↓";left:0;top:-11px}}
-.step .sn{font-family:var(--mono);font-size:11px;color:var(--life);margin-bottom:9px;
+/* --- 生命层平面 --- */
+.plane-life{background:linear-gradient(180deg,rgba(79,134,255,.05),rgba(79,134,255,.012));
+  border-color:rgba(79,134,255,.34);padding:22px 20px 18px}
+.life-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.mod{border:1px solid rgba(79,134,255,.30);border-radius:11px;padding:12px 13px;
+  background:rgba(10,16,30,.72);position:relative}
+.mod.core{border-color:rgba(79,134,255,.62);background:rgba(79,134,255,.075);
+  box-shadow:0 0 0 1px rgba(79,134,255,.12),0 8px 26px -18px rgba(79,134,255,.6)}
+.mod .mh{display:flex;align-items:baseline;gap:7px;margin-bottom:7px}
+.mod .mh b{font-size:12.5px;letter-spacing:-.01em}
+.mod .mh .ln{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--ink4)}
+.mod .mb{font-size:11px;color:var(--ink2);line-height:1.6}
+.mod .mb code{font-family:var(--mono);font-size:10px;color:var(--life2);
+  background:rgba(79,134,255,.1);border:1px solid rgba(79,134,255,.18);border-radius:3px;padding:0 4px}
+
+/* 模块之间的水平流转箭头 */
+.chain{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:11px}
+.chip{border:1px solid var(--line2);border-radius:9px;padding:9px 11px;background:rgba(255,255,255,.014);
+  display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink2);position:relative}
+.chip b{color:var(--ink);font-size:11.5px;font-weight:600}
+.chip .n{font-family:var(--mono);font-size:10px;color:var(--life2);flex:none}
+.chip+.chip::before{content:"→";position:absolute;left:-9px;color:var(--life);font-size:12px;opacity:.6}
+
+/* --- 磁盘平面 --- */
+.plane-disk{background:var(--panel);border-color:#243149;padding:22px 20px 18px}
+.fs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fs-col .fsh{font-family:var(--mono);font-size:10.5px;color:var(--ink3);margin-bottom:9px;
   display:flex;align-items:center;gap:7px}
-.step .sn i{width:18px;height:18px;border-radius:50%;border:1px solid var(--life);
-  display:grid;place-items:center;font-size:9.5px;font-style:normal;flex:none}
-.step h4{margin:0 0 7px;font-size:13.5px;letter-spacing:-.01em;line-height:1.35}
-.step p{margin:0;font-size:11.5px;color:var(--ink2);line-height:1.65}
-.step code{font-family:var(--mono);font-size:10.5px;color:var(--life2);
-  background:rgba(79,134,255,.09);border:1px solid rgba(79,134,255,.2);border-radius:4px;
-  padding:1px 5px;white-space:nowrap}
+.fs-col .fsh i{width:7px;height:7px;border-radius:2px;display:block;flex:none}
+.fs-row{display:grid;grid-template-columns:178px 1fr;gap:10px;font-size:11px;
+  padding:5px 0;border-bottom:1px dashed #1b2338;align-items:baseline}
+.fs-row:last-child{border-bottom:0}
+.fs-row .f{font-family:var(--mono);color:var(--ink);font-size:10.5px;word-break:break-all}
+.fs-row .g{color:var(--ink3)}
+.fs-row .g em{font-style:normal;color:var(--ink2)}
 
-/* --- 第三段：八个文件（记忆本体） --- */
-.files{padding:26px 28px 30px;border-top:1px solid var(--line);
-  background:linear-gradient(180deg,transparent,rgba(79,134,255,.045))}
-.files-hd{font-size:11.5px;letter-spacing:.18em;color:var(--ink3);font-family:var(--mono);
-  text-transform:uppercase;margin-bottom:8px}
-.files-sub{font-size:12.5px;color:var(--ink2);margin:0 0 20px}
-.lanes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-@media(max-width:900px){.lanes{grid-template-columns:1fr}}
-.lane{border:1px solid var(--line2);border-radius:12px;padding:14px 15px;background:rgba(255,255,255,.012)}
-.lane.p1{border-left:3px solid #a78bfa}
-.lane.p2{border-left:3px solid var(--life)}
-.lane.p3{border-left:3px solid var(--ok)}
-.lane .lh{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
-.lane .lh b{font-size:13px}
-.lane .lh .sp{font-size:10.5px;color:var(--ink3);font-family:var(--mono);margin-left:auto}
-.lane ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
-.lane li{font-size:11.5px;color:var(--ink2);line-height:1.5}
-.lane li code{font-family:var(--mono);font-size:10.5px;color:var(--ink);
-  background:#0d1220;border:1px solid var(--line2);border-radius:4px;padding:1px 5px;display:inline-block}
-.lane li em{font-style:normal;color:var(--ink3)}
+/* 磁盘上方连线 */
+.disk-link{height:44px;position:relative}
+.disk-link svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.dwire{stroke:var(--life);stroke-width:1.4;fill:none;opacity:.42}
 
-/* --- 第四段：关键数字 --- */
-.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
-  border-top:1px solid var(--line)}
-@media(max-width:900px){.nums{grid-template-columns:repeat(2,1fr)}}
-.num{background:var(--panel);padding:24px 22px}
-.num .v{font-family:var(--mono);font-size:clamp(20px,2.4vw,30px);font-weight:700;
-  letter-spacing:-.03em;line-height:1;color:#5a688a}
-.num.hi .v{color:var(--life2);text-shadow:0 0 24px rgba(79,134,255,.45)}
-.num .k{font-size:11.5px;color:var(--ink2);margin-top:11px;line-height:1.55}
-.num .k b{color:var(--ink)}
+/* ============ 图例 ============ */
+.legend{display:flex;gap:26px;flex-wrap:wrap;margin:20px auto 0;width:1220px;max-width:100%;padding:0 4px;
+  font-size:11.5px;color:var(--ink3)}
+.legend span{display:flex;align-items:center;gap:8px}
+.legend i{flex:none;display:block}
+.legend .dot{width:7px;height:7px;border-radius:50%}
+.legend .w{width:24px;height:0;border-top:1.4px solid var(--life);opacity:.55}
 
-/* ============ 底部说明 ============ */
-.notes{padding:56px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:36px}
-@media(max-width:900px){.notes{grid-template-columns:1fr}}
-.notes h3{font-size:11.5px;letter-spacing:.2em;color:var(--ink3);font-family:var(--mono);
-  text-transform:uppercase;font-weight:500;margin:0 0 16px}
-.notes ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:11px}
-.notes li{font-size:12.5px;color:var(--ink2);line-height:1.65;padding-left:15px;position:relative}
-.notes li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%}
-.notes .did li::before{background:var(--ok)}
-.notes .not li::before{background:var(--warm)}
-.notes li b{color:var(--ink)}
-
-footer{padding:64px 0 56px;border-top:1px solid var(--line);margin-top:52px}
-footer p{margin:0;font-size:12px;color:var(--ink3);line-height:1.85;max-width:62em}
-footer a{color:var(--ink2)}
+/* ============ 底部清单 ============ */
+.tail{width:1220px;max-width:100%;margin:44px auto 0;padding:0 4px 60px;
+  display:grid;grid-template-columns:1fr 1fr;gap:38px}
+.tail h3{font-size:11px;letter-spacing:.2em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;font-weight:500;margin:0 0 14px}
+.tail ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.tail li{font-size:12px;color:var(--ink2);line-height:1.65;padding-left:15px;position:relative}
+.tail li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%}
+.tail .did li::before{background:var(--ok)}
+.tail .not li::before{background:var(--warm)}
+.tail li b{color:var(--ink)}
+.tail code{font-family:var(--mono);font-size:10.5px;color:var(--ink2);
+  background:#0d1220;border:1px solid var(--line2);border-radius:3px;padding:0 4px}
+@media(max-width:1000px){ .tail{grid-template-columns:1fr;width:auto} }
 </style>
 </head>
 <body>
 
-<header><div class="wrap">
-  <div class="kicker">Memory architecture · one diagram</div>
-  <h1>它凭什么跨对话活着 ——<br>而且<em>第 300 天和第 1 天一样便宜</em></h1>
-  <p class="sub">
-    dsh 给的是<strong>会话</strong>：一次对话一条日志，结束就不再增长。
-    记忆层只做一件它没做的事 —— <strong>把「跨会话仍然成立的事实」落到磁盘上</strong>。
-    下面这张图是一次完整循环：怎么写下去、怎么醒过来、怎么读回来。
-    所有路径与数字都是启动真实 dsh profile 后从磁盘上量出来的。
+<div class="head">
+  <div class="kicker">Memory architecture · full stack</div>
+  <h1>记忆层怎么串起来 ——<br><em>从 dsh 的服务，到磁盘上的八个文件</em></h1>
+  <p class="lead">
+    三层，五条接线：<b>上层是 dsh 提供的服务</b>，<b>中层是生命层的九个模块</b>，
+    <b>下层是它自己落盘的八个文件</b>。
+    每轮跑一次「注入 → 决策 → 写盘 → 布防」；人不在的时候，靠 dsh 的定时器把它叫醒。
+    <b>纵深滚动看整图；模块行数、挂载点、数据流都对着代码核过。</b>
   </p>
-</div></header>
+</div>
 
-<div class="wrap"><div class="diagram">
+<div class="scroller"><div class="board">
 
-  <!-- ① 时间轴 -->
-  <div class="tl">
-    <div class="tl-hd">① 会话会结束 —— 这是必须跨过的那道断层</div>
-    <div class="row">
-      <div><div class="sealed"><i></i><i></i><i></i><i></i></div>
-        <div class="cap"><span class="no">会话 1</span><span class="end">已封存</span></div></div>
-      <div><div class="sealed"><i></i><i></i><i></i><i></i></div>
-        <div class="cap"><span class="no">会话 2</span><span class="end">已封存</span></div></div>
-      <div><div class="sealed"><i></i><i></i><i></i><i></i></div>
-        <div class="cap"><span class="no">会话 3</span><span class="end">已封存</span></div></div>
-      <div><div class="sealed"><i></i><i></i><i></i><i></i></div>
-        <div class="cap"><span class="no">会话 4</span><span class="end">已封存</span></div></div>
-    </div>
-    <div class="cable">
-      <span class="drop" style="left:12.5%"></span><span class="drop" style="left:37.5%"></span>
-      <span class="drop" style="left:62.5%"></span><span class="drop" style="left:87.5%"></span>
-      <div class="rail"></div><div class="live"></div>
-      <span class="jw" style="left:12.5%"><span class="j"></span></span>
-      <span class="jw" style="left:37.5%"><span class="j"></span></span>
-      <span class="jw" style="left:62.5%"><span class="j"></span></span>
-      <span class="jw" style="left:87.5%"><span class="j"></span></span>
-      <span class="lbl"><b>这条命</b> —— 与哪次对话无关，一直在</span>
+  <!-- ================= 上：dsh ================= -->
+  <div class="plane plane-dsh">
+    <span class="plane-tag">DeepSeek Harness · 现成底座（不自研）</span>
+    <div class="dsh-grid">
+      <div class="dsh-svc"><div class="t"><i></i>会话与恢复</div>
+        <div class="d">事件溯源 + 崩溃恢复，按「项目目录 + 会话 id」分桶</div>
+        <div class="api">sessions/&lt;projectKey(cwd)&gt;/&lt;id&gt;/</div></div>
+      <div class="dsh-svc"><div class="t"><i></i>Host 级定时</div>
+        <div class="d">一次性闹钟；进程不在也会在下次启动补投</div>
+        <div class="api">ctx.schedule.create()</div></div>
+      <div class="dsh-svc"><div class="t"><i></i>逐次批准</div>
+        <div class="d">工具级同意；四种结果，只认 allowed-once</div>
+        <div class="api">ctx.approval.request()</div></div>
+      <div class="dsh-svc"><div class="t"><i></i>工具注册表</div>
+        <div class="d">模型可见的工具入口</div>
+        <div class="api">ctx.tools.register()</div></div>
+      <div class="dsh-svc"><div class="t"><i></i>提示词装配</div>
+        <div class="d">把人格与各 section 组合成系统提示词</div>
+        <div class="api">ctx.systemPrompt.section()</div></div>
     </div>
   </div>
 
-  <!-- ② 一次完整循环 -->
-  <div class="cycle">
-    <div class="cyc-hd">② 一次完整循环：它是这么做的<b>——每一步都指到代码</b></div>
-    <div class="steps">
-      <div class="step">
-        <div class="sn"><i>1</i>每一轮开始</div>
-        <h4>把生命状态注入提示词</h4>
-        <p>注册一个 <code>systemPrompt.section</code>，
-          <b>不替换</b> profile 已有的人格设定，只加一段。</p>
-        <p style="margin-top:7px"><em style="color:var(--ink3);font-style:normal">
-          只在唤醒轮附候选短名单 —— 普通轮不付这份成本。</em></p>
-      </div>
-      <div class="step">
-        <div class="sn"><i>2</i>注入什么</div>
-        <h4>一份有界快照</h4>
-        <p>我是谁 · 此刻在做什么 · <b>留给下一步的交接</b> ·
-          最相关的 5 个兴趣 · 最紧的 5 个承诺。</p>
-        <p style="margin-top:7px"><em style="color:var(--ink3);font-style:normal">
-          13 个字段，实测 271B（空）→ 690B（满载）。</em></p>
-      </div>
-      <div class="step">
-        <div class="sn"><i>3</i>这一轮结束</div>
-        <h4>先落盘，再布防</h4>
-        <p>收到 <code>turn/end</code> 后两步：把新事实<b>原子写盘</b>
-          （tmp + rename），再向 dsh 的 <code>schedule</code> 补一个<b>一次性</b>闹钟。</p>
-        <p style="margin-top:7px"><em style="color:var(--ink3);font-style:normal">
-          不持有 setInterval —— 自持定时器会随会话一起死。</em></p>
-      </div>
-      <div class="step">
-        <div class="sn"><i>4</i>到点了</div>
-        <h4>它自己醒过来</h4>
-        <p>dsh 往原会话投一条消息并跑一个普通 turn。抖动 / 静默时段 / 每日预算
-          由生命层自己算（dsh 的 schedule 没有这三项）。</p>
-        <p style="margin-top:7px"><em style="color:var(--ink3);font-style:normal">
-          进程不在也会在下次启动补投。</em></p>
-      </div>
-      <div class="step">
-        <div class="sn"><i>5</i>醒来第一件事</div>
-        <h4>读盘，而不是读上一次会话</h4>
-        <p>这就是跨对话发生的地方：<b>状态按 lifeId 存在磁盘上，
-          与 cwd、与 sessionId 都无关</b>。所以换目录、换会话，它还是同一个它。</p>
-      </div>
+  <!-- ================= 接线区 ================= -->
+  <div class="link">
+    <div class="wires">
+      <svg viewBox="0 0 1180 52" preserveAspectRatio="none">
+        <!-- 五条线：从 dsh 五格底部，汇到生命层 -->
+        <path class="wire wire-dash" d="M118,0 C118,26 590,26 590,52"/>
+        <path class="wire wire-dash" d="M354,0 C354,30 590,30 590,52"/>
+        <path class="wire wire-dash" d="M590,0 L590,52"/>
+        <path class="wire wire-dash" d="M826,0 C826,30 590,30 590,52"/>
+        <path class="wire wire-dash" d="M1062,0 C1062,26 590,26 590,52"/>
+      </svg>
+      <span class="wire-lbl" style="left:24%;top:6px">session/event</span>
+      <span class="wire-lbl" style="left:50%;top:26px">5 个挂载点</span>
+      <span class="wire-lbl" style="left:76%;top:6px">agent/inbox/claimed</span>
     </div>
   </div>
 
-  <!-- ③ 八个文件 -->
-  <div class="files">
-    <div class="files-hd">③ 状态本体：八个文件，按「变化速度」分三层</div>
-    <p class="files-sub">混在一起是长期运行最先崩的地方 —— 更新权限与频率都不同。</p>
-    <div class="lanes">
-      <div class="lane p1">
-        <div class="lh"><b>极慢</b><span class="sp">只有主人确认能改</span></div>
-        <ul>
-          <li><code>identity.json</code><br>名字 · 性格种子 · 版本号</li>
-          <li><em>一条网页注入改不动它 —— 能改人格的注入 = 能换人</em></li>
-        </ul>
+  <!-- ================= 中：生命层 ================= -->
+  <div class="plane plane-life">
+    <span class="plane-tag">Fish Harness · 生命层（本仓库要做的产品）</span>
+
+    <div class="life-grid">
+      <div class="mod core">
+        <div class="mh"><b>index.js</b><span class="ln">1590 行</span></div>
+        <div class="mb">插件入口。注册工具、注入上下文、监听事件、向 dsh 布防。
+          <b>全部走公开扩展点</b>，不改核心。</div>
       </div>
-      <div class="lane p2">
-        <div class="lh"><b>慢</b><span class="sp">由经历累积</span></div>
-        <ul>
-          <li><code>traits.json</code> 兴趣 · 技能（带置信度与来源）</li>
-          <li><code>relations.json</code> 认识谁（主人 / 公开分开存）</li>
-          <li><code>commitments.json</code> 答应了什么、什么时候</li>
-        </ul>
+      <div class="mod core">
+        <div class="mh"><b>store.js</b><span class="ln">737 行</span></div>
+        <div class="mb">生命状态机。<b>三档变量 · 承诺 · 关系 · 账本</b>；
+          每次写原子（tmp+rename），每次读容忍坏文件。</div>
       </div>
-      <div class="lane p3">
-        <div class="lh"><b>快</b><span class="sp">每轮都在动</span></div>
-        <ul>
-          <li><code>activity.json</code> 当前活动 + <b>给下一步的交接</b></li>
-          <li><code>wake.json</code> 下个闹钟 · 预算 · 已投递 id</li>
-          <li><code>ledger.jsonl</code> 只追加 —— 唯一可回放</li>
-          <li><code>outbox.json</code> 外部副作用状态机</li>
-        </ul>
+      <div class="mod core">
+        <div class="mh"><b>wake.js</b><span class="ln">238 行</span></div>
+        <div class="mb">唤醒策略<b>纯函数</b>：静默时段 · 抖动 · 不整天消失。
+          时钟与随机数可注入，所以能确定性测试。</div>
       </div>
+      <div class="mod core">
+        <div class="mh"><b>choose.js</b><span class="ln">703 行</span></div>
+        <div class="mb">活动选择器。七项加权给出<b>带理由的候选</b>；
+          「休息」永远在名单里、分数固定。</div>
+      </div>
+
+      <div class="mod">
+        <div class="mh"><b>outbox.js</b><span class="ln">849 行</span></div>
+        <div class="mb">发布状态机。<code>draft→checked→approved→sending→confirmed /
+          unconfirmed / failed</code>；<b>不确定就不重发</b>。</div>
+      </div>
+      <div class="mod">
+        <div class="mh"><b>compliance.js</b><span class="ln">118 行</span></div>
+        <div class="mb">内容标识<b>硬闸</b>：进 confirmed 之前必须过
+          <code>assertLabeled()</code>，收到平台回执也不行。</div>
+      </div>
+      <div class="mod">
+        <div class="mh"><b>telegram.js</b><span class="ln">133 行</span></div>
+        <div class="mb">唯一的真实渠道适配器。token 只从环境变量读，
+          错误信息擦掉 token；<b>query() 返回 null 而不假装能对账</b>。</div>
+      </div>
+      <div class="mod">
+        <div class="mh"><b>ui.js</b> <span class="ln">179 行</span></div>
+        <div class="mb">只读界面接口 <code>/life/state.json</code>。
+          每次请求现读状态文件；<b>私密内容不出主机</b>。</div>
+      </div>
+      <div class="mod">
+        <div class="mh"><b>config.js</b><span class="ln">287 行</span></div>
+        <div class="mb">零依赖的配置校验器（唤醒 / 选择器 / 发布三组字段）。
+          <b>手写而不是引 schemastery</b> —— 插件要在两种运行时都装得上。</div>
+      </div>
+    </div>
+
+    <!-- 一次循环的串行流 -->
+    <div class="chain">
+      <div class="chip"><span class="n">1</span><span><b>注入</b> systemPrompt.section</span></div>
+      <div class="chip"><span class="n">2</span><span><b>决策</b> choose 给候选</span></div>
+      <div class="chip"><span class="n">3</span><span><b>写盘</b> store 原子写</span></div>
+      <div class="chip"><span class="n">4</span><span><b>布防</b> wake 算下次</span></div>
     </div>
   </div>
 
-  <!-- ④ 数字 -->
-  <div class="nums">
-    <div class="num"><div class="v">tmp→rename</div>
-      <div class="k">每次写是原子的<br><b>断电也不会留下半截文件</b></div></div>
-    <div class="num hi"><div class="v">690 B</div>
-      <div class="k">承载 200 兴趣 + 200 承诺的完整快照<br><b>不随寿命增长</b></div></div>
-    <div class="num"><div class="v">cap/2~cap×2</div>
-      <div class="k">账本懒裁剪后震荡的区间<br><b>每次追加都重写会让长跑变慢</b></div></div>
-    <div class="num"><div class="v">null</div>
-      <div class="k">读到一个截断的身份文件时<br><b>降级，不抛错</b></div></div>
+  <!-- ================= 接线到磁盘 ================= -->
+  <div class="disk-link">
+    <svg viewBox="0 0 1180 44" preserveAspectRatio="none">
+      <path class="dwire" d="M148,0 L148,44"/>
+      <path class="dwire" d="M443,0 L443,44"/>
+      <path class="dwire" d="M738,0 L738,44"/>
+      <path class="dwire" d="M1033,0 L1033,44"/>
+    </svg>
+  </div>
+
+  <!-- ================= 下：磁盘 ================= -->
+  <div class="plane plane-disk">
+    <span class="plane-tag">$DSH_HOME · 落在磁盘上的东西（实跑 dsh 后 find 出来的）</span>
+    <div class="fs">
+      <div class="fs-col">
+        <div class="fsh"><i style="background:var(--dsh)"></i>dsh 管的 —— 会话级，按项目目录分桶</div>
+        <div class="fs-row"><span class="f">sessions/&lt;projectKey(cwd)&gt;/&lt;id&gt;/</span>
+          <span class="g">会话日志 <em>session.v4.jsonl.zstd</em> + <em>session.lock</em></span></div>
+        <div class="fs-row"><span class="f">storages/session_projcache/</span>
+          <span class="g">投影缓存 —— <em>可重建，不是事实源</em></span></div>
+        <div class="fs-row"><span class="f">profiles/&lt;name&gt;/</span>
+          <span class="g">profile 定义（cordis.yml 等）</span></div>
+        <div class="fs-row"><span class="f">.credentials.yaml</span>
+          <span class="g">凭据 —— <em>不进模型上下文</em></span></div>
+      </div>
+      <div class="fs-col">
+        <div class="fsh"><i style="background:var(--life)"></i>生命层管的 —— 生命级，按 lifeId 分桶</div>
+        <div class="fs-row"><span class="f">life/&lt;lifeId&gt;/identity.json</span>
+          <span class="g">极慢 · <em>只有主人确认能改</em></span></div>
+        <div class="fs-row"><span class="f">traits.json · relations.json · commitments.json</span>
+          <span class="g">慢 · 由经历累积，带置信度与来源</span></div>
+        <div class="fs-row"><span class="f">activity.json · wake.json</span>
+          <span class="g">快 · 当前活动 + <em>给下一步的交接</em></span></div>
+        <div class="fs-row"><span class="f">ledger.jsonl · outbox.json</span>
+          <span class="g">只追加的账本 · 外部副作用状态机</span></div>
+      </div>
+    </div>
   </div>
 
 </div></div>
 
-<div class="wrap"><div class="notes">
+<div class="legend">
+  <span><i class="dot" style="background:var(--dsh)"></i>dsh 提供的服务（不重写）</span>
+  <span><i class="dot" style="background:var(--life)"></i>生命层自己实现的模块</span>
+  <span><i class="w"></i>数据流 / 挂载</span>
+  <span><i class="dot" style="background:var(--ok)"></i>已验证</span>
+  <span><i class="dot" style="background:var(--warm)"></i>未验证（见右下）</span>
+</div>
+
+<div class="tail">
   <div class="did">
-    <h3>这张图证明了什么</h3>
+    <h3>这张图证明什么</h3>
     <ul>
-      <li><b>路径是真的</b>：启动真实 dsh profile 后 <code>find</code> 出来的 ——
-        会话在 <code>sessions/&lt;projectKey(cwd)&gt;/&lt;id&gt;/</code>，
-        生命在 <code>life/&lt;lifeId&gt;/</code>。两者分桶方式不同，这正是跨对话的根据。</li>
-      <li><b>数字是量的</b>：690B 是灌入 200 兴趣 + 200 承诺后的实测快照；
-        截断降级、账本震荡区间都跑过。</li>
-      <li><b>机制有断言</b>：注入点、布防时机、原子写、快照有界，
-        在 <code>verify/smoke.mjs</code>、<code>verify/life-week.mjs</code>、<code>verify/publish.mjs</code> 里有对应检查。</li>
+      <li><b>五条接线都是公开扩展点</b>：<code>schedule</code> · <code>approval</code> ·
+        <code>tools</code> · <code>systemPrompt</code> · <code>webServer</code>，
+        加上两个会话事件监听。<b>没有一处改 dsh 核心。</b></li>
+      <li><b>每个模块的行数与职责对着代码核过</b>：合计 4834 行宿主代码 + 176 行客户端，
+        零自有依赖（只为兼容 npm CLI 与 Electron 两种运行时）。</li>
+      <li><b>两类存储分桶方式不同</b>：会话按 <code>projectKey(cwd)</code>、生命按 <code>lifeId</code> ——
+        这就是「换目录、换会话，它还是同一个它」的根据。</li>
+      <li><b>快照有界</b>：每轮注入 13 个字段；灌入 200 兴趣 + 200 承诺后仍是 690 字节，<b>不随寿命增长</b>。</li>
     </ul>
   </div>
   <div class="not">
@@ -290,17 +317,22 @@ footer a{color:var(--ink2)}
       <li><b>长期记忆会不会「糊」</b>：跑三个月要不要总结、怎么总结，<b>未验证</b>。</li>
       <li><b>跨进程没有锁</b>：dsh 有 <code>session.lock</code>，我们这层没有。</li>
       <li><b>真实长跑没做过</b>：七天是压缩跑的，没有真实等待，也没跨真实进程重启。</li>
-      <li><b>发布线一次真实发送都没有过</b>：状态机有断言，平台是真没连过。</li>
+      <li><b>发布线一次真实发送都没有过</b>：状态机与标识硬闸有断言，平台是真没连过。</li>
+      <li><b>UI 只有只读接口</b>：<code>/life/state.json</code> 有测试，像素级没有。</li>
     </ul>
   </div>
-</div></div>
+</div>
 
-<footer><div class="wrap"><p>
-  完整技术方案（含未验清单）见 <a href="MEMORY.md">docs/MEMORY.md</a>；
-  实现见 <a href="https://github.com/hansei996/fish-harness/blob/main/packages/dsh-life/lib/store.js">lib/store.js</a>、
-  <a href="https://github.com/hansei996/fish-harness/blob/main/packages/dsh-life/lib/wake.js">lib/wake.js</a>。
-  数字可用 <a href="https://github.com/hansei996/fish-harness">tools/facts.mjs</a> 与 verify 套件复算。
-</p></div></footer>
+<div class="tail" style="grid-template-columns:1fr;padding-bottom:56px">
+  <div>
+    <h3>怎么复算</h3>
+    <ul>
+      <li><code>node tools/facts.mjs</code> —— 结构事实（工具数 / 状态文件 / 行数 / 挂载点）的唯一权威来源。</li>
+      <li><code>node verify/claims.mjs</code> —— 核对文档里的声称与实测是否一致。</li>
+      <li>完整技术方案（含未验清单）：<a href="MEMORY.md" style="color:var(--life2)">docs/MEMORY.md</a></li>
+    </ul>
+  </div>
+</div>
 
 </body>
 </html>
