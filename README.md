@@ -26,6 +26,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
 | [`docs/PRODUCT.md`](docs/PRODUCT.md) | **产品规划**：市场位置、竞争分析、分阶段对外策略 |
+| [`docs/MARKET.md`](docs/MARKET.md) | **市场调研**：我们不在哪两个市场、分层对标（带可复跑的星数/下载量）、能力矩阵、三档用户与证伪条件、定价基准 |
 | [`docs/STORY.md`](docs/STORY.md) | **叙事**：软件史的下一次变化、三个落地场景、不声称什么 |
 | [`docs/index.html`](docs/index.html) | **对外页面**：单页静态站点，GitHub Pages 直接从 `docs/` 发布 |
 | [`docs/scenarios.html`](docs/scenarios.html) | **三个落地场景的详版原型**：4 幕 × 6 拍，可点走，每拍标「已实现 / 设想」 |

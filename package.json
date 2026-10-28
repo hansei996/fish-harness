@@ -13,6 +13,7 @@
     "verify:ui": "node verify/ui.mjs",
     "verify:publish": "node verify/publish.mjs",
     "verify:landing": "node verify/landing.mjs",
+    "verify:market": "node verify/market.mjs",
     "verify:pack": "node verify/pack-install.mjs",
     "verify:e2e": "node verify/e2e-tools.mjs",
     "verify:claims": "node verify/claims.mjs",
