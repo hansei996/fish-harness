@@ -111,15 +111,6 @@ jobs:
         run: |
           node verify/demo-data.mjs 2>&1 | tee verify-demo-data.log
 
-      # claims：文档里那些「必须等于实测」的数字，以及不许回流的旧值。
-      # 它自己会调 tools/facts.mjs 重新量一遍并逐字比对生成块 ——
-      # 所以它必须跑在其它套件**之后**：项数是它要比对的事实之一。
-      - name: Verify — claims
-        id: claims
-        continue-on-error: true
-        run: |
-          node verify/claims.mjs 2>&1 | tee verify-claims.log
-
       # life-week 同样不需要 dsh：它把七天压缩跑完，用的是生产的 store/choose/wake。
       # 它是「连续七天」这个说法的证据（PRODUCT.md §6 阶段 A），所以必须每平台都跑 ——
       # 跨平台差异（路径、时区）正是它最容易出事的地方。
@@ -164,9 +155,10 @@ jobs:
           set -euo pipefail
           node verify/e2e-tools.mjs 2>&1 | tee verify-e2e.log
 
-      # 数字纪律：证明文档里的数字与代码/真跑一致。
-      # 它必须排在所有套件之后 —— 它要读它们的真实项数来比对生成块。
-      # 放在 Windows 上也跑，正是因为它拦的是一类跨平台看不出来的东西（手抄的数字）。
+      # claims：文档里那些「必须等于实测」的数字，以及不许回流的旧值。
+      # 它自己会调 tools/facts.mjs 重新量一遍并逐字比对生成块，所以**必须排在最后**：
+      # 各套的项数正是它要比对的事实之一。
+      # 重复的 step id 会让整个 workflow 非法（0 秒失败），所以这条只许存在一处。
       - name: Verify — claims
         id: claims
         shell: bash

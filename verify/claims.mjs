@@ -154,6 +154,50 @@ check('文档里引用的每个 verify/tools 脚本都真实存在',
   dangling.length === 0,
   dangling.length ? `指向不存在的文件：${dangling.join(', ')}` : `${referenced.size} 个引用已核`)
 
+// ---------------------------------------------------------------- 5. CI workflow 自身合法
+
+/**
+ * 这一条是真事故的产物：`verify.yml` 里 `claims` 步骤被加了两次（两个
+ * `id: claims`），GitHub Actions 认为整个 workflow 非法，**run 在 0 秒就失败**，
+ * 连 checkout 都没跑。所有套件本地全绿，CI 却全红 —— 而且「0 秒失败」看起来
+ * 像基础设施抖动，不像自己写错了。
+ *
+ * 本地跑一次这个检查只要几毫秒，能省掉一轮 push→等 CI→看日志。
+ */
+const workflow = read('.github/workflows/verify.yml')
+
+// YAML 的一个子集就够：我们只需要每个步骤的 `id:` 与 `name:`，不需要解析全部语法
+// （也不引入 yaml 依赖 —— 这个仓库零运行时依赖是硬约束，verify 也不破例）。
+const stepIds = [...workflow.matchAll(/^\s+- name: (.+)$/gm)].map((m) => m[1].trim())
+const ids = [...workflow.matchAll(/^\s+id: (\S+)$/gm)].map((m) => m[1])
+const dupIds = [...new Set(ids.filter((id) => ids.filter((x) => x === id).length > 1))]
+check('workflow 里没有重复的 step id（重复会让整个 run 0 秒失败）',
+  dupIds.length === 0,
+  dupIds.length ? `重复 id：${dupIds.join(', ')}` : `${ids.length} 个 id`)
+
+// 每套 verify 在 CI 里必须**恰好**被跑一次：漏了等于没进 CI，重复等于浪费机器。
+const missingInCi = []
+const dupInCi = []
+for (const suite of SUITES) {
+  const n = (workflow.match(new RegExp(`node ${suite.file.replace('.', '\\.')}`, 'g')) || []).length
+  if (n === 0) missingInCi.push(suite.name)
+  else if (n > 1) dupInCi.push(`${suite.name}×${n}`)
+}
+check('每套 verify 在 CI 里恰好跑一次',
+  missingInCi.length === 0 && dupInCi.length === 0,
+  [missingInCi.length ? `没进 CI：${missingInCi.join(', ')}` : '', dupInCi.length ? `重复：${dupInCi.join(', ')}` : ''].filter(Boolean).join('; ') || `${SUITES.length} 套`)
+
+// 每个 `id:` 都要有对应的 outcome 进了 ci-report，否则报告里会少一套而没人发现。
+const reported = [...workflow.matchAll(/([A-Z]+)_OUTCOME: \$\{\{ steps\.(\w+)\.outcome \}\}/g)]
+  .map((m) => m[2])
+const orphanIds = ids.filter((id) => !reported.includes(id) && id !== 'none')
+  .filter((id) => workflow.includes(`id: ${id}`) && /Verify —/.test(
+    // 找这个 id 所属的步骤名，只统计 Verify 步骤
+    (workflow.split(/\n\s+- name: /).find((chunk) => chunk.includes(`id: ${id}`)) || '').split('\n')[0]))
+check('CI 里每个 Verify 步骤的 outcome 都进了 Report and gate',
+  orphanIds.length === 0,
+  orphanIds.length ? `没进报告：${orphanIds.join(', ')}` : `${reported.length} 个 outcome`)
+
 // ---------------------------------------------------------------- 汇总
 
 const failed = results.filter((r) => !r.ok)
