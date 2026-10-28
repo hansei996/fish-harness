@@ -155,6 +155,18 @@ jobs:
           set -euo pipefail
           node verify/e2e-tools.mjs 2>&1 | tee verify-e2e.log
 
+      # 落地页与场景原型的像素级验证（真 Chromium）。
+      # 这一条补的是 README「已知限制」里那句「像素级没验」。
+      # 它没装 Playwright 就自己 SKIP（0/0），所以放这里不会把流水线弄红；
+      # 装了浏览器时它会真的打开页面并断言数据被画出来了。
+      - name: Verify — landing
+        id: landing
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node verify/landing.mjs 2>&1 | tee verify-landing.log
+
       # claims：文档里那些「必须等于实测」的数字，以及不许回流的旧值。
       # 它自己会调 tools/facts.mjs 重新量一遍并逐字比对生成块，所以**必须排在最后**：
       # 各套的项数正是它要比对的事实之一。

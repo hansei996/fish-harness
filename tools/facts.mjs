@@ -141,6 +141,9 @@ export const SUITES = [
   { name: 'publish', file: 'verify/publish.mjs', outcome: 'PUBLISH_OUTCOME' },
   { name: 'e2e', file: 'verify/e2e-tools.mjs', outcome: 'E2E_OUTCOME' },
   { name: 'pack', file: 'verify/pack-install.mjs', outcome: 'PACK_OUTCOME' },
+  // landing 需要一个有 Chromium 的 Playwright。CI 里没有就自己 SKIP（0/0），
+  // 所以把它放进表里是安全的 —— 它不会因为缺浏览器而把流水线弄红。
+  { name: 'landing', file: 'verify/landing.mjs', outcome: 'LANDING_OUTCOME' },
 ]
 
 /**
@@ -166,24 +169,33 @@ export function measureSuiteCounts ({ env = process.env, timeoutMs = 600000 } = 
     // 通过率是**运行结果**；把前者写成后者，等于让一次随机失败改写文档。
     const passed = match ? Number(match[1]) : null
     const total = match ? Number(match[2]) : null
+    // `0/0` 是「这套自己跳过了」（例如 landing 在没有 Chromium 的机器上），
+    // **不是「零项」**。把它当成 0 写进文档，读者会以为这套没有断言 ——
+    // 而它其实有 17 条，只是这台机器跑不了。所以标成 skipped，不进合计。
+    const skipped = total === 0
     suites.push({
       name: suite.name,
       file: suite.file,
-      count: total,
-      passed,
-      total,
-      ok: r.status === 0 && passed !== null && passed === total,
+      count: skipped ? null : total,
+      passed: skipped ? null : passed,
+      total: skipped ? null : total,
+      skipped,
+      ok: !skipped && r.status === 0 && passed !== null && passed === total,
       exitCode: r.status,
       ms: Date.now() - started,
     })
   }
-  const missing = suites.filter((s) => s.total === null).map((s) => s.name)
+  // 「跑不起来」和「自己跳过」是两件事：前者要拦住，后者只是这台机器没有那个工具。
+  const missing = suites.filter((s) => s.total === null && !s.skipped).map((s) => s.name)
+  const skippedSuites = suites.filter((s) => s.skipped).map((s) => s.name)
   const failing = suites.filter((s) => s.total !== null && s.passed !== s.total).map((s) => `${s.name} ${s.passed}/${s.total}`)
   return {
     suites,
     total: suites.reduce((sum, s) => sum + (s.total || 0), 0),
     // 没跑出计数的套件必须被点名 —— 否则 `total` 会静默少算，被写进文档。
     missing,
+    // 自己跳过的（缺工具，不是坏了）：要能看见，但不该让流水线红。
+    skipped: skippedSuites,
     // 有一套在红也照样报出来：项数是结构事实，不应该被一次失败改写，
     // 但「现在有一套是红的」必须能被看见，不能悄悄混在总项数里。
     failing,
@@ -232,6 +244,7 @@ const SUITE_ROLES = {
   publish: { needsDsh: false, what: '发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）' },
   e2e: { needsDsh: true, what: '真实 dsh 端到端' },
   pack: { needsDsh: true, what: '打出来的包能不能装进 profile 并激活' },
+  landing: { needsDsh: false, what: '落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）' },
 }
 
 export const BLOCKS = [
@@ -376,7 +389,8 @@ export const BLOCKS = [
         '| --- | --- | --- | --- |',
         ...rows.map(([name, file, what, dsh]) => {
           const s = byName.get(name)
-          return `| \`${file}\` | **${s.count}** | ${what} | ${dsh ? '是' : '否'} |`
+          const cell = s.skipped ? '**—**（本机无浏览器）' : `**${s.count}**`
+          return `| \`${file}\` | ${cell} | ${what} | ${dsh ? '是' : '否'} |`
         }),
         '| `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |',
       ].join('\n')
