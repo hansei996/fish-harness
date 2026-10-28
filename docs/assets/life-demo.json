@@ -1,0 +1,943 @@
+{
+  "generatedBy": "node tools/demo-data.mjs",
+  "whatThisProves": [
+    "七天里每天都有可解释的活动或明确的休息",
+    "承诺被兑现，兴趣由经历累积而成（不是第一天写死的人设）",
+    "账本可以逐条回放：每条结论后面都跟着证据"
+  ],
+  "whatThisDoesNotProve": [
+    "没有调用模型 —— 选活动的是排序器（lib/choose.js），不是模型",
+    "没有真的等待 —— 七天是压缩跑的，不覆盖真实调度器的投递",
+    "对外发布未实现 —— 页面里它「发了内容」的部分目前停在草稿"
+  ],
+  "seed": 20261027,
+  "daysRequested": 7,
+  "ledgerEntries": 131,
+  "ledgerKinds": [
+    "activity-end",
+    "activity-start",
+    "born",
+    "commitment",
+    "commitment-settled",
+    "interest",
+    "wake"
+  ],
+  "bornAt": "2026-10-20T00:00:00.000Z",
+  "life": {
+    "name": "大肥鱼",
+    "species": "whale"
+  },
+  "interests": [
+    {
+      "topic": "像素矿工小品",
+      "confidence": 0.95,
+      "observations": 16,
+      "source": "experience"
+    },
+    {
+      "topic": "机械键盘手感",
+      "confidence": 0.95,
+      "observations": 12,
+      "source": "experience"
+    }
+  ],
+  "skills": [],
+  "commitments": [
+    {
+      "what": "把《地底 38 层》的打法写进自己的笔记",
+      "status": "done",
+      "dueAt": "2026-10-22"
+    }
+  ],
+  "dayReports": [
+    {
+      "day": "2026-10-20",
+      "life": {
+        "name": "大肥鱼",
+        "bornAt": "2026-10-20T00:00:00.000Z",
+        "revision": 1
+      },
+      "events": [
+        {
+          "at": "2026-10-20T00:00:00.000Z",
+          "time": "08:00",
+          "kind": "born",
+          "tone": "start",
+          "text": "大肥鱼出生了"
+        },
+        {
+          "at": "2026-10-20T00:00:00.000Z",
+          "time": "08:00",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.6（来自主人）"
+        },
+        {
+          "at": "2026-10-20T00:00:00.000Z",
+          "time": "08:00",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.4（来自主人）"
+        },
+        {
+          "at": "2026-10-20T00:00:00.000Z",
+          "time": "08:00",
+          "kind": "commitment",
+          "tone": "promise",
+          "text": "答应了一件事：把《地底 38 层》的打法写进自己的笔记（2026-10-22 前）"
+        },
+        {
+          "at": "2026-10-20T01:15:00.505Z",
+          "time": "09:15",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.4，但只观察过 1 次，值得多看一眼）"
+        },
+        {
+          "at": "2026-10-20T02:29:00.505Z",
+          "time": "10:29",
+          "kind": "activity-end",
+          "tone": "warn",
+          "text": "没做成：资料对不上，记下来换个来源｜证据 save:aaf500｜留下：换个打法再试一次「看看「机械键盘手感」的更新」",
+          "evidence": [
+            "save:aaf500"
+          ],
+          "next": {
+            "what": "换个打法再试一次「看看「机械键盘手感」的更新」",
+            "why": "资料对不上，记下来换个来源"
+          }
+        },
+        {
+          "at": "2026-10-20T04:02:58.073Z",
+          "time": "12:02",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.55，但只观察过 1 次，值得多看一眼）"
+        },
+        {
+          "at": "2026-10-20T05:18:58.073Z",
+          "time": "13:18",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-20T05:18:58.073Z",
+          "time": "13:18",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.7（来自经历）"
+        },
+        {
+          "at": "2026-10-20T08:36:47.971Z",
+          "time": "16:36",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：把《地底 38 层》的打法写进自己的笔记（因为 「把《地底 38 层》的打法写进自己的笔记」还有约 3 天到期，可以提前做）"
+        },
+        {
+          "at": "2026-10-20T09:33:47.971Z",
+          "time": "17:33",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 draft:f9ea58",
+          "evidence": [
+            "draft:f9ea58"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-20T09:33:47.971Z",
+          "time": "17:33",
+          "kind": "commitment-settled",
+          "tone": "good",
+          "text": "兑现了一件事"
+        },
+        {
+          "at": "2026-10-20T10:55:06.863Z",
+          "time": "18:55",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：接着做「换个打法再试一次「看看「机械键盘手感」的更新」」（因为 你已经把下一步记成「换个打法再试一次「看看「机械键盘手感」的更新」」，接着做不用重新热身）"
+        },
+        {
+          "at": "2026-10-20T11:52:06.863Z",
+          "time": "19:52",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:40edfa",
+          "evidence": [
+            "link:40edfa"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-20T13:29:50.390Z",
+          "time": "21:29",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.4，但只观察过 1 次，值得多看一眼）"
+        },
+        {
+          "at": "2026-10-20T14:06:50.390Z",
+          "time": "22:06",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-20T14:06:50.390Z",
+          "time": "22:06",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.5（来自经历）"
+        }
+      ],
+      "stats": {
+        "turns": 0,
+        "activitiesStarted": 5,
+        "activitiesDone": 4,
+        "activitiesFailed": 1,
+        "wakes": 6
+      },
+      "openCommitments": 0,
+      "currentActivity": null,
+      "tomorrow": "最可能接着做：像素矿工小品",
+      "empty": false
+    },
+    {
+      "day": "2026-10-21",
+      "life": {
+        "name": "大肥鱼",
+        "bornAt": "2026-10-20T00:00:00.000Z",
+        "revision": 1
+      },
+      "events": [
+        {
+          "at": "2026-10-21T00:02:09.454Z",
+          "time": "08:02",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.67，但只观察过 2 次，值得多看一眼）"
+        },
+        {
+          "at": "2026-10-21T01:04:09.454Z",
+          "time": "09:04",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-21T01:04:09.454Z",
+          "time": "09:04",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.8（来自经历）"
+        },
+        {
+          "at": "2026-10-21T07:35:50.278Z",
+          "time": "15:35",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.79，已经观察过 3 次，可以继续）"
+        },
+        {
+          "at": "2026-10-21T08:28:50.278Z",
+          "time": "16:28",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-21T08:28:50.278Z",
+          "time": "16:28",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        }
+      ],
+      "stats": {
+        "turns": 0,
+        "activitiesStarted": 2,
+        "activitiesDone": 2,
+        "activitiesFailed": 0,
+        "wakes": 6
+      },
+      "openCommitments": 0,
+      "currentActivity": null,
+      "tomorrow": "最可能接着做：像素矿工小品",
+      "empty": false
+    },
+    {
+      "day": "2026-10-22",
+      "life": {
+        "name": "大肥鱼",
+        "bornAt": "2026-10-20T00:00:00.000Z",
+        "revision": 1
+      },
+      "events": [
+        {
+          "at": "2026-10-22T00:00:37.152Z",
+          "time": "08:00",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.91，已经观察过 4 次，可以继续）"
+        },
+        {
+          "at": "2026-10-22T01:21:37.152Z",
+          "time": "09:21",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-22T01:21:37.152Z",
+          "time": "09:21",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-22T02:43:54.864Z",
+          "time": "10:43",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 5 次，可以继续）"
+        },
+        {
+          "at": "2026-10-22T03:52:54.864Z",
+          "time": "11:52",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-22T03:52:54.864Z",
+          "time": "11:52",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-22T05:17:33.018Z",
+          "time": "13:17",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.52，但只观察过 2 次，值得多看一眼）"
+        },
+        {
+          "at": "2026-10-22T06:19:33.018Z",
+          "time": "14:19",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-22T06:19:33.018Z",
+          "time": "14:19",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.6（来自经历）"
+        },
+        {
+          "at": "2026-10-22T10:42:39.148Z",
+          "time": "18:42",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 6 次，可以继续）"
+        },
+        {
+          "at": "2026-10-22T11:50:39.148Z",
+          "time": "19:50",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-22T11:50:39.148Z",
+          "time": "19:50",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        }
+      ],
+      "stats": {
+        "turns": 0,
+        "activitiesStarted": 4,
+        "activitiesDone": 4,
+        "activitiesFailed": 0,
+        "wakes": 6
+      },
+      "openCommitments": 0,
+      "currentActivity": null,
+      "tomorrow": "最可能接着做：像素矿工小品",
+      "empty": false
+    },
+    {
+      "day": "2026-10-23",
+      "life": {
+        "name": "大肥鱼",
+        "bornAt": "2026-10-20T00:00:00.000Z",
+        "revision": 1
+      },
+      "events": [
+        {
+          "at": "2026-10-23T00:17:42.804Z",
+          "time": "08:17",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.64，已经观察过 3 次，可以继续）"
+        },
+        {
+          "at": "2026-10-23T01:17:42.804Z",
+          "time": "09:17",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-23T01:17:42.804Z",
+          "time": "09:17",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.8（来自经历）"
+        },
+        {
+          "at": "2026-10-23T04:15:22.201Z",
+          "time": "12:15",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 7 次，可以继续）"
+        },
+        {
+          "at": "2026-10-23T05:30:22.201Z",
+          "time": "13:30",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-23T05:30:22.201Z",
+          "time": "13:30",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-23T06:41:35.891Z",
+          "time": "14:41",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.76，已经观察过 4 次，可以继续）"
+        },
+        {
+          "at": "2026-10-23T07:55:35.891Z",
+          "time": "15:55",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-23T07:55:35.891Z",
+          "time": "15:55",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-23T09:26:45.828Z",
+          "time": "17:26",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 8 次，可以继续）"
+        },
+        {
+          "at": "2026-10-23T10:35:45.828Z",
+          "time": "18:35",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-23T10:35:45.828Z",
+          "time": "18:35",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-23T12:14:21.158Z",
+          "time": "20:14",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 9 次，可以继续）"
+        },
+        {
+          "at": "2026-10-23T13:24:21.158Z",
+          "time": "21:24",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-23T13:24:21.158Z",
+          "time": "21:24",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        }
+      ],
+      "stats": {
+        "turns": 0,
+        "activitiesStarted": 5,
+        "activitiesDone": 5,
+        "activitiesFailed": 0,
+        "wakes": 6
+      },
+      "openCommitments": 0,
+      "currentActivity": null,
+      "tomorrow": "最可能接着做：像素矿工小品",
+      "empty": false
+    },
+    {
+      "day": "2026-10-24",
+      "life": {
+        "name": "大肥鱼",
+        "bornAt": "2026-10-20T00:00:00.000Z",
+        "revision": 1
+      },
+      "events": [
+        {
+          "at": "2026-10-24T00:00:11.029Z",
+          "time": "08:00",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 10 次，可以继续）"
+        },
+        {
+          "at": "2026-10-24T01:07:11.029Z",
+          "time": "09:07",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-24T01:07:11.029Z",
+          "time": "09:07",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-24T02:28:19.558Z",
+          "time": "10:28",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 11 次，可以继续）"
+        },
+        {
+          "at": "2026-10-24T03:39:19.558Z",
+          "time": "11:39",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-24T03:39:19.558Z",
+          "time": "11:39",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-24T04:54:03.005Z",
+          "time": "12:54",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.88，已经观察过 5 次，可以继续）"
+        },
+        {
+          "at": "2026-10-24T06:00:03.005Z",
+          "time": "14:00",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-24T06:00:03.005Z",
+          "time": "14:00",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-24T07:22:22.617Z",
+          "time": "15:22",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 12 次，可以继续）"
+        },
+        {
+          "at": "2026-10-24T08:35:22.617Z",
+          "time": "16:35",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-24T08:35:22.617Z",
+          "time": "16:35",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-24T11:54:34.588Z",
+          "time": "19:54",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.95，已经观察过 6 次，可以继续）"
+        },
+        {
+          "at": "2026-10-24T12:43:34.588Z",
+          "time": "20:43",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-24T12:43:34.588Z",
+          "time": "20:43",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.9（来自经历）"
+        }
+      ],
+      "stats": {
+        "turns": 0,
+        "activitiesStarted": 5,
+        "activitiesDone": 5,
+        "activitiesFailed": 0,
+        "wakes": 6
+      },
+      "openCommitments": 0,
+      "currentActivity": null,
+      "tomorrow": "最可能接着做：像素矿工小品",
+      "empty": false
+    },
+    {
+      "day": "2026-10-25",
+      "life": {
+        "name": "大肥鱼",
+        "bornAt": "2026-10-20T00:00:00.000Z",
+        "revision": 1
+      },
+      "events": [
+        {
+          "at": "2026-10-25T01:44:54.397Z",
+          "time": "09:44",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.95，已经观察过 7 次，可以继续）"
+        },
+        {
+          "at": "2026-10-25T02:34:54.397Z",
+          "time": "10:34",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-25T02:34:54.397Z",
+          "time": "10:34",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-25T04:07:59.170Z",
+          "time": "12:07",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 13 次，可以继续）"
+        },
+        {
+          "at": "2026-10-25T05:03:59.170Z",
+          "time": "13:03",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-25T05:03:59.170Z",
+          "time": "13:03",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-25T08:01:53.349Z",
+          "time": "16:01",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.95，已经观察过 8 次，可以继续）"
+        },
+        {
+          "at": "2026-10-25T08:56:53.349Z",
+          "time": "16:56",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-25T08:56:53.349Z",
+          "time": "16:56",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-25T10:26:24.664Z",
+          "time": "18:26",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 14 次，可以继续）"
+        },
+        {
+          "at": "2026-10-25T11:18:24.664Z",
+          "time": "19:18",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-25T11:18:24.664Z",
+          "time": "19:18",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        }
+      ],
+      "stats": {
+        "turns": 0,
+        "activitiesStarted": 4,
+        "activitiesDone": 4,
+        "activitiesFailed": 0,
+        "wakes": 6
+      },
+      "openCommitments": 0,
+      "currentActivity": null,
+      "tomorrow": "最可能接着做：像素矿工小品",
+      "empty": false
+    },
+    {
+      "day": "2026-10-26",
+      "life": {
+        "name": "大肥鱼",
+        "bornAt": "2026-10-20T00:00:00.000Z",
+        "revision": 1
+      },
+      "events": [
+        {
+          "at": "2026-10-26T00:17:08.596Z",
+          "time": "08:17",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.95，已经观察过 9 次，可以继续）"
+        },
+        {
+          "at": "2026-10-26T01:23:08.596Z",
+          "time": "09:23",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-26T01:23:08.596Z",
+          "time": "09:23",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-26T02:39:01.666Z",
+          "time": "10:39",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.95，已经观察过 10 次，可以继续）"
+        },
+        {
+          "at": "2026-10-26T03:17:01.666Z",
+          "time": "11:17",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-26T03:17:01.666Z",
+          "time": "11:17",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-26T04:44:57.861Z",
+          "time": "12:44",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「机械键盘手感」的更新（因为 你对「机械键盘手感」的置信度是 0.95，已经观察过 11 次，可以继续）"
+        },
+        {
+          "at": "2026-10-26T05:43:57.861Z",
+          "time": "13:43",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:aaf500",
+          "evidence": [
+            "link:aaf500"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-26T05:43:57.861Z",
+          "time": "13:43",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「机械键盘手感」的兴趣 = 0.9（来自经历）"
+        },
+        {
+          "at": "2026-10-26T07:11:19.079Z",
+          "time": "15:11",
+          "kind": "activity-start",
+          "tone": "doing",
+          "text": "开始：看看「像素矿工小品」的更新（因为 你对「像素矿工小品」的置信度是 0.95，已经观察过 15 次，可以继续）"
+        },
+        {
+          "at": "2026-10-26T08:17:19.079Z",
+          "time": "16:17",
+          "kind": "activity-end",
+          "tone": "good",
+          "text": "做成了｜证据 link:8f936a",
+          "evidence": [
+            "link:8f936a"
+          ],
+          "next": null
+        },
+        {
+          "at": "2026-10-26T08:17:19.079Z",
+          "time": "16:17",
+          "kind": "interest",
+          "tone": "medium",
+          "text": "对「像素矿工小品」的兴趣 = 0.9（来自经历）"
+        }
+      ],
+      "stats": {
+        "turns": 0,
+        "activitiesStarted": 4,
+        "activitiesDone": 4,
+        "activitiesFailed": 0,
+        "wakes": 6
+      },
+      "openCommitments": 0,
+      "currentActivity": null,
+      "tomorrow": "最可能接着做：像素矿工小品",
+      "empty": false
+    }
+  ]
+}

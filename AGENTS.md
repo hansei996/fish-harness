@@ -37,12 +37,13 @@ remained, would this still pass?**
 The same fact has appeared with three or four different values in this
 repository (tools: 11/13/17; state files: 7/8; LOC: 2438/4949).
 
-- Authoritative sources: `node tools/facts.mjs` (structural facts),
-  `node verify/numbers.mjs` (re-measures code and checks it against the claims
-  in the docs).
+- Authoritative sources: `node tools/facts.mjs` (measures structural facts and
+  generates the marked blocks in the docs), `node verify/claims.mjs` (re-measures
+  and checks every claim and generated block against them).
 - This rule was violated *after* those tools existed. It is therefore enforced as
-  an assertion: run `node verify/numbers.mjs` after changing code, and it reports
-  every document claiming a value the code contradicts.
+  an assertion: run `node verify/claims.mjs` after changing code, and it reports
+  every document claiming a value the code contradicts. Run
+  `node tools/facts.mjs --write` to regenerate the marked blocks in the docs.
 - Volatile external figures must come from a single authoritative source. For
   GitHub stars, use the repository page, not the search API:
 
@@ -136,7 +137,7 @@ node verify/publish.mjs       # publish state machine, labelling, reconciliation
 node verify/e2e-tools.mjs     # real dsh end to end
 node verify/pack-install.mjs  # packaging and installation
 node tools/facts.mjs          # structural facts (single source of truth)
-node verify/numbers.mjs       # documentation claims vs. measured code
+node verify/claims.mjs        # documentation claims vs. measured code
 ```
 
 Do not hard-code suite counts in prose; measure them.
