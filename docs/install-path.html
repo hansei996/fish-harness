@@ -199,7 +199,9 @@ a{color:var(--life2)}
     <div class="st"><div class="n">启动</div><div class="h">读盘复原</div>
       <div class="d">不是新建，是<b>接着过</b>。生命周期与身份从 <code>life/&lt;lifeId&gt;/</code> 读回。</div></div>
     <div class="st"><div class="n">每轮</div><div class="h">注入有界快照</div>
-      <div class="d">13 个字段 / 690 字节封顶 —— <b>不随寿命增长</b>。</div></div>
+      <div class="d"><!-- facts:install-snapshot -->
+13 个字段 / 648 字节封顶 —— <b>不随寿命增长</b>。
+<!-- /facts:install-snapshot --></div></div>
     <div class="st"><div class="n">轮结束</div><div class="h">写盘 + 布防</div>
       <div class="d">原子写；再向 <code>schedule</code> 补一个一次性闹钟。</div></div>
     <div class="st"><div class="n">到点</div><div class="h">自己醒来</div>

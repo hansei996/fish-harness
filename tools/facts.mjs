@@ -81,6 +81,17 @@ export function measureCodeFacts () {
 
   const hostFiles = jsFiles('lib')
   const clientFiles = jsFiles('client')
+
+  // 模块之间的相对 import 边（谁引用谁）。总览图画的就是它们，所以必须由这里
+  // 量、由 verify/framework.mjs 核 —— 画在图上一条不存在的依赖，比不画更有害。
+  const edges = []
+  for (const file of hostFiles) {
+    const text = fs.readFileSync(path.join(PLUGIN, 'lib', file), 'utf8')
+    for (const m of text.matchAll(/from\s+'\.\/([a-z0-9-]+)\.js'/g)) {
+      edges.push([file.replace(/\.js$/, ''), m[1]])
+    }
+  }
+  edges.sort((a, b) => (a[0] + a[1]).localeCompare(b[0] + b[1]))
   const files = {}
   for (const f of hostFiles) files[`lib/${f}`] = lineCount(path.join(PLUGIN, 'lib', f))
   for (const f of clientFiles) files[`client/${f}`] = lineCount(path.join(PLUGIN, 'client', f))
@@ -115,13 +126,122 @@ export function measureCodeFacts () {
       files,
       totalLines: Object.values(files).reduce((a, b) => a + b, 0),
     },
+    edges,
     // 分开报，不合成一个模糊的「挂载点数」：合成之后没人能复核，而文档里
     // 「六个挂载点」正是这么来的（7 行 inject/on/effect 混数）。
     serviceMounts,
     events,
     slots,
     hasEffect,
+    // 「每轮注入的上下文有多大」也是结构事实，而且它支撑的是整篇的中心论点：
+    // **它不随寿命增长**。这条以前手抄在 docs/MEMORY.md，写成一个对不上的值
+    // （而且同一事实在三个文件里有三个版本）。它还会随内容长短微动，所以只能量。
+    // 手抄一个支撑核心结论的数字，是这仓库最不该犯的错 —— 所以挪到这里量。
+    snapshot: measureSnapshotFacts(),
+    // dsh 那一侧的规模：包数与版本。总览图写「306 个包」这种数是给读者一个量级，
+    // 但量级也会过期（dsh 一升级就变），所以这里量出来。
+    dsh: measureDshFacts(),
   }
+}
+
+/**
+ * 量**装在那里的那份 dsh**：版本，以及它闭包里 `@deepseek-ai/*` 包的**去重个数**。
+ *
+ * 为什么要「去重后的包名个数」而不是「.pnpm 里的目录数」：同一个包会因为
+ * peer 组合不同在 .pnpm 里出现好几个目录（实测 560 个目录 vs 306 个包名）。
+ * 报目录数会凭空多出 80%，且随 peer 组合乱跳。
+ *
+ * 找不到 `DSH_BIN` 就返回 null（跳过），而不是编一个数 —— 文档里写 `null`
+ * 会被 assertRenderable 拦下，是**故意**的：宁可这一格渲染失败，也不能写进一个
+ * 长得像数字的 null。
+ */
+function measureDshFacts () {
+  const bin = process.env.DSH_BIN
+  if (!bin || !fs.existsSync(bin)) return null
+  // DSH_BIN = <pkg>/lib/bin.js，其祖父目录是包目录。realpath 必须先做：
+  // pnpm 把它链进虚拟 store，不解析就找不到同级依赖（verify/dsh-bin.mjs 记过这个坑）。
+  let pkgDir
+  try {
+    pkgDir = path.dirname(path.dirname(fs.realpathSync.native(bin)))
+  } catch {
+    return null
+  }
+  let version = null
+  try {
+    version = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8')).version
+  } catch { /* 版本读不到不影响包数 */ }
+  // 从包目录**逐级往上找 `.pnpm`**。不能只往上两级：pnpm 的真实路径是
+  // `<root>/node_modules/.pnpm/@deepseek-ai+dsh@<v>_<hash>/node_modules/@deepseek-ai/dsh`，
+  // 真正的 store 在四级之上（这一步是实测出来的 —— 只上两级会落到 `.../<hash>/node_modules`，
+  // 那里没有 `.pnpm`，于是这条静默地报「量不到」）。
+  let store = null
+  let dir = pkgDir
+  for (let i = 0; i < 8 && dir && dir !== path.dirname(dir); i++) {
+    const candidate = path.join(dir, '.pnpm')
+    if (path.basename(dir) === '.pnpm') { store = dir; break }
+    if (fs.existsSync(candidate)) { store = candidate; break }
+    dir = path.dirname(dir)
+  }
+  if (!store) return { version, packages: null, method: 'no .pnpm found above the install' }
+  const names = new Set()
+  try {
+    for (const entry of fs.readdirSync(store)) {
+      const m = /^@deepseek-ai\+([a-z0-9.-]+)@/.exec(entry)
+      if (m) names.add(m[1])
+    }
+  } catch {
+    return { version, packages: null, method: 'unreadable .pnpm' }
+  }
+  return {
+    version,
+    packages: names.size,
+    entries: fs.readdirSync(store).length,
+    method: "ls node_modules/.pnpm | grep -o '^@deepseek-ai+[a-z0-9.-]*' | sort -u | wc -l",
+  }
+}
+
+/**
+ * 量 `LifeStore.snapshot()` 的**上界**：灌满兴趣与承诺之后，它序列化出多少字节、
+ * 多少个字段、每轮实际取几条。
+ *
+ * 为什么必须灌满：空生命的快照当然小，那证明不了「不随寿命增长」。灌到远超每轮
+ * 实际注入的量（各 200 条，`snapshot()` 只各取前 5），得到的数才等于「再怎么长也
+ * 就这么大」。灌少了会把逃逸空间量小，灌松了会把结论量虚 —— 所以把这个前提写下来。
+ *
+ * 为什么走子进程：`measureCodeFacts()` 是**同步**的（`verify/claims.mjs` 也同步调
+ * 它），而 `store.js` 是 ESM，只能 `import()`。起子进程跑完把 JSON 打回来，与
+ * `measureSuiteCounts()` 的做法一致，也不必把整条调用链改成 async。
+ */
+function measureSnapshotFacts () {
+  const probe = `
+    import { LifeStore } from ${JSON.stringify(pathToFileURL(path.join(PLUGIN, 'lib', 'store.js')).href)}
+    import fs from 'node:fs'
+    import os from 'node:os'
+    import path from 'node:path'
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-life-snapshot-'))
+    const store = new LifeStore({ home: dir, lifeId: 'facts' })
+    store.ensure({})
+    for (let i = 0; i < 200; i++) store.recordInterest({ topic: '兴趣' + i, confidence: 0.5 })
+    for (let i = 0; i < 200; i++) store.makeCommitment({ what: '承诺' + i })
+    const snap = store.snapshot()
+    process.stdout.write(JSON.stringify({
+      bytes: Buffer.byteLength(JSON.stringify(snap)),
+      fields: Object.keys(snap).length,
+      interests: snap.interests.length,
+      commitments: snap.openCommitments.length,
+      fed: 200,
+    }))
+    fs.rmSync(dir, { recursive: true, force: true })
+  `
+  const r = spawnSync(process.execPath, ['--input-type=module', '--eval', probe], {
+    encoding: 'utf8', cwd: REPO, timeout: 30000,
+  })
+  if (r.status !== 0 || !r.stdout) {
+    // 量不出来就**抛**，不返回 null：`null` 会被渲染进文档、长得像个数。
+    // 这正是 assertRenderable() 存在的理由，但在这里先炸掉能给出更好的信息。
+    throw new Error(`snapshot 度量失败：${(r.stderr || r.stdout || '').slice(0, 300)}`)
+  }
+  return JSON.parse(r.stdout)
 }
 
 /**
@@ -146,6 +266,13 @@ export const SUITES = [
   { name: 'landing', file: 'verify/landing.mjs', outcome: 'LANDING_OUTCOME' },
   { name: 'market', file: 'verify/market.mjs', outcome: 'MARKET_OUTCOME', offlineArgs: ['--offline'] },
   { name: 'scenarios', file: 'verify/scenarios.mjs', outcome: 'SCENARIOS_OUTCOME' },
+  // framework：总览图的核对。它与 scenarios 一样是纯本地文本+源码核对，
+  // 所以放同一段；它排在 claims 之前（claims 要数它的项数）。
+  //
+  // `--offline`：它有几条要「本机装了一棵可解析的 dsh」才量得动（包规模），
+  // 而那个数取决于本机安装树的 peer 组合 —— 不固定口径，写进文档的项数就会
+  // 随环境漂，`claims` 会报假红。理由与 market 那条一样，做法也一样。
+  { name: 'framework', file: 'verify/framework.mjs', outcome: 'FRAMEWORK_OUTCOME', offlineArgs: ['--offline'] },
 ]
 
 /**
@@ -252,6 +379,7 @@ const SUITE_ROLES = {
   landing: { needsDsh: false, what: '落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）' },
   market: { needsDsh: false, what: '市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）' },
   scenarios: { needsDsh: false, what: '落地剧本的每个引用都真实存在，且「未实现」的标记与 STORY.md 口径一致' },
+  framework: { needsDsh: false, what: '技术总图（docs/framework.html）上画的 import 边 / 挂载 API / 生成块里的数字全部对着源码核（离线口径；装了 dsh 时手动跑可多核 dsh 包规模 3 条）' },
 }
 
 export const BLOCKS = [
@@ -482,6 +610,58 @@ export const BLOCKS = [
         ...rows,
         '```',
       ].join('\n')
+    },
+  },
+  {
+    // 总览图（docs/framework.html）的「每轮注入多大」那一条。
+    //
+    // 它以前手写在 docs/MEMORY.md，与实测对不上；后来发现同一事实在三个文件里有三个值。
+    // 而这个数是**整篇的中心论点的唯一证据** —— 如果它随寿命增长，「长期跑得起」
+    // 就反了。让机器写，人只剩「要不要引用」这一件事。
+    name: 'framework-snapshot',
+    file: 'docs/framework.html',
+    render: (facts) => {
+      const s = facts.snapshot
+      if (!s) throw new Error('framework-snapshot 需要 facts.snapshot（measureSnapshotFacts 没跑）')
+      return `      <li><b>每轮只付固定的一小笔</b>：注入 ${cn(s.fields)} 个字段，实测 `
+        + `<b>${s.bytes} 字节封顶</b>（灌满 ${s.fed} 个兴趣 + ${s.fed} 条承诺之后量的，`
+        + `实际各取前 ${s.interests} / ${s.commitments} 条）。`
+        + `<b>不随寿命增长</b> —— 这是长期跑得起的关键取舍：不是记得越多越好，而是每轮只付固定的一小笔。</li>`
+    },
+  },
+  {
+    // 总览图第 3 带标题里的规模。宿主行数与客户端行数**分开写**：混成一个
+    // 「5010 行」正是 AGENTS.md §2.1 记过的那类错 —— 一个数里塞了两件事实，
+    // 谁也没法复核。所以两段都从 `facts.code` 里取。
+    name: 'framework-size',
+    file: 'docs/framework.html',
+    render: (facts) => {
+      const client = facts.code.files['client/life-overview.js']
+      return `${facts.code.hostFiles} 个宿主模块 ${facts.code.totalLines - client} 行 + 客户端半身 ${client} 行`
+    },
+  },
+  {
+    // 记忆层技术方案里的那格快照数。它是最早手抄的一处（写成一个与实测不符的值），
+    // 也是「每轮只付固定的一小笔」这个论点的证据本身。同一个事实出现三个抄写点
+    // （MEMORY.md、install-path.html、framework.html）—— 全部由这里生成。
+    name: 'memory-snapshot',
+    file: 'docs/MEMORY.md',
+    render: (facts) => {
+      const s = facts.snapshot
+      if (!s) throw new Error('memory-snapshot 需要 facts.snapshot')
+      return '```\n'
+        + `${s.fields} 个字段 · ${s.bytes} 字节 · 兴趣取前 ${s.interests} · 承诺取前 ${s.commitments}\n`
+        + '```'
+    },
+  },
+  {
+    // 开箱即用路径里的同一格 —— 同一事实的第三个值。三个抄写点，现在是同一处生成。
+    name: 'install-snapshot',
+    file: 'docs/install-path.html',
+    render: (facts) => {
+      const s = facts.snapshot
+      if (!s) throw new Error('install-snapshot 需要 facts.snapshot')
+      return `${s.fields} 个字段 / ${s.bytes} 字节封顶 —— <b>不随寿命增长</b>。`
     },
   },
 ]

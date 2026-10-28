@@ -58,6 +58,26 @@ assertion fails → restore the fix. An assertion that was never seen failing is
 untested. One assertion in this repository passed unconditionally because its
 checks were combined in the wrong order.
 
+The same rule applies to a **figure**. A diagram is the artifact most likely to
+look right while being wrong: a nonexistent dependency edge, a stale tool count,
+a hand-copied byte figure are indistinguishable from true facts once drawn. So
+every external-facing figure gets its own suite that re-derives what it claims
+from source — see `verify/framework.mjs` for `docs/framework.html`, which checks
+the drawn `import` edges as a **set equality** against the source (a missing edge
+misleads exactly as much as an invented one).
+
+Two corollaries learned the hard way:
+
+- **A suite's check count is a structural fact**, so it must not vary by
+  environment. Checks that need a local install (a resolvable `dsh`) or the
+  network go behind an `--offline` flag that skips them *without counting them*
+  (`verify/framework.mjs`, `verify/market.mjs`). Otherwise `claims` reports a
+  false red on a machine whose numbers are actually correct.
+- **A number that supports the central claim must never be transcribed.** The
+  per-turn injected snapshot was hand-written as 682 bytes in `docs/MEMORY.md`
+  while the measured value was 621 — and that number is the only evidence for
+  "it stays cheap as it ages". It is now measured by `tools/facts.mjs`.
+
 ### 2.3 Platform and API facts come from official documentation
 
 Assumptions about external interfaces have repeatedly been wrong:

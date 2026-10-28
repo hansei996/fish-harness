@@ -228,6 +228,21 @@ jobs:
       # 落地剧本：每个工具名 / 状态文件 / §X.Y / 被引用的文件都必须真实存在，
       # 并且「发布未接真实平台」这类话必须一直在（删掉它，剧本就变成能力声称）。
       # 不需要 dsh、不需要网络。
+      # framework：总览图（docs/framework.html）上画的每条 import 边、每个挂载 API、
+      # 每个生成块里的数字，全部对着源码核。图是最容易「看起来对」的产物 ——
+      # 这条让「图上写错了」变成一次红，而不是一个读起来很顺的误会。
+      - name: Verify — framework
+        id: framework
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          # **`--offline` 是有意的**，与 market 那一条同一个理由：这套里
+          # 「dsh 包规模」那几条要读本机那棵安装树，而目录数取决于 peer 组合 ——
+          # 不固定口径，写进文档的项数就会随环境漂，claims 会报假红。
+          # 本机装了 dsh 时手动跑一次不带 flag 的，能多核三条。
+          node verify/framework.mjs --offline 2>&1 | tee verify-framework.log
+
       - name: Verify — scenarios
         id: scenarios
         shell: bash
@@ -266,6 +281,7 @@ jobs:
           LANDING_OUTCOME: ${{ steps.landing.outcome }}
           MARKET_OUTCOME: ${{ steps.market.outcome }}
           SCENARIOS_OUTCOME: ${{ steps.scenarios.outcome }}
+          FRAMEWORK_OUTCOME: ${{ steps.framework.outcome }}
         run: node .github/scripts/ci-report.mjs
 
       - name: Upload verify logs
@@ -284,5 +300,6 @@ jobs:
             verify-e2e.log
             verify-pack.log
             verify-report.md
+            verify-framework.log
           if-no-files-found: ignore
           retention-days: 7

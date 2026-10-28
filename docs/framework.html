@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>一张总图：代码模块与技术框架怎么合起来</title>
+<style>
+:root{
+  color-scheme: dark;
+  --ink:#eef3ff; --ink2:#95a4c7; --ink3:#5a688a; --ink4:#39435e;
+  --bg:#05070d; --panel:#0a0f1a; --line:#18203a; --line2:#232d47;
+  --dsh:#7c8aa8; --life:#4f86ff; --life2:#a8c8ff;
+  --ok:#4ade80; --warm:#ffb765; --bad:#f87171; --vio:#a78bfa; --cyan:#22d3ee;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:13.5px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.scroller{overflow-x:auto;padding:22px 18px 40px}
+.board{width:1310px;margin:0 auto}
+a{color:var(--life2)}
+
+.head{padding:34px 0 0}
+.kicker{font-size:11px;letter-spacing:.24em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;margin-bottom:12px}
+h1{font-size:27px;line-height:1.22;letter-spacing:-.03em;margin:0 0 9px;font-weight:700}
+h1 em{font-style:normal;color:var(--life2)}
+.lead{color:var(--ink2);font-size:13px;margin:0;max-width:86em;line-height:1.72}
+.lead b{color:var(--ink)}
+.lead code{font-family:var(--mono);font-size:11px;color:var(--life2)}
+
+/* ===== 唯一画布 ===== */
+.canvas{position:relative;margin-top:20px;border:1px solid var(--line2);border-radius:16px;
+  background:linear-gradient(180deg,#080d17,#060a12);overflow:hidden}
+.canvas > svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.band{position:relative;padding:28px 18px 20px}
+.band + .band{border-top:1px dashed #1b2338}
+.band-tag{position:absolute;left:18px;top:10px;font-family:var(--mono);font-size:9.5px;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink4)}
+.band-note{font-size:11px;color:var(--ink3);margin:10px 0 12px;line-height:1.62;max-width:92em}
+.band-note b{color:#a8b4cc}
+.band-note code{font-family:var(--mono);font-size:10px;color:var(--life2);
+  background:rgba(79,134,255,.09);border:1px solid rgba(79,134,255,.18);border-radius:3px;padding:0 3px}
+
+/* ===== dsh 三组 ===== */
+.dsh-groups{display:grid;grid-template-columns:1.1fr 1.5fr 1.05fr;gap:12px;align-items:start}
+.dgrp{border:1px dashed #2f3a58;border-radius:11px;padding:11px 12px 12px;
+  background:rgba(124,138,168,.028)}
+.dgrp > .gt{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:#8b99b8;margin-bottom:8px;display:block}
+.dgrp > .gn{font-size:10.5px;color:var(--ink3);line-height:1.55;margin:0 0 10px}
+.dgrp > .gn b{color:#a8b4cc}
+.pkg{border:1px solid #2b3450;border-radius:8px;padding:7px 9px;background:rgba(255,255,255,.014);
+  margin-bottom:6px}
+.pkg:last-child{margin-bottom:0}
+.pkg .p{font-family:var(--mono);font-size:9.5px;color:#8fa0bd;word-break:break-all;line-height:1.4}
+.pkg .n{font-size:10px;color:#aab6cf;line-height:1.5;margin-top:3px}
+.pkg .n em{font-style:normal;color:var(--ink4);font-family:var(--mono);font-size:9px;display:block}
+.pkg .n b{color:#dce8ff}
+.pkg.wired{border-color:rgba(79,134,255,.62);background:rgba(79,134,255,.09)}
+.pkg.wired .p{color:var(--life2)}
+.pkg.wired .n{color:#dce8ff}
+.pkg.relied{border-color:rgba(34,211,238,.36);background:rgba(34,211,238,.045)}
+.pkg.relied .p{color:var(--cyan)}
+.pkg.dim{opacity:.7}
+
+/* ===== 接线带 ===== */
+.junction{height:96px;padding-top:0}
+.jlbl{position:absolute;font-family:var(--mono);font-size:9.5px;color:var(--life2);
+  background:#070b14;padding:1px 6px;border-radius:3px;border:1px solid rgba(79,134,255,.32);
+  white-space:nowrap;z-index:4;transform:translateX(-50%)}
+
+/* ===== 生命层 DAG ===== */
+.dag{position:relative;height:366px}
+.node{position:absolute;z-index:4;border-radius:10px;padding:9px 11px;
+  border:1px solid var(--line2);background:#0c1220;box-shadow:0 10px 24px -20px #000}
+.node .fn{font-family:var(--mono);font-size:11.5px;font-weight:600;margin-bottom:3px;
+  display:flex;align-items:baseline;gap:6px}
+.node .fn .ln{font-size:9px;color:var(--ink4);font-weight:400;margin-left:auto}
+.node .rl{font-size:10px;color:var(--ink2);line-height:1.48}
+.node .rl b{color:var(--ink)}
+.node .rl code{font-family:var(--mono);font-size:9px;color:var(--life2);
+  background:rgba(79,134,255,.1);border:1px solid rgba(79,134,255,.18);border-radius:3px;padding:0 3px}
+.node .svc{margin-top:6px;padding-top:6px;border-top:1px dashed rgba(79,134,255,.28);
+  font-family:var(--mono);font-size:8.5px;color:var(--life2);line-height:1.5}
+.node .diskout{margin-top:5px;padding-top:5px;border-top:1px dashed #233049;
+  font-family:var(--mono);font-size:8.5px;color:#8b9ab5;line-height:1.5}
+.node.entry{border-color:rgba(79,134,255,.7);background:rgba(79,134,255,.1)}
+.node.entry .fn{color:var(--life2)}
+.node.domain{border-color:rgba(79,134,255,.36)}
+.node.domain .fn{color:#dbe7ff}
+.node.leaf{border-color:#2f3a58}
+.node.leaf .fn{color:#b6c2d8}
+.node.io{border-color:rgba(34,211,238,.42);background:rgba(34,211,238,.05)}
+.node.io .fn{color:var(--cyan)}
+.node.local{border-color:rgba(167,139,250,.38);background:rgba(167,139,250,.045)}
+.node.local .fn{color:var(--vio)}
+.rowlabel{position:absolute;left:0;font-family:var(--mono);font-size:9px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink4);writing-mode:vertical-rl;transform:rotate(180deg)}
+
+/* ===== 磁盘 ===== */
+.disk-cols{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;align-items:start}
+.dhead{font-family:var(--mono);font-size:9.5px;padding-top:11px;display:flex;align-items:center;gap:7px;
+  white-space:nowrap;color:var(--ink2)}
+.dhead i{width:7px;height:7px;border-radius:2px;flex:none;display:block}
+.drows{border:1px solid #243149;border-radius:10px;padding:10px 13px;background:var(--panel)}
+.drow{display:grid;grid-template-columns:246px 1fr;gap:10px;font-size:10px;padding:4px 0;
+  border-bottom:1px dashed #1b2338;align-items:baseline}
+.drow:last-child{border-bottom:0}
+.drow .f{font-family:var(--mono);color:var(--ink);font-size:9.5px;word-break:break-all}
+.drow .g{color:var(--ink3);line-height:1.55}
+.drow .g em{font-style:normal;color:var(--ink2)}
+.drow .w{font-family:var(--mono);font-size:8.5px;color:#6f8fc9}
+
+/* ===== 差异条 ===== */
+.diff{display:grid;grid-template-columns:1fr 86px 1fr;margin-top:20px;
+  border:1px solid var(--line2);border-radius:14px;overflow:hidden}
+.dcell{padding:15px 17px 17px;background:var(--panel)}
+.dcell.them{background:rgba(124,138,168,.05)}
+.dcell.us{background:rgba(79,134,255,.06)}
+.dcell h3{font-size:10px;letter-spacing:.19em;font-family:var(--mono);text-transform:uppercase;
+  font-weight:500;margin:0 0 11px;color:var(--ink3)}
+.dcell.them h3{color:#a3aec4}
+.dcell.us h3{color:var(--life2)}
+.dcell ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+.dcell li{font-size:11px;color:var(--ink2);line-height:1.6;padding-left:13px;position:relative}
+.dcell li::before{content:"";position:absolute;left:0;top:6.5px;width:4px;height:4px;border-radius:50%}
+.dcell.them li::before{background:var(--dsh)}
+.dcell.us li::before{background:var(--life)}
+.dcell li b{color:var(--ink)}
+.dcell code{font-family:var(--mono);font-size:9.5px;color:var(--life2);
+  background:rgba(79,134,255,.1);border:1px solid rgba(79,134,255,.18);border-radius:3px;padding:0 3px}
+.dcell.them code{color:#9fb0cc;background:rgba(124,138,168,.12);border-color:#2b3450}
+.divider{display:grid;place-items:center;background:#070b14;border-left:1px solid var(--line2);
+  border-right:1px solid var(--line2);font-family:var(--mono);font-size:9px;letter-spacing:.18em;
+  color:var(--ink4);text-transform:uppercase;writing-mode:vertical-rl}
+
+/* ===== 图例 ===== */
+.legend{display:flex;gap:20px;flex-wrap:wrap;margin:16px 0 0;font-size:11px;color:var(--ink3)}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend i{flex:none;display:block;width:11px;height:11px;border-radius:3px;border:1px solid}
+.legend .e{background:rgba(79,134,255,.1);border-color:rgba(79,134,255,.7)}
+.legend .d{background:#0c1220;border-color:rgba(79,134,255,.36)}
+.legend .l{background:#0c1220;border-color:#2f3a58}
+.legend .i2{background:rgba(34,211,238,.05);border-color:rgba(34,211,238,.42)}
+.legend .lo{background:rgba(167,139,250,.045);border-color:rgba(167,139,250,.38)}
+.legend .w{background:rgba(79,134,255,.09);border-color:rgba(79,134,255,.62)}
+.legend .r{background:rgba(34,211,238,.045);border-color:rgba(34,211,238,.36)}
+.legend .ln{width:24px;height:0;border-top:1.5px solid var(--life);border-radius:0}
+.legend .lnd{width:24px;height:0;border-top:1.5px dashed var(--life);border-radius:0}
+.legend .lndsh{width:24px;height:0;border-top:1.5px dashed var(--cyan);border-radius:0}
+
+/* ===== 底部 ===== */
+.tail{margin:32px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:34px}
+.tail h3{font-size:10px;letter-spacing:.2em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;font-weight:500;margin:0 0 12px}
+.tail ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.tail li{font-size:11.5px;color:var(--ink2);line-height:1.64;padding-left:14px;position:relative}
+.tail li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;border-radius:50%}
+.tail .did li::before{background:var(--ok)}
+.tail .not li::before{background:var(--warm)}
+.tail li b{color:var(--ink)}
+.tail code{font-family:var(--mono);font-size:10px;color:var(--ink2);
+  background:#0d1220;border:1px solid var(--line2);border-radius:3px;padding:0 4px}
+</style>
+</head>
+<body>
+
+<div class="scroller"><div class="board">
+
+<div class="head">
+  <div class="kicker">One canvas · modules &amp; framework, wired</div>
+  <h1>一张总图：<em>代码模块</em>、<em>技术框架</em>、<em>磁盘</em>，画在一次</h1>
+  <p class="lead">
+    这一张图从上往下是一条完整的链：<b>dsh 自带什么</b> → <b>我们挂在它的哪些扩展点上</b> →
+    <b>生命层的九个模块谁 import 谁、各自管什么</b> → <b>这些模块往磁盘上写什么</b>。
+    线全部是真的：模块之间的实线扫自源码的 <code>import</code>，指向 dsh 的虚线取自真实的公开 API 调用，
+    指向磁盘的线取自 <code>writeJsonAtomic</code> 的调用点。数字由 <code>node tools/facts.mjs</code> 量出，不手抄。
+  </p>
+</div>
+
+<div class="canvas">
+  <svg id="wires" preserveAspectRatio="none"></svg>
+
+  <!-- ============ 带 1：dsh 运行时 ============ -->
+  <div class="band" id="band-dsh">
+    <span class="band-tag">Band 1 · 底座（deepsseek harness，不是我们写的）</span>
+    <p class="band-note" id="pkg-count">
+      dsh 是<b>「一切皆插件」</b>的运行时：一次干净安装里有 <b>306 个</b> <code>@deepseek-ai/*</code> 包
+      （去重后的包名个数；<code>.pnpm</code> 下共 560 个目录，同一个包会因 peer 组合占多个）。
+      数法：<code>ls node_modules/.pnpm | grep -o '^@deepseek-ai+[a-z0-9.-]*' | sort -u | wc -l</code>，
+      装的是 dsh <code>0.2.1-rc.2</code>。下面三组是<b>与我们相关的</b>：
+      <b>青色框是 dsh 自己就有的「连续性」组件</b>（会话落盘、上下文压缩、持久目标、跨会话引用），
+      <b>蓝色框是我们真正挂上去的扩展点</b>。
+    </p>
+    <div class="dsh-groups">
+
+      <div class="dgrp">
+        <span class="gt">① 连续性：dsh 自己就有</span>
+        <p class="gn">「活得久」这件事<b>有一半是别人做好的</b>。这一组我们一行都不写。</p>
+        <div class="pkg relied" id="p-session"><div class="p">dsh-session</div>
+          <div class="n">会话与事件流<em>on('session/event') 也在这里</em></div></div>
+        <div class="pkg relied" id="p-persist"><div class="p">dsh-session-persistence-jsonl</div>
+          <div class="n">每会话一个追加式 JSONL，zstd 压缩，含<b>尾部截断恢复</b></div></div>
+        <div class="pkg relied" id="p-compact"><div class="p">dsh-compaction-basic</div>
+          <div class="n">上下文快满时把最老的历史压成摘要</div></div>
+        <div class="pkg relied" id="p-goal"><div class="p">dsh-goal</div>
+          <div class="n">一个持久目标，跨轮次 / resume / 重启</div></div>
+        <div class="pkg relied" id="p-ref"><div class="p">dsh-session-reference</div>
+          <div class="n">把<b>别的会话</b>摘成只读快照当背景</div></div>
+        <div class="pkg dim" id="p-proj"><div class="p">dsh-session-projection ·-cache</div>
+          <div class="n">从事件日志派生当前值，客户端不必回放</div></div>
+        <div class="pkg dim" id="p-query"><div class="p">dsh-session-query-sqlite</div>
+          <div class="n">会话检索索引（可重建）</div></div>
+        <div class="pkg dim" id="p-fmt"><div class="p">dsh-session-format ×4</div>
+          <div class="n">v0→v4 四代格式迁移</div></div>
+      </div>
+
+      <div class="dgrp">
+        <span class="gt">② 我们挂上去的：7 个扩展点</span>
+        <p class="gn">全部是公开扩展点，<b>没有一处改 dsh 核心</b>。每个框下面写着真实 API。</p>
+        <div class="pkg wired" id="p-loop"><div class="p">dsh-agent-loop</div>
+          <div class="n">跑轮次<em>ctx.tools.register() × 17</em></div></div>
+        <div class="pkg wired" id="p-prompt"><div class="p">dsh-system-prompt</div>
+          <div class="n">提示词装配<em>ctx.systemPrompt.section()</em></div></div>
+        <div class="pkg wired" id="p-sched"><div class="p">dsh-schedule</div>
+          <div class="n">Host 级定时<em>ctx.schedule.create()</em></div></div>
+        <div class="pkg wired" id="p-auth"><div class="p">dsh-authorization</div>
+          <div class="n">逐次批准<em>ctx.approval.request()</em></div></div>
+        <div class="pkg wired" id="p-sessionw"><div class="p">dsh-session</div>
+          <div class="n">两个事件<em>root.on('session/event')</em>
+            <em>root.on('agent/inbox/claimed')</em></div></div>
+        <div class="pkg wired" id="p-web"><div class="p">dsh-host-webserver</div>
+          <div class="n">宿主 web 服务<em>ctx.webServer.register()</em></div></div>
+        <div class="pkg wired" id="p-clientmods"><div class="p">dsh-client-modules</div>
+          <div class="n">浏览器半身<em>slots: shell.overlay · settings.section</em></div></div>
+      </div>
+
+      <div class="dgrp">
+        <span class="gt">③ 我们不接线，但靠它</span>
+        <p class="gn">这些不是挂载点，是<b>我们的地基</b>。其中一个决定了「养不死」成立不成立。</p>
+        <div class="pkg relied" id="p-atomic"><div class="p">dsh-atomic-write</div>
+          <div class="n"><b>原子替换 + 跨进程文件锁</b>。我们抄了它的手法（tmp + rename），
+            <b>但没引它</b> —— 本插件零自有依赖。</div></div>
+        <div class="pkg dim" id="p-sandbox"><div class="p">dsh-sandbox</div>
+          <div class="n">进程隔离 —— 我们跑的每个外部动作都在它里面</div></div>
+        <div class="pkg dim" id="p-jobs"><div class="p">dsh-jobs-local</div>
+          <div class="n">后台作业（<b>不是</b>调度器：不跨重启、无 cron）</div></div>
+        <div class="pkg dim" id="p-cred"><div class="p">dsh-credentials-local</div>
+          <div class="n">凭据存储 —— 我们只从环境变量读 token</div></div>
+        <div class="pkg dim" id="p-pm"><div class="p">dsh-plugin-manager · dsh-home-paths</div>
+          <div class="n">安装与路径规则 —— 我们的状态落在 <code>DSH_HOME/life/</code></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 带 2：接线 ============ -->
+  <div class="band junction" id="band-junction">
+    <span class="band-tag">Band 2 · 接线</span>
+    <span class="jlbl" style="left:640px;top:70px">青色虚线 = dsh 的扩展点 → 生命层模块（每个挂载点下面那行斜体就是真实 API 名）</span>
+  </div>
+
+  <!-- ============ 带 3：生命层 ============ -->
+  <div class="band" id="band-life">
+    <span class="band-tag">Band 3 · 生命层（本仓库）<!-- facts:framework-size -->
+9 个宿主模块 4834 行 + 客户端半身 176 行
+<!-- /facts:framework-size --></span>
+    <div class="dag" id="dag">
+      <svg id="dagwires" preserveAspectRatio="none"></svg>
+
+      <span class="rowlabel" style="top:20px">入口 / 装配</span>
+      <span class="rowlabel" style="top:208px">领域与 IO</span>
+      <span class="rowlabel" style="top:316px">纯函数底层</span>
+
+      <div class="node entry" id="n-index" style="left:470px;top:18px;width:390px">
+        <div class="fn">index.js<span class="ln">1590 行 · 唯一装配点</span></div>
+        <div class="rl">插件入口。<b>五个服务注入 + 两个事件监听 + 卸载反注册，全收在这一个文件里</b>；
+          其余八个模块不知道 dsh 存在。</div>
+        <div class="svc">tools · systemPrompt · schedule · approval · session/event · agent/inbox/claimed</div>
+        <div class="diskout">写：ledger(turn / wake) · outbox(publish)</div>
+      </div>
+
+      <div class="node domain" id="n-store" style="left:36px;top:206px;width:226px">
+        <div class="fn">store.js<span class="ln">737 行</span></div>
+        <div class="rl">生命状态机：三档变量 · 承诺 · 关系 · 账本 · 唤醒绑定。<b>原子写、容忍坏文件</b>。</div>
+        <div class="diskout">写：全部 8 个状态文件（唯一写盘点）</div>
+      </div>
+      <div class="node domain" id="n-choose" style="left:274px;top:206px;width:196px">
+        <div class="fn">choose.js<span class="ln">703 行</span></div>
+        <div class="rl">活动选择器。七项加权给出<b>带理由的候选</b>；休息永远在名单里。</div>
+      </div>
+      <div class="node domain" id="n-outbox" style="left:482px;top:206px;width:196px">
+        <div class="fn">outbox.js<span class="ln">849 行</span></div>
+        <div class="rl">发布状态机。<b>不确定就不重发</b>；<code>committed</code> 永不裁剪。</div>
+        <div class="diskout">经 store 写：outbox.json</div>
+      </div>
+      <div class="node io" id="n-ui" style="left:690px;top:206px;width:200px">
+        <div class="fn">ui.js<span class="ln">179 行</span></div>
+        <div class="rl">只读接口 <code>/life/state.json</code>；<b>坏文件如实报错，不编故事</b>。</div>
+        <div class="svc">webServer 路由（headless 里不注册）</div>
+      </div>
+      <div class="node io" id="n-tg" style="left:902px;top:206px;width:176px">
+        <div class="fn">telegram.js<span class="ln">133 行</span></div>
+        <div class="rl">唯一真实渠道。token 只从环境变量读；<code>query()</code> 返回 <b>null</b>。</div>
+      </div>
+      <div class="node local" id="n-config" style="left:1090px;top:206px;width:152px">
+        <div class="fn">config.js<span class="ln">287</span></div>
+        <div class="rl">零依赖校验器（为兼容两种运行时手写）</div>
+      </div>
+
+      <div class="node leaf" id="n-wake" style="left:274px;top:314px;width:196px">
+        <div class="fn">wake.js<span class="ln">238 行</span></div>
+        <div class="rl">静默时段 · 抖动 · 不整天消失。时钟与随机数可注入 → 能确定性测试。</div>
+      </div>
+      <div class="node leaf" id="n-comp" style="left:482px;top:314px;width:196px">
+        <div class="fn">compliance.js<span class="ln">118 行</span></div>
+        <div class="rl">标识硬闸 <code>assertLabeled()</code>；<b>没有任何 strip / remove 函数</b>。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 带 4：磁盘 ============ -->
+  <div class="band" id="band-disk">
+    <span class="band-tag">Band 4 · 磁盘（实跑 dsh 之后 find 出来的）</span>
+    <p class="band-note">
+      两边落在<b>不同的键</b>下，这就是「换目录、换会话，它还是同一个它」的根据：
+      dsh 按 <code>projectKey(cwd)</code> 分会话，我们按 <code>lifeId</code> 分生命。
+    </p>
+    <div class="disk-cols">
+      <div class="dhead" id="d-dsh"><i style="background:var(--dsh)"></i>dsh 写的 —— 会话级</div>
+      <div class="drows">
+        <div class="drow"><span class="f">sessions/&lt;proj&gt;/&lt;id&gt;/</span>
+          <span class="g">session.v4.jsonl.zstd + session.lock <em>（键是 cwd，换目录就换一套）</em></span></div>
+        <div class="drow"><span class="f">storages/session_projcache/</span>
+          <span class="g">投影缓存 <em>可重建</em></span></div>
+        <div class="drow"><span class="f">profiles/&lt;name&gt;/</span>
+          <span class="g">profile 定义 <em>这一套装了哪些插件</em></span></div>
+        <div class="drow"><span class="f">.credentials.yaml</span>
+          <span class="g">凭据 <em>不进模型上下文</em></span></div>
+      </div>
+
+      <div class="dhead" id="d-life"><i style="background:var(--life)"></i>我们写的 —— 生命级，按 lifeId</div>
+      <div class="drows">
+        <div class="drow"><span class="f">life/&lt;lifeId&gt;/identity.json</span>
+          <span class="g">极慢 <em>带 revision，只有主人确认能改</em> <span class="w">← store</span></span></div>
+        <div class="drow"><span class="f">traits.json · relations.json</span>
+          <span class="g">慢 <em>兴趣/技能带置信度 · 主人与公开分开存</em> <span class="w">← store</span></span></div>
+        <div class="drow"><span class="f">commitments.json</span>
+          <span class="g">慢 <em>答应了什么、什么时候到期</em> <span class="w">← store</span></span></div>
+        <div class="drow"><span class="f">activity.json · wake.json</span>
+          <span class="g">快 <em>当前活动 + 留给下一步 · 下个闹钟 + 当天预算</em> <span class="w">← store</span></span></div>
+        <div class="drow"><span class="f">ledger.jsonl</span>
+          <span class="g">只追加 <em>12 种 kind，唯一可回放的记录</em> <span class="w">← store / index</span></span></div>
+        <div class="drow"><span class="f">outbox.json</span>
+          <span class="g">快 <em>发布状态机；committed 永不丢</em> <span class="w">← store / index</span></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><i class="e"></i>入口 / 装配</span>
+  <span><i class="d"></i>领域模块（纯逻辑）</span>
+  <span><i class="l"></i>共享底层（纯函数，不碰 IO）</span>
+  <span><i class="i2"></i>IO 模块</span>
+  <span><i class="lo"></i>本地化 / 配置</span>
+  <span><i class="w"></i>我们接线的 dsh 包</span>
+  <span><i class="r"></i>dsh 自己就有、我们受益</span>
+  <span><i class="ln"></i>import 方向（扫自源码）</span>
+  <span><i class="lndsh"></i>挂载 / 监听（真实 API 调用）</span>
+  <span><i class="lnd"></i>写盘（writeJsonAtomic）</span>
+</div>
+
+<div class="diff">
+  <div class="dcell them">
+    <h3>dsh 管什么 · 会话世界</h3>
+    <ul>
+      <li><b>一次对话之内的一切</b>：轮次、工具、沙箱、批准、提示词装配。</li>
+      <li><b>会话的持久化</b>：每会话一个 JSONL，含尾部截断恢复。但是 —— <b>状态挂在这条会话上</b>。</li>
+      <li><b>上下文不会爆</b>：快满时把最老的历史压成摘要。</li>
+      <li><b>一个会话一个目标</b>：<code>dsh-goal</code> 跨轮次、跨 resume、跨重启。</li>
+      <li><b>跨会话看别人</b>：<code>dsh-session-reference</code> 把别的会话摘成<b>只读快照</b>当背景。</li>
+      <li><b>它没有的</b>：一个<b>跨会话仍然成立的「我」</b>；也没有「没人叫、自己醒」——
+        <code>schedule</code> 只是个定时器，<b>没有抖动、没有免打扰、没有每日预算</b>（全包搜这三个词 0 命中）。</li>
+    </ul>
+  </div>
+  <div class="divider">交界</div>
+  <div class="dcell us">
+    <h3>我们补什么 · 生命世界</h3>
+    <ul>
+      <li><b>键从会话换成生命</b>：<code>life/&lt;lifeId&gt;/</code>。会话没了，命还在 ——
+        换 cwd、换会话、进程重启，它还是同一个它。</li>
+      <li><b>状态按变化速度分层</b>：极慢（身份，改要主人确认）/ 慢（兴趣、关系、承诺）/
+        快（当前活动、闹钟）/ 只追加（账本）。</li>
+<!-- facts:framework-snapshot -->
+      <li><b>每轮只付固定的一小笔</b>：注入 13 个字段，实测 <b>648 字节封顶</b>（灌满 200 个兴趣 + 200 条承诺之后量的，实际各取前 5 / 5 条）。<b>不随寿命增长</b> —— 这是长期跑得起的关键取舍：不是记得越多越好，而是每轮只付固定的一小笔。</li>
+<!-- /facts:framework-snapshot -->
+      <li><b>自己会醒</b>：在 dsh 的定时器上补三样它没有的 —— 抖动、静默时段、每日预算，
+        并按 <code>messageId</code> 幂等记账。</li>
+      <li><b>明天接着昨天</b>：每轮结束留一条 <code>next</code>，下一次醒来在快照里读得到。
+        （这条曾是死代码，是七天连跑把它暴露出来的。）</li>
+      <li><b>外部副作用单独管</b>：<code>sending</code> 先落盘再发；
+        <code>unconfirmed</code> 没有自动重试路径。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tail">
+  <div class="did">
+    <h3>这张图证明什么</h3>
+    <ul>
+      <li><b>接线全是公开扩展点</b>：五个服务注入（<code>tools</code> · <code>systemPrompt</code> ·
+        <code>schedule</code> · <code>approval</code> · <code>webServer</code>）加两个事件监听
+        （<code>session/event</code> · <code>agent/inbox/claimed</code>），再加客户端两个 slot。
+        <b>没有一处改 dsh 核心</b>，所以 dsh 升级不会把我们改坏。</li>
+      <li><b>模块之间的线是真的</b>：9 个模块的 <b>11 条 import</b> 扫自源码，
+        四个纯函数模块（choose / wake / compliance / config）<b>不 import 任何 IO</b> ——
+        七天长跑能压成 0.1 秒就是靠这个。</li>
+      <li><b>写盘只有一个口</b>：8 个状态文件的每一次写入都经过 <code>store.js</code> 的
+        <code>writeJsonAtomic</code>（tmp + rename）。入口和发布线只调 store，不自己写文件。</li>
+      <li><b>两地分键是有意的</b>：dsh 按 <code>projectKey(cwd)</code>，我们按 <code>lifeId</code> ——
+        这才是「会话会结束，命不会」的机制，而不是一个说法。</li>
+    </ul>
+  </div>
+  <div class="not">
+    <h3>这张图没有证明什么</h3>
+    <ul>
+      <li><b>长期记忆会不会「糊」</b>：跑三个月要不要总结、怎么总结，<b>未验证</b>。</li>
+      <li><b>我们这层没有跨进程锁</b>：<code>dsh-atomic-write</code> 有 <code>withFileLock</code>，
+        我们<b>没引它</b> —— 并发读改写只靠「每次重读」，真双进程压测会看到丢更新。</li>
+      <li><b>真实长跑没做过</b>：七天是压缩跑的（没有真实等待），也没有跨真实进程重启。</li>
+      <li><b>发布线一次真实发送都没有过</b>：状态机与标识硬闸有断言，平台是真没连过。</li>
+      <li><b>UI 只有只读接口</b>：<code>/life/state.json</code> 有测试，像素级没有。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tail" style="grid-template-columns:1fr;padding-top:0">
+  <div>
+    <h3>怎么复算</h3>
+    <ul>
+      <li><code>node tools/facts.mjs</code> —— 结构事实的唯一权威来源（工具数 / 状态文件 / 行数 / 挂载点 / 快照字节上限）</li>
+      <li><code>node verify/claims.mjs</code> —— 核对文档声称与实测是否一致</li>
+      <li><code>node verify/framework.mjs</code> —— 核对<b>这一页</b>：模块的 import 边、挂载点、写盘口，全对着源码核</li>
+      <li>完整技术方案（含未验清单）：<a href="MEMORY.md">docs/MEMORY.md</a> ·
+        模块依赖详图：<a href="module-graph.html">docs/module-graph.html</a></li>
+    </ul>
+  </div>
+</div>
+
+</div></div>
+
+<script>
+(function(){
+  var NS = 'http://www.w3.org/2000/svg'
+  var canvas = document.querySelector('.canvas')
+  var svg    = document.getElementById('wires')
+  var dag    = document.getElementById('dag')
+  var dagw   = document.getElementById('dagwires')
+
+  // ---- 生命层内部：真实 import 边（扫自 packages/dsh-life） ----------------
+  var EDGES = [
+    ['index','store'],['index','choose'],['index','outbox'],
+    ['index','ui'],['index','tg'],['index','config'],['index','wake'],
+    ['store','wake'],['store','outbox'],
+    ['outbox','comp'],
+    ['ui','wake']
+  ]
+
+  // ---- dsh 包 → 生命层模块：真实挂载点 ------------------------------------
+  var WIRES = [
+    { from:'p-loop',       to:'n-index', label:'ctx.tools.register() × 17' },
+    { from:'p-prompt',     to:'n-index', label:'ctx.systemPrompt.section()' },
+    { from:'p-sched',      to:'n-index', label:'ctx.schedule.create()' },
+    { from:'p-auth',       to:'n-index', label:'ctx.approval.request()' },
+    { from:'p-sessionw',   to:'n-index', label:"on('session/event') · on('agent/inbox/claimed')" },
+    { from:'p-web',        to:'n-ui',    label:'ctx.webServer.register()' },
+    { from:'p-clientmods', to:'n-ui',    label:'slots: shell.overlay · settings.section' }
+  ]
+
+  // ---- 生命层模块 → 磁盘：真实写盘点 --------------------------------------
+  var DISK = [
+    { from:'n-store', to:'d-life', label:'writeJsonAtomic（8 个状态文件）' },
+    { from:'n-index', to:'d-life', label:'appendLedger(turn / wake / publish)' }
+  ]
+
+  function el (id) { return document.getElementById(id) }
+  function box (node, cr) {
+    var r = node.getBoundingClientRect()
+    return {
+      left: r.left - cr.left, right: r.right - cr.left,
+      top: r.top - cr.top, bottom: r.bottom - cr.top,
+      cx: r.left - cr.left + r.width / 2, cy: r.top - cr.top + r.height / 2,
+      w: r.width, h: r.height
+    }
+  }
+  function mkpath (d, color, width, dash, opacity) {
+    var p = document.createElementNS(NS, 'path')
+    p.setAttribute('d', d)
+    p.setAttribute('stroke', color)
+    p.setAttribute('stroke-width', String(width))
+    p.setAttribute('fill', 'none')
+    p.setAttribute('opacity', String(opacity))
+    if (dash) p.setAttribute('stroke-dasharray', dash)
+    return p
+  }
+
+  function draw () {
+    var cr = canvas.getBoundingClientRect()
+    svg.setAttribute('viewBox', '0 0 ' + cr.width + ' ' + cr.height)
+    svg.innerHTML = ''
+
+    // ==== 生命层内部 DAG（画在它自己那层 svg 上，坐标相对 #dag） ==========
+    var dr = dag.getBoundingClientRect()
+    dagw.setAttribute('viewBox', '0 0 ' + dr.width + ' ' + dr.height)
+    dagw.innerHTML = ''
+    EDGES.forEach(function (e) {
+      var A = el('n-' + e[0]).getBoundingClientRect()
+      var B = el('n-' + e[1]).getBoundingClientRect()
+      var ax = A.left - dr.left + A.width / 2, ay = A.bottom - dr.top
+      var bx = B.left - dr.left + B.width / 2, by = B.top - dr.top
+      var d
+      if (by >= ay) {
+        var mid = ay + (by - ay) * 0.5
+        d = 'M' + ax + ',' + ay + ' C' + ax + ',' + mid + ' ' + bx + ',' + mid + ' ' + bx + ',' + by
+      } else {
+        var ty = B.bottom - dr.top
+        var my = ty + 12
+        d = 'M' + ax + ',' + ay + ' L' + ax + ',' + my + ' L' + bx + ',' + my + ' L' + bx + ',' + ty
+      }
+      dagw.appendChild(mkpath(d, '#4f86ff', 1.35, null, 0.44))
+    })
+
+    // ==== Band1 的包 → Band3 的模块（跨带虚线） ==========================
+    var grouped = {}
+    WIRES.forEach(function (w) { (grouped[w.to] = grouped[w.to] || []).push(w) })
+    Object.keys(grouped).forEach(function (to) {
+      var list = grouped[to]
+      var t = box(el(to), cr)
+      list.forEach(function (w, i) {
+        var f = box(el(w.from), cr)
+        var n = list.length
+        var spread = (i - (n - 1) / 2) * Math.min(74, t.w / (n + 1))
+        var lx = t.cx + spread, ly = t.top
+        var sy = f.bottom <= ly ? f.bottom : f.top
+        var mid = sy + (ly - sy) * 0.55
+        var d = 'M' + f.cx + ',' + sy + ' C' + f.cx + ',' + mid + ' ' + lx + ',' + mid + ' ' + lx + ',' + ly
+        svg.appendChild(mkpath(d, '#22d3ee', 1.25, '5 4', 0.4))
+      })
+    })
+
+    // ==== Band3 的模块 → Band4 的磁盘 ====================================
+    DISK.forEach(function (w) {
+      var f = box(el(w.from), cr)
+      var t = box(el(w.to), cr)
+      var sy = f.bottom, ty = t.top
+      if (ty <= sy) return
+      var mid = sy + (ty - sy) * 0.5
+      var d = 'M' + f.cx + ',' + sy + ' C' + f.cx + ',' + mid + ' ' + t.cx + ',' + mid + ' ' + t.cx + ',' + ty
+      svg.appendChild(mkpath(d, '#4f86ff', 1.15, '3 4', 0.3))
+    })
+  }
+
+  window.addEventListener('load', draw)
+  window.addEventListener('resize', draw)
+  draw()
+  setTimeout(draw, 260)
+})()
+</script>
+</body>
+</html>
