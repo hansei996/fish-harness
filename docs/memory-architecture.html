@@ -3,148 +3,175 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>会话会结束，命不会</title>
+<title>记忆层：一张图讲清它怎么跨对话活着</title>
 <style>
 :root{
   color-scheme: dark;
-  --ink:#eef3ff; --ink2:#94a3c6; --ink3:#5a688a;
-  --bg:#05070d; --panel:#0a0f1a; --line:#18203a;
+  --ink:#eef3ff; --ink2:#95a4c7; --ink3:#5a688a;
+  --bg:#05070d; --panel:#0a0f1a; --line:#18203a; --line2:#232d47;
   --dead1:#1b2338; --dead2:#141b2c;
-  --life:#4f86ff; --life2:#a8c8ff;
+  --life:#4f86ff; --life2:#a8c8ff; --warm:#ffb765; --ok:#4ade80;
   --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
 body{font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
-  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
 
-.wrap{max-width:1200px;margin:0 auto;padding:0 26px}
-
-/* ===================== 英雄 ===================== */
-.hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;padding:40px 0}
+/* ============ 头部 ============ */
+header{padding:66px 0 40px}
 .kicker{font-size:11.5px;letter-spacing:.24em;color:var(--ink3);font-family:var(--mono);
-  text-transform:uppercase;margin-bottom:20px}
-h1{font-size:clamp(32px,5vw,66px);line-height:1.06;letter-spacing:-.035em;margin:0 0 18px;font-weight:700}
-h1 .dead{color:#43506e}
+  text-transform:uppercase;margin-bottom:18px}
+h1{font-size:clamp(26px,3.4vw,44px);line-height:1.16;letter-spacing:-.03em;margin:0 0 14px;font-weight:700}
 h1 em{font-style:normal;color:var(--life2)}
-.sub{color:var(--ink2);font-size:clamp(14px,1.45vw,16.5px);margin:0 0 60px;max-width:36em;line-height:1.75}
-.sub b{color:var(--ink);font-weight:600}
+.sub{color:var(--ink2);font-size:15px;margin:0;max-width:52em;line-height:1.8}
+.sub b{color:var(--ink)}
 
-/* ---------- 时间轴 ---------- */
-.stage{margin-top:6px}
+/* ============ 图的主体 ============ */
+.diagram{border:1px solid var(--line);border-radius:18px;background:var(--panel);
+  padding:0;overflow:hidden;margin-top:30px}
 
-/* 会话：像被密封的方块，暗淡、有「已关闭」的质感 */
-.row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.cell{position:relative}
-.sealed{
-  height:78px;border-radius:10px;position:relative;overflow:hidden;
-  background:linear-gradient(165deg,var(--dead1),var(--dead2));
-  border:1px solid #232d47;
-  box-shadow:inset 0 1px 0 #2a3550, inset 0 -14px 24px -14px #000;
-}
-/* 里面的「对话气泡」残影：表示这里曾经有内容，现在停了 */
-.sealed i{position:absolute;left:11px;height:4px;border-radius:2px;background:#28334e;display:block}
-.sealed i:nth-child(1){top:15px;width:58%;opacity:.95}
-.sealed i:nth-child(2){top:27px;width:40%;opacity:.7}
-.sealed i:nth-child(3){top:39px;width:66%;opacity:.5}
-.sealed i:nth-child(4){top:51px;width:30%;opacity:.32}
-/* 顶部封条：像被贴了胶带 */
-.sealed::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;
+/* --- 第一段：时间轴 --- */
+.tl{padding:30px 28px 24px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(79,134,255,.035),transparent)}
+.tl-hd{font-size:11.5px;letter-spacing:.18em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;margin-bottom:20px}
+.row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.sealed{height:62px;border-radius:9px;position:relative;overflow:hidden;
+  background:linear-gradient(165deg,var(--dead1),var(--dead2));border:1px solid var(--line2);
+  box-shadow:inset 0 -12px 20px -12px #000}
+.sealed::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;
   background:repeating-linear-gradient(115deg,#2b3550 0 6px,#1b2338 6px 12px)}
-.sealed::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.02),transparent 40%)}
-.cap{display:flex;align-items:baseline;gap:8px;margin-top:11px;font-size:11.5px;font-family:var(--mono)}
-.cap .no{color:var(--ink3)}
-.cap .end{color:#7a4a4a;margin-left:auto}
+.sealed i{position:absolute;left:10px;height:3px;border-radius:2px;background:#28334e;display:block}
+.sealed i:nth-child(1){top:13px;width:56%}
+.sealed i:nth-child(2){top:23px;width:38%;opacity:.7}
+.sealed i:nth-child(3){top:33px;width:62%;opacity:.45}
+.sealed i:nth-child(4){top:43px;width:28%;opacity:.28}
+.cap{display:flex;align-items:baseline;gap:7px;margin-top:9px;font-size:11px;font-family:var(--mono)}
+.cap .no{color:var(--ink3)} .cap .end{color:#8a5252;margin-left:auto}
 
-/* ---------- 生命主线：粗、亮、贯穿 ---------- */
-.cable{position:relative;height:104px;margin:26px 0 0}
-.cable .track{position:absolute;left:0;right:0;top:44px;height:6px;border-radius:3px;
+.cable{position:relative;height:80px;margin-top:16px}
+.cable .rail{position:absolute;left:0;right:0;top:34px;height:6px;border-radius:3px;
   background:linear-gradient(90deg,#0f1626,#16203a 40%,#0f1626)}
-.cable .live{position:absolute;left:0;top:44px;height:6px;border-radius:3px;width:100%;
+.cable .live{position:absolute;left:0;top:34px;height:6px;border-radius:3px;width:100%;
   background:linear-gradient(90deg,#2d5fd0,var(--life) 45%,var(--life2));
-  box-shadow:0 0 12px 1px rgba(79,134,255,.7), 0 0 34px 6px rgba(79,134,255,.3),
-             0 0 70px 14px rgba(79,134,255,.12);
-  transform-origin:left;animation:pulse 4.5s ease-in-out infinite}
-@keyframes pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.28)}}
-/* 每个会话落到主线上的「记忆节点」 */
-.cable .jw{position:absolute;top:26px;width:42px;height:42px;transform:translateX(-50%);
-  display:grid;place-items:center;pointer-events:none}
-.cable .j{width:24px;height:24px;border-radius:50%;
+  box-shadow:0 0 12px 1px rgba(79,134,255,.7),0 0 34px 6px rgba(79,134,255,.28)}
+.cable .jw{position:absolute;top:25px;width:40px;height:40px;transform:translateX(-50%);
+  display:grid;place-items:center}
+.cable .j{width:22px;height:22px;border-radius:50%;
   background:radial-gradient(circle,var(--life2),var(--life) 62%,transparent 74%);
   box-shadow:0 0 16px 4px rgba(79,134,255,.75)}
-.cable .jw{outline:1px solid rgba(168,200,255,.28);outline-offset:-3px;border-radius:50%}
-.cable .lbl{position:absolute;left:0;top:70px;font-size:12.5px;color:var(--life2);
-  font-family:var(--mono);letter-spacing:.05em}
+.cable .lbl{position:absolute;left:0;top:58px;font-size:12px;color:var(--life2);font-family:var(--mono)}
 .cable .lbl b{color:#fff;font-weight:600}
-/* 从会话垂下到主线的引线，表示「状态被写下去」 */
-.cable .drop{position:absolute;top:-26px;width:1px;height:70px;
-  background:linear-gradient(180deg,transparent,rgba(79,134,255,.5))}
+.cable .drop{position:absolute;top:-14px;width:1px;height:50px;
+  background:linear-gradient(180deg,transparent,rgba(79,134,255,.45))}
 
-.legend{display:flex;gap:30px;flex-wrap:wrap;margin-top:30px;font-size:12.5px;color:var(--ink3)}
-.legend span{display:flex;align-items:center;gap:9px}
-.legend i{flex:none}
-.legend .d{width:22px;height:9px;border-radius:3px;background:linear-gradient(165deg,var(--dead1),var(--dead2));border:1px solid #232d47}
-.legend .l{width:26px;height:6px;border-radius:3px;background:linear-gradient(90deg,#2d5fd0,var(--life2));box-shadow:0 0 10px 2px rgba(79,134,255,.5)}
+/* --- 第二段：一个完整循环（机制） --- */
+.cycle{padding:30px 28px 32px}
+.cyc-hd{font-size:11.5px;letter-spacing:.18em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;margin-bottom:24px}
+.cyc-hd b{color:var(--ink2);letter-spacing:0;text-transform:none;font-family:inherit;font-size:13px;margin-left:10px}
+.steps{display:grid;grid-template-columns:repeat(5,1fr);gap:0;align-items:stretch}
+@media(max-width:1000px){.steps{grid-template-columns:1fr;gap:12px}}
+.step{position:relative;padding:0 16px}
+.step:first-child{padding-left:0}
+.step:last-child{padding-right:0}
+/* 步骤之间的箭头 */
+.step+.step::before{content:"→";position:absolute;left:-7px;top:6px;color:var(--life);
+  font-size:14px;opacity:.65}
+@media(max-width:1000px){.step+.step::before{content:"↓";left:0;top:-11px}}
+.step .sn{font-family:var(--mono);font-size:11px;color:var(--life);margin-bottom:9px;
+  display:flex;align-items:center;gap:7px}
+.step .sn i{width:18px;height:18px;border-radius:50%;border:1px solid var(--life);
+  display:grid;place-items:center;font-size:9.5px;font-style:normal;flex:none}
+.step h4{margin:0 0 7px;font-size:13.5px;letter-spacing:-.01em;line-height:1.35}
+.step p{margin:0;font-size:11.5px;color:var(--ink2);line-height:1.65}
+.step code{font-family:var(--mono);font-size:10.5px;color:var(--life2);
+  background:rgba(79,134,255,.09);border:1px solid rgba(79,134,255,.2);border-radius:4px;
+  padding:1px 5px;white-space:nowrap}
 
-/* ===================== 三个数字 ===================== */
-.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
-  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-@media(max-width:780px){.facts{grid-template-columns:1fr}}
-.fact{background:var(--panel);padding:40px 30px}
-.fact .n{font-size:clamp(30px,4vw,52px);font-weight:700;letter-spacing:-.04em;line-height:1;
-  font-family:var(--mono);color:#43506e}
-.fact.hot .n{color:var(--life2);text-shadow:0 0 30px rgba(79,134,255,.5)}
-.fact .l{color:var(--ink2);font-size:13.5px;margin-top:14px;line-height:1.65}
-.fact .l b{color:var(--ink)}
+/* --- 第三段：八个文件（记忆本体） --- */
+.files{padding:26px 28px 30px;border-top:1px solid var(--line);
+  background:linear-gradient(180deg,transparent,rgba(79,134,255,.045))}
+.files-hd{font-size:11.5px;letter-spacing:.18em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;margin-bottom:8px}
+.files-sub{font-size:12.5px;color:var(--ink2);margin:0 0 20px}
+.lanes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:900px){.lanes{grid-template-columns:1fr}}
+.lane{border:1px solid var(--line2);border-radius:12px;padding:14px 15px;background:rgba(255,255,255,.012)}
+.lane.p1{border-left:3px solid #a78bfa}
+.lane.p2{border-left:3px solid var(--life)}
+.lane.p3{border-left:3px solid var(--ok)}
+.lane .lh{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.lane .lh b{font-size:13px}
+.lane .lh .sp{font-size:10.5px;color:var(--ink3);font-family:var(--mono);margin-left:auto}
+.lane ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+.lane li{font-size:11.5px;color:var(--ink2);line-height:1.5}
+.lane li code{font-family:var(--mono);font-size:10.5px;color:var(--ink);
+  background:#0d1220;border:1px solid var(--line2);border-radius:4px;padding:1px 5px;display:inline-block}
+.lane li em{font-style:normal;color:var(--ink3)}
 
-/* ===================== 三句话 ===================== */
-.why{padding:96px 0 0}
-.why .eyebrow{font-size:11.5px;letter-spacing:.24em;color:var(--ink3);font-family:var(--mono);
-  text-transform:uppercase;margin-bottom:44px}
-.big{display:flex;flex-direction:column;gap:52px}
-.big .item{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:start;
-  padding-left:0}
-.big .num{font-family:var(--mono);font-size:13px;color:var(--life);padding-top:9px;letter-spacing:.06em}
-.big .item h3{margin:0 0 10px;font-size:clamp(18px,2.2vw,27px);line-height:1.3;
-  letter-spacing:-.02em;font-weight:650}
-.big .item p{margin:0;color:var(--ink2);font-size:14px;line-height:1.8;max-width:44em}
-.big .item p b{color:var(--ink)}
+/* --- 第四段：关键数字 --- */
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+  border-top:1px solid var(--line)}
+@media(max-width:900px){.nums{grid-template-columns:repeat(2,1fr)}}
+.num{background:var(--panel);padding:24px 22px}
+.num .v{font-family:var(--mono);font-size:clamp(20px,2.4vw,30px);font-weight:700;
+  letter-spacing:-.03em;line-height:1;color:#5a688a}
+.num.hi .v{color:var(--life2);text-shadow:0 0 24px rgba(79,134,255,.45)}
+.num .k{font-size:11.5px;color:var(--ink2);margin-top:11px;line-height:1.55}
+.num .k b{color:var(--ink)}
 
-footer{padding:92px 0 60px}
-footer p{margin:0;font-size:12px;color:var(--ink3);line-height:1.9;max-width:56em}
+/* ============ 底部说明 ============ */
+.notes{padding:56px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:36px}
+@media(max-width:900px){.notes{grid-template-columns:1fr}}
+.notes h3{font-size:11.5px;letter-spacing:.2em;color:var(--ink3);font-family:var(--mono);
+  text-transform:uppercase;font-weight:500;margin:0 0 16px}
+.notes ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:11px}
+.notes li{font-size:12.5px;color:var(--ink2);line-height:1.65;padding-left:15px;position:relative}
+.notes li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%}
+.notes .did li::before{background:var(--ok)}
+.notes .not li::before{background:var(--warm)}
+.notes li b{color:var(--ink)}
+
+footer{padding:64px 0 56px;border-top:1px solid var(--line);margin-top:52px}
+footer p{margin:0;font-size:12px;color:var(--ink3);line-height:1.85;max-width:62em}
 footer a{color:var(--ink2)}
 </style>
 </head>
 <body>
 
-<section class="hero"><div class="wrap">
-  <div class="kicker">Memory architecture</div>
-  <h1><span class="dead">会话会结束。</span><br><em>命不会。</em></h1>
+<header><div class="wrap">
+  <div class="kicker">Memory architecture · one diagram</div>
+  <h1>它凭什么跨对话活着 ——<br>而且<em>第 300 天和第 1 天一样便宜</em></h1>
   <p class="sub">
-    一般 Agent 活在<strong>一次对话</strong>里 —— 窗口一关，全部清零。
-    这一条不是：它的身份、兴趣、承诺和没做完的事<strong>存在磁盘上</strong>，
-    所以下一次对话对它不是重启，只是又一天。
+    dsh 给的是<strong>会话</strong>：一次对话一条日志，结束就不再增长。
+    记忆层只做一件它没做的事 —— <strong>把「跨会话仍然成立的事实」落到磁盘上</strong>。
+    下面这张图是一次完整循环：怎么写下去、怎么醒过来、怎么读回来。
+    所有路径与数字都是启动真实 dsh profile 后从磁盘上量出来的。
   </p>
+</div></header>
 
-  <div class="stage">
+<div class="wrap"><div class="diagram">
+
+  <!-- ① 时间轴 -->
+  <div class="tl">
+    <div class="tl-hd">① 会话会结束 —— 这是必须跨过的那道断层</div>
     <div class="row">
-      <div class="cell"><div class="sealed"><i></i><i></i><i></i><i></i></div>
-        <div class="cap"><span class="no">会话 1</span><span class="end">已结束</span></div></div>
-      <div class="cell"><div class="sealed"><i></i><i></i><i></i><i></i></div>
-        <div class="cap"><span class="no">会话 2</span><span class="end">已结束</span></div></div>
-      <div class="cell"><div class="sealed"><i></i><i></i><i></i><i></i></div>
-        <div class="cap"><span class="no">会话 3</span><span class="end">已结束</span></div></div>
-      <div class="cell"><div class="sealed"><i></i><i></i><i></i><i></i></div>
-        <div class="cap"><span class="no">会话 4</span><span class="end">已结束</span></div></div>
+      <div><div class="sealed"><i></i><i></i><i></i><i></i></div>
+        <div class="cap"><span class="no">会话 1</span><span class="end">已封存</span></div></div>
+      <div><div class="sealed"><i></i><i></i><i></i><i></i></div>
+        <div class="cap"><span class="no">会话 2</span><span class="end">已封存</span></div></div>
+      <div><div class="sealed"><i></i><i></i><i></i><i></i></div>
+        <div class="cap"><span class="no">会话 3</span><span class="end">已封存</span></div></div>
+      <div><div class="sealed"><i></i><i></i><i></i><i></i></div>
+        <div class="cap"><span class="no">会话 4</span><span class="end">已封存</span></div></div>
     </div>
-
     <div class="cable">
-      <span class="drop" style="left:12.5%"></span>
-      <span class="drop" style="left:37.5%"></span>
-      <span class="drop" style="left:62.5%"></span>
-      <span class="drop" style="left:87.5%"></span>
-      <div class="track"></div>
-      <div class="live"></div>
+      <span class="drop" style="left:12.5%"></span><span class="drop" style="left:37.5%"></span>
+      <span class="drop" style="left:62.5%"></span><span class="drop" style="left:87.5%"></span>
+      <div class="rail"></div><div class="live"></div>
       <span class="jw" style="left:12.5%"><span class="j"></span></span>
       <span class="jw" style="left:37.5%"><span class="j"></span></span>
       <span class="jw" style="left:62.5%"><span class="j"></span></span>
@@ -153,49 +180,126 @@ footer a{color:var(--ink2)}
     </div>
   </div>
 
-  <div class="legend">
-    <span><i class="d"></i>dsh 会话：一次对话一条，结束就封存，日志停止增长</span>
-    <span><i class="l"></i>Fish 生命：每次对话把状态写下去，它自己从不断</span>
+  <!-- ② 一次完整循环 -->
+  <div class="cycle">
+    <div class="cyc-hd">② 一次完整循环：它是这么做的<b>——每一步都指到代码</b></div>
+    <div class="steps">
+      <div class="step">
+        <div class="sn"><i>1</i>每一轮开始</div>
+        <h4>把生命状态注入提示词</h4>
+        <p>注册一个 <code>systemPrompt.section</code>，
+          <b>不替换</b> profile 已有的人格设定，只加一段。</p>
+        <p style="margin-top:7px"><em style="color:var(--ink3);font-style:normal">
+          只在唤醒轮附候选短名单 —— 普通轮不付这份成本。</em></p>
+      </div>
+      <div class="step">
+        <div class="sn"><i>2</i>注入什么</div>
+        <h4>一份有界快照</h4>
+        <p>我是谁 · 此刻在做什么 · <b>留给下一步的交接</b> ·
+          最相关的 5 个兴趣 · 最紧的 5 个承诺。</p>
+        <p style="margin-top:7px"><em style="color:var(--ink3);font-style:normal">
+          13 个字段，实测 271B（空）→ 690B（满载）。</em></p>
+      </div>
+      <div class="step">
+        <div class="sn"><i>3</i>这一轮结束</div>
+        <h4>先落盘，再布防</h4>
+        <p>收到 <code>turn/end</code> 后两步：把新事实<b>原子写盘</b>
+          （tmp + rename），再向 dsh 的 <code>schedule</code> 补一个<b>一次性</b>闹钟。</p>
+        <p style="margin-top:7px"><em style="color:var(--ink3);font-style:normal">
+          不持有 setInterval —— 自持定时器会随会话一起死。</em></p>
+      </div>
+      <div class="step">
+        <div class="sn"><i>4</i>到点了</div>
+        <h4>它自己醒过来</h4>
+        <p>dsh 往原会话投一条消息并跑一个普通 turn。抖动 / 静默时段 / 每日预算
+          由生命层自己算（dsh 的 schedule 没有这三项）。</p>
+        <p style="margin-top:7px"><em style="color:var(--ink3);font-style:normal">
+          进程不在也会在下次启动补投。</em></p>
+      </div>
+      <div class="step">
+        <div class="sn"><i>5</i>醒来第一件事</div>
+        <h4>读盘，而不是读上一次会话</h4>
+        <p>这就是跨对话发生的地方：<b>状态按 lifeId 存在磁盘上，
+          与 cwd、与 sessionId 都无关</b>。所以换目录、换会话，它还是同一个它。</p>
+      </div>
+    </div>
   </div>
-</div></section>
 
-<div class="facts">
-  <div class="fact"><div class="n">20</div>
-    <div class="l">一次会话的事件数<br>然后<b>它就不再增长了</b></div></div>
-  <div class="fact hot"><div class="n">682<small style="font-size:.45em">B</small></div>
-    <div class="l">每轮注入的生命状态<br><b>第 1 天和第 300 天一样多</b></div></div>
-  <div class="fact"><div class="n">0</div>
-    <div class="l">开启新一天所需的对话历史<br><b>状态在磁盘上，不在会话里</b></div></div>
-</div>
-
-<section class="why"><div class="wrap">
-  <div class="eyebrow">为什么它不会死</div>
-  <div class="big">
-    <div class="item"><span class="num">01</span><div>
-      <h3>写坏一半，也不会变成半截文件</h3>
-      <p>每次写先落临时文件再改名，每次读容忍坏文件。
-        <b>实测：把身份文件截断，它只降级成「读不到」，不抛错。</b>
-        一条坏文件不该弄死一条命。</p></div></div>
-    <div class="item"><span class="num">02</span><div>
-      <h3>没人叫它，它自己会醒</h3>
-      <p>接着底座的定时器补一次性闹钟：<b>有抖动</b>（不会每天同一秒醒）、
-        <b>有静默时段</b>（夜里不打扰）、<b>有每日预算</b>，
-        而且<b>不会整天消失</b> —— 最后这条是模拟长跑时抓出来的真 bug。</p></div></div>
-    <div class="item"><span class="num">03</span><div>
-      <h3>明天还记得昨天，这是磁盘上的事实</h3>
-      <p>失败时它留下一条「下一步」，下次醒来就写在状态里读得到。
-        <b>不是靠提示词请求它记住 —— 是那个字段本来就在。</b>
-        这条曾经是死代码，连着跑七天日志才把它暴露出来。</p></div></div>
+  <!-- ③ 八个文件 -->
+  <div class="files">
+    <div class="files-hd">③ 状态本体：八个文件，按「变化速度」分三层</div>
+    <p class="files-sub">混在一起是长期运行最先崩的地方 —— 更新权限与频率都不同。</p>
+    <div class="lanes">
+      <div class="lane p1">
+        <div class="lh"><b>极慢</b><span class="sp">只有主人确认能改</span></div>
+        <ul>
+          <li><code>identity.json</code><br>名字 · 性格种子 · 版本号</li>
+          <li><em>一条网页注入改不动它 —— 能改人格的注入 = 能换人</em></li>
+        </ul>
+      </div>
+      <div class="lane p2">
+        <div class="lh"><b>慢</b><span class="sp">由经历累积</span></div>
+        <ul>
+          <li><code>traits.json</code> 兴趣 · 技能（带置信度与来源）</li>
+          <li><code>relations.json</code> 认识谁（主人 / 公开分开存）</li>
+          <li><code>commitments.json</code> 答应了什么、什么时候</li>
+        </ul>
+      </div>
+      <div class="lane p3">
+        <div class="lh"><b>快</b><span class="sp">每轮都在动</span></div>
+        <ul>
+          <li><code>activity.json</code> 当前活动 + <b>给下一步的交接</b></li>
+          <li><code>wake.json</code> 下个闹钟 · 预算 · 已投递 id</li>
+          <li><code>ledger.jsonl</code> 只追加 —— 唯一可回放</li>
+          <li><code>outbox.json</code> 外部副作用状态机</li>
+        </ul>
+      </div>
+    </div>
   </div>
-</div></section>
+
+  <!-- ④ 数字 -->
+  <div class="nums">
+    <div class="num"><div class="v">tmp→rename</div>
+      <div class="k">每次写是原子的<br><b>断电也不会留下半截文件</b></div></div>
+    <div class="num hi"><div class="v">690 B</div>
+      <div class="k">承载 200 兴趣 + 200 承诺的完整快照<br><b>不随寿命增长</b></div></div>
+    <div class="num"><div class="v">cap/2~cap×2</div>
+      <div class="k">账本懒裁剪后震荡的区间<br><b>每次追加都重写会让长跑变慢</b></div></div>
+    <div class="num"><div class="v">null</div>
+      <div class="k">读到一个截断的身份文件时<br><b>降级，不抛错</b></div></div>
+  </div>
+
+</div></div>
+
+<div class="wrap"><div class="notes">
+  <div class="did">
+    <h3>这张图证明了什么</h3>
+    <ul>
+      <li><b>路径是真的</b>：启动真实 dsh profile 后 <code>find</code> 出来的 ——
+        会话在 <code>sessions/&lt;projectKey(cwd)&gt;/&lt;id&gt;/</code>，
+        生命在 <code>life/&lt;lifeId&gt;/</code>。两者分桶方式不同，这正是跨对话的根据。</li>
+      <li><b>数字是量的</b>：690B 是灌入 200 兴趣 + 200 承诺后的实测快照；
+        截断降级、账本震荡区间都跑过。</li>
+      <li><b>机制有断言</b>：注入点、布防时机、原子写、快照有界，
+        在 <code>verify/smoke.mjs</code>、<code>verify/life-week.mjs</code>、<code>verify/publish.mjs</code> 里有对应检查。</li>
+    </ul>
+  </div>
+  <div class="not">
+    <h3>这张图没有证明什么</h3>
+    <ul>
+      <li><b>长期记忆会不会「糊」</b>：跑三个月要不要总结、怎么总结，<b>未验证</b>。</li>
+      <li><b>跨进程没有锁</b>：dsh 有 <code>session.lock</code>，我们这层没有。</li>
+      <li><b>真实长跑没做过</b>：七天是压缩跑的，没有真实等待，也没跨真实进程重启。</li>
+      <li><b>发布线一次真实发送都没有过</b>：状态机有断言，平台是真没连过。</li>
+    </ul>
+  </div>
+</div></div>
 
 <footer><div class="wrap"><p>
-  图中数字与路径均为实跑一个真实 dsh profile 后从磁盘读出：会话事件数实测、
-  状态文件路径实测、682 字节为灌入 200 个兴趣 + 200 条承诺后的快照实测值。
-  完整技术方案见 <a href="MEMORY.md">docs/MEMORY.md</a>。
-  <br><br>
-  <b>它没有证明什么</b>：长期记忆会不会「糊」（跑三个月要不要总结）未验证；跨进程没有锁；
-  真实长跑没做过（七天是压缩跑的，没有真实等待）。
+  完整技术方案（含未验清单）见 <a href="MEMORY.md">docs/MEMORY.md</a>；
+  实现见 <a href="https://github.com/hansei996/fish-harness/blob/main/packages/dsh-life/lib/store.js">lib/store.js</a>、
+  <a href="https://github.com/hansei996/fish-harness/blob/main/packages/dsh-life/lib/wake.js">lib/wake.js</a>。
+  数字可用 <a href="https://github.com/hansei996/fish-harness">tools/facts.mjs</a> 与 verify 套件复算。
 </p></div></footer>
 
 </body>
