@@ -24,7 +24,7 @@
  *   node tools/facts.mjs --json     # 供程序消费（verify/claims.mjs 用这个）
  *   node tools/facts.mjs --suites   # 额外真跑七套 verify 数项数（慢，约 30s，需要一个能跑的 dsh）
  */
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -445,6 +445,39 @@ const MOUNT_TARGETS = {
   'effect()': '卸载时全部反注册',
 }
 
+/**
+ * 被度量的那些文件里，有没有**未提交**的改动？
+ *
+ * 为什么需要它：`--write` 会把当前工作区量出来的数字**写进文档**，而 CI 看到的
+ * 是提交后的状态。两者不一致时，文档里就留下一个「本地全绿、CI 全红」的数字。
+ *
+ * 这不是假设 —— 真的发生了：并行干活时，一个 agent 的 `verify/demo-data.mjs`
+ * 有未提交改动（13 条断言），`--write` 把 16 写进了 README，而提交的版本是 17。
+ * 本地跑一遍全绿（因为本地读的是同一个工作区），CI 上 `claims` 报「生成块与实测
+ * 不一致」——**而 CI 是对的，文档是错的**。
+ *
+ * 所以 `--write` 在有未提交改动时拒绝执行：读 C 写 A 得到 B，这种账没人能对。
+ * `--check` 只警告不拒绝（它不会把数字写进任何文件，破坏性为零）。
+ */
+function uncommittedMeasuredFiles () {
+  // 被度量的路径：宿主代码（工具数/行数/状态文件/挂载点）与各套 verify（项数）。
+  const paths = ['packages/dsh-life', 'verify', 'tools']
+  let out = ''
+  try {
+    out = execFileSync('git', ['status', '--porcelain', '--', ...paths], {
+      cwd: REPO, encoding: 'utf8',
+    })
+  } catch {
+    // 没有 git（或不在仓库里）时不能判断，就当作干净 —— 不因为环境缺 git 而拦人。
+    return null
+  }
+  return out.split('\n')
+    .map((l) => l.slice(3).trim())
+    .filter(Boolean)
+    // facts.mjs 自己肯定可能是脏的（你正在改它），那不是「数字来源不可信」。
+    .filter((f) => f !== 'tools/facts.mjs')
+}
+
 /** 把 CRLF 归一成 LF。生成与比对都必须走它，否则 Windows 上会假红。 */
 const normalizeEol = (text) => text.replace(/\r\n/g, '\n')
 
@@ -540,12 +573,29 @@ function main () {
   const needSuites = argv.includes('--suites') || argv.includes('--write') || argv.includes('--check')
   if (needSuites) facts.verify = measureSuiteCounts()
 
+  const dirty = uncommittedMeasuredFiles()
+
   if (argv.includes('--write')) {
+    // 有未提交改动时**拒绝写入**：写进去的数字描述的是工作区，而 CI 看到的是提交。
+    // 详见 uncommittedMeasuredFiles() 的说明（这真的发生过）。
+    if (dirty && dirty.length && !argv.includes('--allow-dirty')) {
+      console.error('拒绝写入：被度量的文件里有未提交改动，写进去的数字 CI 看不到。')
+      for (const f of dirty.slice(0, 12)) console.error(`  未提交：${f}`)
+      if (dirty.length > 12) console.error(`  …还有 ${dirty.length - 12} 个`)
+      console.error('\n先把它们提交（或 stash），再跑 --write。确实要预览就加 --allow-dirty。')
+      process.exitCode = 1
+      return
+    }
     const touched = writeBlocks(facts, { only: argValue(argv, '--only') })
     console.log(touched.length ? `已更新：${touched.join(', ')}` : '无需更新（已是最新）')
     return
   }
+
   if (argv.includes('--check')) {
+    // --check 不改文件，破坏性为零，所以只警告 —— 但必须说清结论可能不对。
+    if (dirty && dirty.length) {
+      console.error(`注意：被度量的文件里有 ${dirty.length} 个未提交改动，下面的结论只对当前工作区成立。`)
+    }
     const stale = checkBlocks(facts)
     if (stale.length) {
       for (const s of stale) console.error(`STALE  ${s.file} 的 ${s.block} 块：${s.reason}`)
