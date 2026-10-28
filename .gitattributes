@@ -1,0 +1,18 @@
+# 换行统一成 LF。
+#
+# 为什么这个文件存在：仓库里有一个「文档里的生成块必须等于实测」的闸门
+# （tools/facts.mjs + verify/claims.mjs）。它的比较是逐字的，而块的生成用 `\n`。
+# 没有这一行时，Windows 的 checkout 会把工作区文件改成 CRLF，于是**每个块都
+# 被判成「不一致」**，而文件其实一个字都没错 —— 实测：把 README 转成 CRLF，
+# `--check` 立刻报 6 个块 STALE。
+#
+# 代码侧也做了归一化（不靠这个文件兜底），但把换行固定下来更省事：
+# 生成物是文本、要能 diff，LF 让「改了一行就是一行」在三个平台上都成立。
+* text=auto eol=lf
+
+# 二进制产物不碰。
+*.png binary
+*.gif binary
+*.mp4 binary
+*.ttf binary
+*.woff2 binary

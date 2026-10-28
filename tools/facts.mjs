@@ -151,22 +151,36 @@ export function measureSuiteCounts ({ env = process.env, timeoutMs = 600000 } = 
     })
     const text = `${r.stdout || ''}${r.stderr || ''}`
     const match = /(\d+)\/(\d+) checks passed/.exec(text)
+    // 项数取 `M`（总项数），**不是** `N`（通过数）。
+    //
+    // 第一版取了 N，于是「有一套正在红」的时候，文档里的总项数会悄悄变小 ——
+    // 实测踩到过：demo-data 15/16 时，总项数被写成 210 而不是 211，页面看上去
+    // 一切正常，只是少了一项。项数是一个**结构事实**（有多少条断言），
+    // 通过率是**运行结果**；把前者写成后者，等于让一次随机失败改写文档。
+    const passed = match ? Number(match[1]) : null
+    const total = match ? Number(match[2]) : null
     suites.push({
       name: suite.name,
       file: suite.file,
-      count: match ? Number(match[1]) : null,
-      total: match ? Number(match[2]) : null,
+      count: total,
+      passed,
+      total,
+      ok: r.status === 0 && passed !== null && passed === total,
       exitCode: r.status,
       ms: Date.now() - started,
     })
   }
-  const missing = suites.filter((s) => s.count === null).map((s) => s.name)
+  const missing = suites.filter((s) => s.total === null).map((s) => s.name)
+  const failing = suites.filter((s) => s.total !== null && s.passed !== s.total).map((s) => `${s.name} ${s.passed}/${s.total}`)
   return {
     suites,
-    total: suites.reduce((sum, s) => sum + (s.count || 0), 0),
+    total: suites.reduce((sum, s) => sum + (s.total || 0), 0),
     // 没跑出计数的套件必须被点名 —— 否则 `total` 会静默少算，被写进文档。
     missing,
-    allPassed: suites.every((s) => s.exitCode === 0 && s.count !== null && s.count === s.total),
+    // 有一套在红也照样报出来：项数是结构事实，不应该被一次失败改写，
+    // 但「现在有一套是红的」必须能被看见，不能悄悄混在总项数里。
+    failing,
+    allPassed: failing.length === 0 && missing.length === 0,
   }
 }
 
@@ -345,7 +359,7 @@ export const BLOCKS = [
       const rows = Object.keys(fileOf).map((name) => {
         const s = byName.get(name)
         const role = SUITE_ROLES[name]
-        return `| \`${fileOf[name]}\` | ${s.count} 项：${role.what}${role.needsDsh ? '（需要真 dsh）' : '（不需要真 dsh）'} | ${s.count}/${s.total} 通过 |`
+        return `| \`${fileOf[name]}\` | ${s.count} 项：${role.what}${role.needsDsh ? '（需要真 dsh）' : '（不需要真 dsh）'} | ${s.passed}/${s.total} 通过${s.ok ? '' : ' ⚠'} |`
       })
       return [
         `| 套件 | 查什么 | 本机实测（合计 ${v.total} 项） |`,
@@ -421,6 +435,9 @@ const MOUNT_TARGETS = {
   'effect()': '卸载时全部反注册',
 }
 
+/** 把 CRLF 归一成 LF。生成与比对都必须走它，否则 Windows 上会假红。 */
+const normalizeEol = (text) => text.replace(/\r\n/g, '\n')
+
 const MARK = (name) => ({ open: `<!-- facts:${name} -->`, close: `<!-- /facts:${name} -->` })
 
 /** 把 blocks 里的区域重写进文件。返回改过哪些文件。 */
@@ -450,7 +467,12 @@ export function writeBlocks (facts, { only = null } = {}) {
     const i = text.indexOf(open)
     const j = text.indexOf(close)
     if (i < 0 || j < 0) throw new Error(`${block.file} 缺少 ${open} / ${close} 标记`)
-    const next = text.slice(0, i + open.length) + '\n' + block.render(facts) + '\n' + text.slice(j)
+    // 写回时必须**保持文件原有的换行风格**。文件可能是 CRLF（Windows 的
+    // checkout），而生成内容用的是 `\n`；直接拼会写出一个混合换行的文件 ——
+    // README 上实测会产生 451 行假 diff，把真正的一行改动埋掉。
+    const eol = text.includes('\r\n') ? '\r\n' : '\n'
+    const body = normalizeEol(block.render(facts)).split('\n').join(eol)
+    const next = text.slice(0, i + open.length) + eol + body + eol + text.slice(j)
     if (next !== text) { fs.writeFileSync(file, next); touched.add(block.file) }
   }
   return [...touched]
@@ -466,8 +488,12 @@ export function checkBlocks (facts) {
     const i = text.indexOf(open)
     const j = text.indexOf(close)
     if (i < 0 || j < 0) { stale.push({ block: block.name, file: block.file, reason: '标记缺失' }); continue }
-    const onDisk = text.slice(i + open.length, j).replace(/^\n|\n$/g, '')
-    const fresh = block.render(facts)
+    // 换行必须归一化再比：块的生成用的是 `\n`，而 checkout 出来可能是 CRLF
+    // （`.gitattributes` 没固定 eol，Windows 上 runner 的 core.autocrlf 会改它）。
+    // 不归一化的话，Windows 上会报「每个块都不一致」—— 而文件其实一个字都没错。
+    // 这条是实测出来的：把 README 转成 CRLF，`--check` 立刻报 6 个块 STALE。
+    const onDisk = normalizeEol(text.slice(i + open.length, j)).replace(/^\n|\n$/g, '')
+    const fresh = normalizeEol(block.render(facts))
     if (onDisk !== fresh) stale.push({ block: block.name, file: block.file, reason: '与实测不一致' })
   }
   return stale
@@ -488,10 +514,9 @@ function human (facts) {
   if (facts.verify) {
     lines.push('', '  verify 套件（真跑）')
     for (const s of facts.verify.suites) {
-      const ok = s.count !== null && s.count === s.total && s.exitCode === 0
-      lines.push(`    ${ok ? 'ok  ' : 'BAD '}${s.name.padEnd(11)} ${String(s.count).padStart(3)}/${String(s.total).padEnd(3)} ${String(s.ms).padStart(6)}ms`)
+      lines.push(`    ${s.ok ? 'ok  ' : 'BAD '}${s.name.padEnd(11)} ${String(s.passed).padStart(3)}/${String(s.total).padEnd(3)} ${String(s.ms).padStart(6)}ms`)
     }
-    lines.push(`    合计 ${facts.verify.total} 项`)
+    lines.push(`    合计 ${facts.verify.total} 项${facts.verify.failing.length ? ` —— 红：${facts.verify.failing.join(', ')}` : ''}`)
   } else {
     lines.push('', '  （加 --suites 会真跑七套 verify 数项数；需要一个能跑的 dsh，约 30s）')
   }
