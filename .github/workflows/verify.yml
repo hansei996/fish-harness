@@ -182,7 +182,6 @@ jobs:
           PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           PACK_OUTCOME: ${{ steps.pack.outcome }}
-          CLAIMS_OUTCOME: ${{ steps.claims.outcome }}
         run: node .github/scripts/ci-report.mjs
 
       - name: Upload verify logs
@@ -200,7 +199,6 @@ jobs:
             verify-publish.log
             verify-e2e.log
             verify-pack.log
-            verify-claims.log
             verify-report.md
           if-no-files-found: ignore
           retention-days: 7

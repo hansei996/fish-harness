@@ -200,6 +200,62 @@ check('CI 里每个 Verify 步骤的 outcome 都进了 Report and gate',
 
 // ---------------------------------------------------------------- 汇总
 
+// ---------------------------------------------------------------- 5. workflow 必须真的合法
+
+// 这一条是被一次真实的 CI 失败逼出来的，而且失败的样子特别难懂：
+// workflow 在 0 秒内失败、`jobs` 列表是空的、没有任何日志 —— 原因是 YAML 里
+// 出现了**重复的 key**（`CLAIMS_OUTCOME` 与 `verify-claims.log` 各出现两次）。
+// 两个人各自往同一个文件里加了同一个步骤，各自看都没问题。
+//
+// GitHub 对非法 workflow 只给一个很模糊的提示，所以这里自己检。检测方式：
+// 在同一缩进层级上，同一个 key 只许出现一次；列表项（`- `）之间互不冲突。
+{
+  const problems = []
+  const files = [
+    '.github/workflows/verify.yml',
+    '.github/workflows/pages.yml',
+  ]
+  for (const file of files) {
+    let text
+    try { text = read(file) } catch { continue }
+    // 只看 `key:` 形式的行。用缩进 + 「是否还处在同一个列表项里」来划分作用域：
+    // 一个 `- name:` 开头的行会开启一个新的作用域，同名 key 在这里是合法的。
+    const scopes = new Map() // `${indent}|${scopeIndex}` -> Set(keys)
+    let scope = 0
+    text.split(/\r?\n/).forEach((line, i) => {
+      const code = line.replace(/#.*$/, '')
+      if (!code.trim()) return
+      const indent = code.length - code.trimStart().length
+      // 列表项开启新作用域（同一层级连续出现时作用域各算各的）。
+      if (/^\s*-\s/.test(code)) scope++
+      const m = /^\s*(?:-\s+)?([A-Za-z_][A-Za-z0-9_.-]*)\s*:/.exec(code)
+      if (!m) return
+      const key = `${indent}|${scope}`
+      if (!scopes.has(key)) scopes.set(key, new Map())
+      const seen = scopes.get(key)
+      if (seen.has(m[1])) {
+        problems.push(`${file}:${i + 1} 「${m[1]}」与第 ${seen.get(m[1])} 行重复（同一作用域内）`)
+      } else {
+        seen.set(m[1], i + 1)
+      }
+    })
+  }
+  check('workflow 里没有同一作用域的重复 key（重复会让整个 workflow 0 秒失败）',
+    problems.length === 0,
+    problems.length ? problems.join('; ') : `${files.length} 个 workflow 已扫`)
+}
+
+// 每套 verify 在 CI 里的日志文件必须**唯一**：重复的 path 条目本身不致命，
+// 但它和上面那条是同一个错误的两半（同一批人、同一时刻加的）。
+{
+  const dup = []
+  for (const suite of SUITES) {
+    const n = (workflow.match(new RegExp(`tee ${suite.file.replace(/^verify\//, 'verify-')}\\.log`, 'g')) || []).length
+    if (n > 1) dup.push(`${suite.name}×${n}`)
+  }
+  check('每套 verify 在 CI 里只写一份日志', dup.length === 0, dup.join(', ') || `${SUITES.length} 套各一份`)
+}
+
 const failed = results.filter((r) => !r.ok)
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
 if (failed.length) console.log(`failed: ${failed.map((r) => r.label).join(' | ')}`)
