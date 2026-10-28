@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>记忆层架构：为什么它能长期自己跑</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --ac:#4f6fc0; --deep:#1b2c61; --ac2:#7088c0;
+  --t:light-dark(#161c2c,#e9eef9); --m:light-dark(#6d7893,#8a95ad);
+  --l:light-dark(#e9edf5,#1e2637); --soft:light-dark(#f6f9fd,#131a27);
+  --bg:light-dark(#fff,#0e131d); --page:light-dark(#eef3fb,#080b11);
+  --ok:light-dark(#15803d,#4ade80); --wn:light-dark(#a16207,#fbbf24);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--t);
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:32px 22px 72px}
+h1{font-size:20px;margin:0 0 8px;letter-spacing:-.01em}
+.lede{color:var(--m);font-size:13.5px;margin:0 0 6px;max-width:64em}
+.lede b{color:var(--t)}
+h2{font-size:15px;margin:34px 0 12px;color:var(--deep);
+  border-left:3px solid var(--ac);padding-left:10px}
+@media (prefers-color-scheme: dark){ h2{color:var(--ac2)} }
+
+/* ---------- 分层图 ---------- */
+.layers{display:flex;flex-direction:column;gap:3px}
+.band{border:1px solid var(--l);border-radius:12px;background:var(--bg);overflow:hidden}
+.band-hd{display:flex;align-items:center;gap:10px;padding:10px 15px;background:var(--soft);
+  border-bottom:1px solid var(--l);font-size:13px}
+.band-hd .badge{width:auto;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:600;
+  border:1px solid;white-space:nowrap}
+.band-hd b{font-weight:600}
+.band-hd .who{margin-left:auto;color:var(--m);font-size:11.5px;font-family:var(--mono)}
+.band-bd{padding:13px 15px}
+.dsh .badge{color:var(--m);border-color:var(--l)}
+.mem .badge{color:var(--ac);border-color:color-mix(in oklab,var(--ac) 40%,transparent)}
+.mem{border-color:color-mix(in oklab,var(--ac) 30%,var(--l))}
+
+/* 八个文件，按变化速度分三档 */
+.speeds{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:760px){.speeds{grid-template-columns:1fr}}
+.spd{border:1px solid var(--l);border-radius:10px;padding:11px 12px;background:var(--soft)}
+.spd .h{display:flex;align-items:baseline;gap:7px;margin-bottom:8px}
+.spd .h b{font-size:12.5px}
+.spd .h .v{font-size:10.5px;color:var(--m);font-family:var(--mono);margin-left:auto}
+.spd ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+.spd li{font-size:11.5px;color:var(--m);display:flex;gap:6px;align-items:baseline}
+.spd li code{font-family:var(--mono);font-size:10.5px;color:var(--t);background:var(--bg);
+  border:1px solid var(--l);border-radius:4px;padding:1px 5px;flex:none}
+.spd .s1{border-left:3px solid #8b5cf6}
+.spd .s2{border-left:3px solid var(--ac)}
+.spd .s3{border-left:3px solid var(--ok)}
+
+/* 单向数据流箭头 */
+.flow{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0}
+.arrow{color:var(--m);font-size:15px;line-height:1}
+
+/* 四条机制 */
+.four{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:11px}
+.mech{border:1px solid var(--l);border-radius:11px;padding:12px 14px;background:var(--bg)}
+.mech h3{margin:0 0 6px;font-size:12.5px}
+.mech p{margin:0;font-size:11.5px;color:var(--m);line-height:1.6}
+.mech p b{color:var(--t)}
+.mech .ev{margin-top:8px;padding-top:8px;border-top:1px dashed var(--l);
+  font-family:var(--mono);font-size:10.5px;color:var(--ok);word-break:break-all}
+.mech .ev.warn{color:var(--wn)}
+
+/* 有界上下文对比 */
+.bound{border:1px solid var(--l);border-radius:12px;overflow:hidden}
+.bound-row{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--l)}
+@media(max-width:700px){.bound-row{grid-template-columns:1fr}}
+.bound-cell{background:var(--bg);padding:13px 15px}
+.bound-cell h4{margin:0 0 8px;font-size:12.5px}
+.bound-cell.bad h4{color:#b91c1c} .bound-cell.good h4{color:var(--ok)}
+.bound-cell p{margin:0;font-size:11.5px;color:var(--m)}
+.bound-bar{display:flex;align-items:flex-end;gap:2px;height:56px;margin:10px 0 8px}
+.bound-bar i{flex:1;background:var(--ac);border-radius:2px 2px 0 0;display:block;min-height:3px}
+.bound-cell.bad .bound-bar i{background:#dc2626}
+.bound-cell.good .bound-bar i{background:var(--ok)}
+.bound-num{font-family:var(--mono);font-size:11px}
+
+.note{margin-top:26px;border:1px solid color-mix(in oklab,var(--wn) 32%,transparent);
+  background:color-mix(in oklab,var(--wn) 7%,var(--bg));border-radius:12px;padding:14px 16px;
+  font-size:12.5px;color:var(--m)}
+.note b{color:var(--t)}
+.note code{font-family:var(--mono);font-size:11.5px;background:var(--bg);border:1px solid var(--l);
+  border-radius:5px;padding:1px 5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>记忆层架构：为什么它能长期自己跑</h1>
+  <p class="lede">
+    dsh 让一个 Agent 活过<b>一次对话</b>；记忆层让它活过<b>一次重启</b>。
+    后者是状态问题 —— 进程会退、手机会关机、dsh 会升级。
+    <b>会话没了可以重开，状态没了它就变成另一个人。</b>
+  </p>
+
+  <h2>一、八个文件，按变化速度分层</h2>
+  <div class="layers">
+    <div class="band mem">
+      <div class="band-hd"><span class="badge">记忆层</span><b>跨会话仍然成立的事实</b>
+        <span class="who">8 个状态文件</span></div>
+      <div class="band-bd">
+        <div class="speeds">
+          <div class="spd s1">
+            <div class="h"><b>极慢</b><span class="v">只有主人能改</span></div>
+            <ul>
+              <li><code>identity.json</code><span>名字 · 性格种子 · 版本号</span></li>
+            </ul>
+          </div>
+          <div class="spd s2">
+            <div class="h"><b>慢</b><span class="v">由经历累积</span></div>
+            <ul>
+              <li><code>traits.json</code><span>兴趣 · 技能（带置信度与来源）</span></li>
+              <li><code>relations.json</code><span>认识谁（主人/公开分开）</span></li>
+              <li><code>commitments.json</code><span>答应了什么、什么时候</span></li>
+            </ul>
+          </div>
+          <div class="spd s3">
+            <div class="h"><b>快</b><span class="v">每轮都在动</span></div>
+            <ul>
+              <li><code>activity.json</code><span>此刻在做什么 + 给下一步的交接</span></li>
+              <li><code>wake.json</code><span>下一个闹钟 · 当天预算</span></li>
+              <li><code>ledger.jsonl</code><span>追加式账本（唯一可回放的）</span></li>
+              <li><code>outbox.json</code><span>发布状态机</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow"><span class="arrow">↕</span></div>
+
+    <div class="band dsh">
+      <div class="band-hd"><span class="badge">DeepSeek Harness</span>
+        <b>会话 · 调度 · 沙箱 · 批准 · 工具注册</b>
+        <span class="who">开源底座，不自研</span></div>
+      <div class="band-bd" style="padding:10px 15px">
+        <p style="margin:0;font-size:11.5px;color:var(--m)">
+          会话持久化、崩溃恢复、Host 级定时、后台作业、逐次批准、进程隔离 ——
+          <b>这些它已经做完了。</b>记忆层不重写其中任何一件，只用它的公开扩展点。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <h2>二、四条让它「不养死」的机制（都实测过）</h2>
+  <div class="four">
+    <div class="mech">
+      <h3>① 每次写都是原子的</h3>
+      <p>先写临时文件，再 <code>rename</code>。<b>断电时磁盘上要么是旧内容、要么是新内容，永远不会是半截 JSON。</b></p>
+      <div class="ev">tmp + rename</div>
+    </div>
+    <div class="mech">
+      <h3>② 每次读都容忍文件坏掉</h3>
+      <p>截断的 JSON 不抛错，降级成 <code>null</code>；账本尾部有半行就跳过。<b>一条坏文件不该弄死一条命。</b></p>
+      <div class="ev">identity.json 被截断 → 没崩，读到 null</div>
+    </div>
+    <div class="mech">
+      <h3>③ 账本有上限，而且是懒裁剪</h3>
+      <p>写满阈值才收，收到一半 —— 于是它在 <code>cap/2 ~ cap×2</code> 之间<b>震荡</b>而不是精确停在 cap。<b>每次追加都重写整个文件，会让长跑实例越来越慢。</b></p>
+      <div class="ev">写 500 条 → 401 → 收到 216 条</div>
+    </div>
+    <div class="mech">
+      <h3>④ 每轮注入的上下文有界</h3>
+      <p>只给「此刻该知道的」：我是谁、在做什么、下一步、最相关的 5 个兴趣、最紧的 5 个承诺。</p>
+      <div class="ev">13 个字段 · 682 字节 · 不随寿命增长</div>
+    </div>
+  </div>
+
+  <h2>三、为什么这就能长期自己跑</h2>
+
+  <div class="bound">
+    <div class="bound-row">
+      <div class="bound-cell bad">
+        <h4>✕ 如果每轮塞进全部记忆</h4>
+        <div class="bound-bar">
+          <i style="height:8%"></i><i style="height:12%"></i><i style="height:19%"></i>
+          <i style="height:28%"></i><i style="height:41%"></i><i style="height:57%"></i>
+          <i style="height:74%"></i><i style="height:92%"></i><i style="height:100%"></i>
+        </div>
+        <p>token 随寿命<b>线性增长</b> —— 跑三个月就贵到用不起。而且越长越慢、越贵，最终只能是「养不起」而不是「养不死」。</p>
+      </div>
+      <div class="bound-cell good">
+        <h4>✓ 每轮只付固定的一小笔</h4>
+        <div class="bound-bar">
+          <i style="height:34%"></i><i style="height:34%"></i><i style="height:34%"></i>
+          <i style="height:34%"></i><i style="height:34%"></i><i style="height:34%"></i>
+          <i style="height:34%"></i><i style="height:34%"></i><i style="height:34%"></i>
+        </div>
+        <p><span class="bound-num">682 字节</span>，第 1 天和第 300 天一样。要更多时它自己去查（<code>life_ledger</code>）。<b>这是长期可运行的关键取舍。</b></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="four" style="margin-top:12px">
+    <div class="mech">
+      <h3>它自己会醒</h3>
+      <p>每轮结束向 dsh 的 <code>schedule</code> 补一个一次性闹钟。抖动 / 静默时段 / 每日预算 / 不整天消失 —— 四条策略在 <code>lib/wake.js</code>，纯函数，可确定性测试。</p>
+      <div class="ev">不整天消失：34 小时空窗是 soak 抓出来的</div>
+    </div>
+    <div class="mech">
+      <h3>明天还记得昨天</h3>
+      <p>失败时留下一条<b>下一步</b>（<code>activity.next</code>），下次醒来在快照里读得到 —— 这是数据上的事实，不是提示词里的请求。</p>
+      <div class="ev warn">这条曾经是死代码：有读的分支，没有写的路径</div>
+    </div>
+    <div class="mech">
+      <h3>外部副作用单独管</h3>
+      <p><code>sending</code> 先落盘再发 —— 崩在中间，磁盘上是「可能已发」而不是「从没发过」；<code>unconfirmed</code> 没有自动重试路径。</p>
+      <div class="ev warn">Telegram 无幂等键、无法反查 → 这一步必须由人</div>
+    </div>
+  </div>
+
+  <h2>四、不做的事（也是为什么它简单）</h2>
+  <div class="four">
+    <div class="mech"><h3>不引数据库</h3><p>单实例状态量小。引入 DB 会把「装一个插件」变成「部署一套服务」。</p></div>
+    <div class="mech"><h3>不把向量库当唯一事实源</h3><p>检索索引可以重建，<b>账本不可</b>。能重建的东西不能是权威。</p></div>
+    <div class="mech"><h3>不复制对话历史</h3><p>那在 dsh 的 <code>core/session</code> 里；复制会带来两套不一致。</p></div>
+    <div class="mech"><h3>不让猜想自动变事实</h3><p>摘要与候选变更可以自动生成，但提升为事实需要显式动作。</p></div>
+  </div>
+
+  <div class="note">
+    <b>这张图证明什么、没证明什么。</b>
+    图中所有数字都可用 <code>node tools/facts.mjs</code> 与 <code>node verify/claims.mjs</code> 复算，
+    「四条机制」都有对应断言（<code>verify/smoke.mjs</code> 等）。
+    <b>但它没有证明「跑三个月不会糊」</b> —— 长期记忆要不要总结、怎么总结，尚未验证；
+    真实长跑也没做过（七天是压缩跑的，没有真实等待）。
+    完整方案与未验清单见 <a href="MEMORY.md">docs/MEMORY.md</a>。
+  </div>
+</div>
+</body>
+</html>
