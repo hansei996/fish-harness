@@ -772,13 +772,13 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 ### 11.1 代码级：已实现，可复现
 
 <!-- facts:plan-verify-table -->
-实测 **211 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
+实测 **213 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |
 | `verify/smoke.mjs` | **70** | 存储不变量、持久性、损坏降级、**唤醒策略与记账、7 天 soak**、**活动选择器**（确定性，可注入随机量） | 否 |
 | `verify/day-report.mjs` | **28** | 「它的一天」报告工具：账本→人话的翻译、失败照实说、结论带证据、缺数据不崩 | 否 |
-| `verify/demo-data.mjs` | **16** | 对外页面引用的数据产物与实现一致；含「换时区结论不变」与「篡改能被发现」 | 否 |
+| `verify/demo-data.mjs` | **18** | 对外页面引用的数据产物与实现一致；含「换时区结论不变」与「篡改能被发现」 | 否 |
 | `verify/life-week.mjs` | **16** | 连跑七天（压缩时钟，复用生产的 store/choose/wake） | 否 |
 | `verify/ui.mjs` | **28** | 界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归 | 否 |
 | `verify/publish.mjs` | **27** | 发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation | 否 |
