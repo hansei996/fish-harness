@@ -41,6 +41,14 @@ const DEFAULTS = {
   publisherChannels: [],
   publisherProviderCode: 'dsh-life',
   publisherMaxOutbox: 200,
+  // 视频标注。空 ffmpeg 路径 = 这个部署没有标注能力，于是 life_attach_video 会
+  // 明确拒绝（而不是把未标注的原片发出去）。默认空是刻意的：多数部署没有 ffmpeg，
+  // 而「没有能力」必须是显式的，不能靠路径猜。
+  videoFfmpegPath: '',
+  videoFfprobePath: '',
+  videoFontPath: '',
+  videoFontSize: 18,
+  videoLabelTemplate: '—— AI 生成 · 内容编号 {contentId}',
 }
 
 /** Channel kinds this build knows how to describe. Credentials are separate. */
@@ -141,6 +149,23 @@ function validate (input) {
     }
   }
 
+  // 视频标注用的路径与模板。空串是合法值（= 没配这个能力），所以这里只查类型、
+  // 不查非空 —— 把它写成「必填」会逼部署随便填一个不存在的路径。
+  for (const key of ['videoFfmpegPath', 'videoFfprobePath', 'videoFontPath', 'videoLabelTemplate']) {
+    if (!(key in raw)) continue
+    const value = raw[key]
+    if (typeof value !== 'string') {
+      issues.push(issue(key, `${key} must be a string`))
+    } else if (value.length > 500) {
+      issues.push(issue(key, `${key} must be at most 500 characters`))
+    } else if (key === 'videoLabelTemplate' && value && !value.includes('{contentId}')) {
+      // 与文本标识同一条硬规则：模板可以改措辞，但不能丢掉必填的内容编号。
+      issues.push(issue(key, 'videoLabelTemplate must contain {contentId}'))
+    } else {
+      out[key] = value
+    }
+  }
+
   for (const key of ['injectContext', 'autoCreate', 'wakeEnabled', 'chooserEnabled', 'publisherEnabled']) {
     if (!(key in raw)) continue
     if (typeof raw[key] !== 'boolean') {
@@ -168,6 +193,7 @@ function validate (input) {
     ['wakeMaxPerDay', 1, 48],
     ['chooserTopN', 1, 5],
     ['publisherMaxOutbox', 10, 2000],
+    ['videoFontSize', 8, 96],
   ]) {
     if (!(key in raw)) continue
     const value = raw[key]

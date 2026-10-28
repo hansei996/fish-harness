@@ -24,7 +24,7 @@ dsh 已经自带会话持久化与崩溃恢复（`core/session`）、持久目�
 - **中** —— 兴趣、技能、关系。由多次真实经历累积，每条带置信度和来源。
 - **快** —— 当前活动。**同时只允许一个**，并带原因。
 
-**17 个模型可见工具**（`life_*`）：我是谁、活动生命周期、兴趣、技能、承诺、人物、账本、主人确认的身份修改、**自己决定何时再来**（`life_wake`）、**问自己现在能做什么**（`life_candidates`），以及发布线的**起草 / 入队检查 / 状态与对账 / 经主人批准后发布**（`life_draft_post`、`life_publish_queue`、`life_publish_status`、`life_publish`）。发布必须过 dsh `approval`，只有 `allowed-once` 才算同意；没有批准通道（headless）一律不发。
+**18 个模型可见工具**（`life_*`）：我是谁、活动生命周期、兴趣、技能、承诺、人物、账本、主人确认的身份修改、**自己决定何时再来**（`life_wake`）、**问自己现在能做什么**（`life_candidates`），以及发布线的**起草 / 入队检查 / 状态与对账 / 经主人批准后发布**（`life_draft_post`、`life_publish_queue`、`life_publish_status`、`life_publish`），以及**视频标注**（`life_attach_video`）。发布必须过 dsh `approval`，只有 `allowed-once` 才算同意；没有批准通道（headless）一律不发。
 
 **自主唤醒** —— 每轮结束后向 dsh 的 Host 定时器补一个一次性闹钟；到点后 dsh 往原会话投一条 `source.kind === 'schedule'` 的消息并跑一个普通 turn。抖动、静默时段、每日预算由生命层自己实现（见下文）。
 
@@ -165,6 +165,8 @@ dsh plugin --profile <你的 profile> add link:/绝对路径/packages/dsh-life
 普通主人轮**一个字符都不加**：这段是给「自己醒来、没人说话」的那一轮用的。`life_candidates` 工具可以在任何一轮按需取完整明细（`topN` 可选，默认 `chooserTopN`），返回 `parts`、`weights`、`notes` 和休息候选，用来回答「为什么它排第一」。`chooserEnabled: false` 时唤醒轮不加短名单，工具会明确报 `life/chooser-disabled`，而不是静默返回空列表。
 
 ## 发出去这件事
+
+视频发布线多一步且不可省：原始片段必须先过 `life_attach_video` —— 每帧烧显式标识、容器写隐式标识，然后**回读首帧像素**证明标识真的烧进去了。核验不过就不产出 mediaId，于是草稿无法引用它。批准绑定的是**文件字节**：发布前重新哈希磁盘文件、上传时再核一次，换掉视频不能复用旧批准；没有 ffmpeg 就明确拒绝，绝不发原片。
 
 发布线分两层：**记录与状态机**（起草 / 标识 / outbox / 对账）和**批准与渠道**（`life_publish` 走 dsh `approval`，Telegram 适配器从环境变量读 token）。测试始终不联网、不真的发帖；真实发送只有在用户配置了带 `tokenEnv` 的渠道、且主人对**这一版内容**点了同意之后才会发生。
 

@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { LifeStore, newId, resolveDshHome } from './store.js'
 import { installLifeUi } from './ui.js'
 import { ConfigSchema, ConfigDefaults } from './config.js'
@@ -12,6 +14,16 @@ import {
   sendAttempt,
 } from './outbox.js'
 import { createTelegramTransport } from './telegram.js'
+import {
+  assertVideoArtifact,
+  createRunner,
+  fileDigest,
+  labelVideo,
+  MAX_VIDEO_BYTES,
+  MAX_VIDEO_SECONDS,
+  probeVideo,
+  verifyVideoLabel,
+} from './video.js'
 import {
   dayKeyOf,
   isQuietAt,
@@ -56,6 +68,23 @@ export const inject = []
 
 /** Cordis validates this through Standard Schema; see lib/config.js. */
 export const Config = ConfigSchema
+
+/**
+ * `child_process.spawn`, imported lazily.
+ *
+ * A static `import { spawn } from 'node:child_process'` would be evaluated at
+ * module load, and this package must load in every runtime dsh supports —
+ * including ones where the video path is never used. The video labeler is the
+ * only consumer, so the import happens on first use and a failure to import
+ * degrades to "no video capability", which is an honest state.
+ */
+let nodeSpawn = null
+try {
+  // eslint-disable-next-line antiplus/no-dynamic-import
+  nodeSpawn = (await import('node:child_process')).spawn
+} catch (err) {
+  nodeSpawn = null
+}
 
 const SECTION_NAME = 'dsh-life:identity'
 const SECTION_ORDER = 450 // after the deployment persona, before tool guidance
@@ -140,6 +169,21 @@ export function apply (root, config = {}) {
   const publisherRuntime = {
     transport: resolveTransport(root, config),
     approval: null,
+    // Child processes for the video labeller. Built lazily and only when a
+    // config actually names an ffmpeg path, so a text-only deployment never
+    // touches child_process — and a profile without ffmpeg fails with a clear
+    // "no labelling capability" instead of publishing an unlabelled file.
+    get runner () {
+      if (!settings.videoFfmpegPath) return null
+      if (this._runner) return this._runner
+      try {
+        this._runner = createRunner({ spawn: nodeSpawn })
+      } catch (err) {
+        this._runner = null
+      }
+      return this._runner
+    },
+    _runner: null,
   }
 
   // Approval is optional for the same reason schedule is: a partial profile
@@ -500,6 +544,23 @@ function buildTools (store, settings, wakeRuntime, publisherRuntime) {
   // these tools stop at "waiting for the keeper". A tool must never be able to
   // turn its own draft into `approved`, and none of them can reach `confirmed`
   // without a receipt from an injected transport.
+  // Media attachment. `life_draft_post` is text-only on purpose: a video draft
+  // has to go through labelling *and* a verified burn-in first, and folding that
+  // into the text tool would make "record a draft" able to spawn an ffmpeg job.
+  tools.push(tool({
+    name: 'life_attach_video',
+    description: 'Turn a raw video file you already produced into a publishable, labelled artifact: draws the mandatory AI-generation label on every frame (including the first), writes the implicit identifier into the container metadata, and then verifies both by decoding frame 0 and re-reading the metadata. Returns a contentId plus a digest; pass both to life_draft_post. If ffmpeg is unavailable or verification fails, nothing is returned and nothing can be published — an unlabelled video must never leave this process.',
+    parameters: {
+      path: { type: 'string', required: true, description: 'Absolute path of the raw video produced by your own activity (e.g. a gameplay clip)' },
+      text: { type: 'string', description: 'The post body that will carry this video; the platform label is added later by life_publish_queue' },
+      evidence: { type: 'array', items: { type: 'string' }, description: 'Ledger-backed references proving the footage is your own experience' },
+      channel: { type: 'string', description: 'Configured channel id (or kind); defaults to the only configured channel' },
+      account: { type: 'string', description: 'Account for that channel; defaults to the configured account' },
+    },
+    required: ['path'],
+    execute: async (args) => attachVideo(store, settings, publisherRuntime, args),
+  }))
+
   tools.push(tool({
     name: 'life_draft_post',
     description: 'Draft a post from something that actually happened. Every evidence reference must already exist in your life ledger (an activity-end id, an activity-end evidence string, or a ledger entry time); a draft about something you did not do is refused. This only records a draft: nothing is approved, nothing is sent, and there is no tool that can turn this draft into an approval.',
@@ -508,6 +569,7 @@ function buildTools (store, settings, wakeRuntime, publisherRuntime) {
       evidence: { type: 'array', items: { type: 'string' }, required: true, description: 'Ledger-backed references: activity-end ids/evidence or ledger entry times' },
       channel: { type: 'string', description: 'Configured channel id (or kind); defaults to the only configured channel' },
       account: { type: 'string', description: 'Account for that channel; defaults to the configured account' },
+      mediaId: { type: 'string', description: 'A labelled video from life_attach_video to publish with this post; omit for a text-only post' },
     },
     required: ['text', 'evidence'],
     execute: async (args) => draftPost(store, settings, args),
@@ -1067,6 +1129,103 @@ function labelOptionsFor (settings) {
   }
 }
 
+/**
+ * `life_attach_video`: label a raw clip, verify the burn-in, and hand back the
+ * digest the draft must bind to.
+ *
+ * The verified artifact is cached in memory for this process only, keyed by its
+ * digest. Why not write it to the life directory: the artifact is derived data,
+ * the source clip already lives where the activity put it, and persisting a
+ * second copy of a 50 MB file per draft would grow the life folder without
+ * bound. The digest is what is durable; the path is re-derivable.
+ *
+ * A cached entry is only reused when the file on disk still hashes to the same
+ * digest, so an edited file cannot be published under a stale approval.
+ */
+const verifiedMedia = new Map()
+
+async function attachVideo (store, settings, runtime, args) {
+  ensurePublisherEnabled(settings)
+  const input = args && typeof args === 'object' ? args : {}
+  const sourcePath = typeof input.path === 'string' ? input.path.trim() : ''
+  if (!sourcePath) throw new Error('life/video-file-required')
+  if (!path.isAbsolute(sourcePath)) throw new Error('life/video-path-must-be-absolute')
+  if (!fs.existsSync(sourcePath)) throw new Error(`life/video-file-missing: ${sourcePath}`)
+  if (!runtime.runner) {
+    // No runner means no ffmpeg in this profile. Refusing is the whole point of
+    // this module: the alternative is publishing the raw file.
+    throw new Error('life/video-runner-unavailable: 这个 profile 没有可用的 ffmpeg；没有标注能力时不会发布任何视频')
+  }
+
+  const contentId = newId('post')
+  const probed = await probeVideo({ filePath: sourcePath, run: runtime.runner, ffprobePath: settings.videoFfprobePath })
+  if (probed.durationSec !== null && probed.durationSec > MAX_VIDEO_SECONDS) {
+    throw new Error(`life/video-too-long: ${Math.round(probed.durationSec)}s 超过上限 ${MAX_VIDEO_SECONDS}s`)
+  }
+
+  const outPath = `${sourcePath.replace(/\.[a-z0-9]+$/i, '')}.labelled.mp4`
+  const labelled = await labelVideo({
+    inputPath: sourcePath,
+    outputPath: outPath,
+    contentId,
+    providerCode: settings.publisherProviderCode,
+    template: settings.videoLabelTemplate,
+    fontFile: settings.videoFontPath,
+    fontSize: settings.videoFontSize,
+    run: runtime.runner,
+    ffmpegPath: settings.videoFfmpegPath,
+  })
+
+  // Verification is not optional and not reported-and-ignored: `ok: false` means
+  // this tool throws. A "labelled" file that cannot prove its label is the one
+  // artifact that must never reach the outbox.
+  const verified = await verifyVideoLabel({
+    labelledPath: labelled.path,
+    sourcePath,
+    contentId,
+    providerCode: settings.publisherProviderCode,
+    run: runtime.runner,
+    ffmpegPath: settings.videoFfmpegPath,
+    ffprobePath: settings.videoFfprobePath,
+    maxBytes: MAX_VIDEO_BYTES,
+  })
+  if (!verified.ok) {
+    throw new Error(`life/video-label-unverified: ${verified.problems.join('; ')}`)
+  }
+
+  const media = {
+    kind: 'video',
+    path: labelled.path,
+    digest: labelled.digest,
+    labelText: labelled.labelText,
+    metadata: labelled.metadata.fields,
+    durationSec: labelled.durationSec,
+    sizeBytes: labelled.sizeBytes,
+    width: labelled.width,
+    height: labelled.height,
+    verifiedAt: new Date().toISOString(),
+  }
+  assertVideoArtifact({ ...media, contentId })
+  verifiedMedia.set(labelled.digest, { ...media, contentId })
+
+  return {
+    ok: true,
+    mediaId: labelled.digest,
+    contentId,
+    path: media.path,
+    digest: media.digest,
+    labelText: media.labelText,
+    metadata: media.metadata,
+    durationSec: media.durationSec,
+    sizeBytes: media.sizeBytes,
+    verified: {
+      frame0HasLabel: verified.burned ? !verified.burned.identical : null,
+      metadataOk: true,
+    },
+    message: '视频已标注并核验（首帧显式标识 + 容器隐式标识）。下一步：life_draft_post 带上 mediaId 与 text/evidence。',
+  }
+}
+
 /** `life_draft_post`: record a draft and nothing else. */
 function draftPost (store, settings, args) {
   ensurePublisherEnabled(settings)
@@ -1076,6 +1235,25 @@ function draftPost (store, settings, args) {
   if (text.length > 4000) throw new Error('life/publish-text-too-long: 正文最多 4000 字')
   const evidence = requireLedgerEvidence(store, input.evidence)
   const target = resolvePublishChannel(settings, input.channel, input.account)
+
+  // A mediaId must resolve to an artifact that was verified *in this process*.
+  // Accepting a bare path or digest from the model would let a post claim a
+  // video that was never labelled.
+  let media = null
+  const mediaId = typeof input.mediaId === 'string' ? input.mediaId.trim() : ''
+  if (mediaId) {
+    const cached = verifiedMedia.get(mediaId)
+    if (!cached) {
+      throw new Error('life/publish-media-unknown: mediaId 不是本进程核验过的视频；先调 life_attach_video')
+    }
+    // Re-hash before trusting the cache: the file may have been replaced.
+    if (!fs.existsSync(cached.path) || fileDigest(cached.path) !== cached.digest) {
+      verifiedMedia.delete(mediaId)
+      throw new Error('life/publish-media-changed: 已核验的视频文件变了，需要重新 life_attach_video')
+    }
+    media = cached
+  }
+
   const record = createDraft({
     contentId: newId('post'),
     text,
@@ -1083,6 +1261,20 @@ function draftPost (store, settings, args) {
     channel: target.channel,
     account: target.account,
     labelOptions: labelOptionsFor(settings),
+    media: media
+      ? {
+          kind: 'video',
+          path: media.path,
+          digest: media.digest,
+          labelText: media.labelText,
+          metadata: media.metadata,
+          durationSec: media.durationSec,
+          sizeBytes: media.sizeBytes,
+          width: media.width,
+          height: media.height,
+          verifiedAt: media.verifiedAt,
+        }
+      : null,
   })
   const stored = store.appendOutboxItem(record, { max: settings.publisherMaxOutbox })
   const pruned = stored.dropped && (stored.dropped.proposed > 0 || stored.dropped.settled > 0)
@@ -1312,6 +1504,25 @@ async function publishNow (store, settings, runtime, args, exec) {
     }
   }
 
+  // Media pre-flight, before asking for consent.
+  //
+  // A video record's `checked` state was produced by `life_publish_queue`, which
+  // only re-reads stored fields — it does not touch the disk. So this is the
+  // point where the artifact is re-verified against the digest the approval
+  // will bind to. Asking the keeper to approve a file that has since been
+  // replaced (or had its label stripped) would be asking for consent to
+  // something that no longer exists.
+  const mediaIssue = await checkMediaBeforePublish(settings, runtime, item)
+  if (mediaIssue) {
+    return {
+      ok: false,
+      outcome: mediaIssue.outcome,
+      id: item.contentId,
+      status: item.status,
+      message: mediaIssue.message,
+    }
+  }
+
   // Resolve the transport before asking for consent: a channel that cannot
   // send should not make the keeper approve something for nothing.
   const resolved = transportForItem(settings, runtime, item)
@@ -1446,6 +1657,66 @@ async function publishNow (store, settings, runtime, args, exec) {
     id: result.record.contentId,
     status: result.record.status,
     message: result.error || '没有发送',
+  }
+}
+
+/**
+ * Re-verify a media record immediately before its approval request.
+ *
+ * Returns `null` when there is nothing to check or everything checks out, or an
+ * `{outcome, message}` describing why the publish must not proceed.
+ *
+ * Deliberately a *re-hash of the file*, not a comparison of stored strings: the
+ * stored digest is what was true when the clip was labelled, and the whole point
+ * of checking here is that the file may have changed since.
+ */
+async function checkMediaBeforePublish (settings, runtime, item) {
+  const media = item.media
+  if (!media || typeof media !== 'object') return null
+  if (media.kind !== 'video') {
+    return { outcome: 'media-unsupported', message: `这个版本还不支持 ${media.kind} 媒体；没有请求批准` }
+  }
+  if (!fs.existsSync(media.path)) {
+    return { outcome: 'media-missing', message: '视频文件不在了（可能被清理或移动）；没有请求批准' }
+  }
+  if (fileDigest(media.path) !== media.digest) {
+    return { outcome: 'media-changed', message: '视频文件的字节与已核验的那一份不同；没有请求批准，请重新 life_attach_video' }
+  }
+  const ok = assertVideoArtifactQuiet({ ...media, contentId: item.contentId })
+  if (!ok.ok) {
+    return { outcome: 'media-metadata-invalid', message: `${ok.message}；没有请求批准` }
+  }
+  // If an ffmpeg is configured, re-prove the burn-in rather than trusting the
+  // stored `metadata` field. Without one, the digest check above is the whole
+  // guarantee — and that is stated instead of implied.
+  const runner = runtime.runner
+  if (!runner) return null
+  try {
+    const verified = await verifyVideoLabel({
+      labelledPath: media.path,
+      contentId: item.contentId,
+      providerCode: settings.publisherProviderCode,
+      run: runner,
+      ffmpegPath: settings.videoFfmpegPath,
+      ffprobePath: settings.videoFfprobePath,
+      maxBytes: MAX_VIDEO_BYTES,
+    })
+    if (!verified.ok) {
+      return { outcome: 'media-label-unverified', message: `视频标注核验不通过：${verified.problems.join('; ')}；没有请求批准` }
+    }
+  } catch (err) {
+    return { outcome: 'media-verify-failed', message: `视频标注核验出错：${messageOf(err)}；没有请求批准` }
+  }
+  return null
+}
+
+/** `assertVideoArtifact` as a plain result instead of a throw. */
+function assertVideoArtifactQuiet (media) {
+  try {
+    assertVideoArtifact(media)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, message: messageOf(err) }
   }
 }
 

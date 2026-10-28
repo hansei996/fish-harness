@@ -91,11 +91,22 @@ const MAX_RECONCILE_ENTRIES = 20
 const inFlightSends = new Set()
 
 /**
- * Content version: a short digest of the exact text. `contentVersion` is what
- * approvals bind to, so one changed character invalidates them.
+ * Content version: a short digest of the exact bytes a post would publish.
+ * `contentVersion` is what approvals bind to, so one changed character — or a
+ * swapped video — must invalidate them.
+ *
+ * Media is included as a second component on purpose. Binding only the caption
+ * would let someone replace the video file while the keeper's approval (which
+ * covers "these bytes") silently stayed valid; the video *is* the content in
+ * that case. Text-only callers pass no digest and get exactly the previous
+ * value, so existing records and assertions do not shift.
  */
-export function contentVersionOf (text) {
-  return createHash('sha256').update(String(text ?? ''), 'utf8').digest('hex').slice(0, 16)
+export function contentVersionOf (text, mediaDigest = null) {
+  const body = String(text ?? '')
+  const source = typeof mediaDigest === 'string' && mediaDigest.trim()
+    ? `${body}\u0000${mediaDigest.trim()}`
+    : body
+  return createHash('sha256').update(source, 'utf8').digest('hex').slice(0, 16)
 }
 
 /**
@@ -119,6 +130,7 @@ export function createDraft ({
   channel,
   account,
   labelOptions = {},
+  media = null,
   now = Date.now(),
 } = {}) {
   if (typeof contentId !== 'string' || !contentId.trim()) throw new Error('life/publish-content-id-required')
@@ -126,14 +138,16 @@ export function createDraft ({
   if (typeof channel !== 'string' || !channel.trim()) throw new Error('life/publish-channel-required')
   if (typeof account !== 'string' || !account.trim()) throw new Error('life/publish-account-required')
   const at = isoOf(now)
+  const normalizedMedia = normalizeMedia(media)
   const record = {
     // `id` and `contentId` are the same value on purpose: 标识办法 §5 requires
     // one stable content number, so there is no second id to drift from it.
     id: contentId.trim(),
     contentId: contentId.trim(),
     text,
-    contentVersion: contentVersionOf(text),
+    contentVersion: contentVersionOf(text, normalizedMedia ? normalizedMedia.digest : null),
     evidence: Array.isArray(evidence) ? evidence.filter((item) => typeof item === 'string' && item.trim()) : [],
+    ...(normalizedMedia ? { media: normalizedMedia } : {}),
     channel: channel.trim(),
     account: account.trim(),
     status: 'draft',
@@ -143,7 +157,7 @@ export function createDraft ({
     approval: null,
     idempotencyKey: idempotencyKeyOf({
       contentId,
-      contentVersion: contentVersionOf(text),
+      contentVersion: contentVersionOf(text, normalizedMedia ? normalizedMedia.digest : null),
       channel,
       account,
     }),
@@ -618,6 +632,17 @@ export function candidateOf (record) {
     text: record.labeledText,
     metadata: record.metadata,
     evidence: Array.isArray(record.evidence) ? record.evidence.slice() : [],
+    // Present only for media posts. A transport that cannot carry it must
+    // refuse rather than silently publish the caption alone.
+    media: record.media && typeof record.media === 'object'
+      ? {
+          kind: record.media.kind,
+          path: record.media.path,
+          digest: record.media.digest,
+          sizeBytes: record.media.sizeBytes ?? null,
+          durationSec: record.media.durationSec ?? null,
+        }
+      : null,
   }
 }
 
@@ -769,7 +794,47 @@ function deriveLabel (record, labelOptions) {
   // A draft whose text is empty or whose label cannot be produced must never
   // reach checked/approved, so the derivation itself runs the gate.
   assertLabeled(labeled)
-  return { labeled, contentVersion: contentVersionOf(labeled.text), labelOptions: options }
+  const mediaDigest = record.media && typeof record.media === 'object' && typeof record.media.digest === 'string'
+    ? record.media.digest
+    : null
+  return { labeled, contentVersion: contentVersionOf(labeled.text, mediaDigest), labelOptions: options }
+}
+
+/**
+ * Normalize the media attachment of a record, if any.
+ *
+ * Only the fields the publish line needs are kept, and the 64-hex `digest` is
+ * **required**: it is what binds an approval to a specific file. A record whose
+ * media has no digest would have a content version that ignores the video — the
+ * exact hole that lets a file be swapped after approval — so it is refused
+ * rather than stored with a null digest.
+ */
+function normalizeMedia (media) {
+  if (media === null || media === undefined) return null
+  if (typeof media !== 'object') throw new Error('life/publish-media-invalid')
+  const kind = media.kind === 'video' ? 'video' : null
+  if (!kind) throw new Error('life/publish-media-kind-unsupported')
+  const digest = typeof media.digest === 'string' ? media.digest.trim() : ''
+  if (!/^[0-9a-f]{64}$/.test(digest)) throw new Error('life/publish-media-digest-required')
+  const filePath = typeof media.path === 'string' && media.path.trim() ? media.path.trim() : ''
+  if (!filePath) throw new Error('life/publish-media-path-required')
+  const labelText = typeof media.labelText === 'string' && media.labelText.trim() ? media.labelText.trim() : ''
+  if (!labelText) throw new Error('life/publish-media-label-text-required')
+  const metadata = media.metadata && typeof media.metadata === 'object' ? media.metadata : null
+  if (!metadata) throw new Error('life/publish-media-metadata-required')
+  const out = {
+    kind,
+    path: filePath,
+    digest,
+    labelText,
+    metadata,
+    ...(Number.isFinite(media.durationSec) ? { durationSec: media.durationSec } : {}),
+    ...(Number.isFinite(media.sizeBytes) ? { sizeBytes: media.sizeBytes } : {}),
+    ...(Number.isFinite(media.width) ? { width: media.width } : {}),
+    ...(Number.isFinite(media.height) ? { height: media.height } : {}),
+    ...(typeof media.verifiedAt === 'string' ? { verifiedAt: media.verifiedAt } : {}),
+  }
+  return out
 }
 
 function normalizeLabelOptions (options) {
