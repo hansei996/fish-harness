@@ -120,3 +120,82 @@ README 目前到「装完重启 profile」就结束了。实测下来陌生人�
 - **没测「从没装过 dsh」的人**：那一段的门槛（`npx @deepseek-ai/dsh`、Node 版本、网络）完全没测。
 - **没测真账号登录后的首轮对话**：没有凭据，只验证到「profile 组合正确、插件挂载、状态目录结构存在」。
 - **npm 发布后这段还要重做一遍**：发布之后 `add dsh-life` 能跑通，但「裸 profile」这个坑与发布无关，仍然在。
+
+---
+
+## 五、第二次实测：macOS，而且这一次走到了「它真的出生」
+
+> 上面那份是 Windows 上的，且只验证到「profile 组合正确、目录结构存在」。原文在上一节里
+> 明写了「**没测 macOS / Linux**」「**没测真账号登录后的首轮对话**」。下面这次补掉前一个缺口，
+> 并把最后一步推到底：**真的启动一个 profile，看它有没有把一条命写进磁盘。**
+>
+> 核对日期 **2026-10-28** · macOS（Darwin）· Node v24.18.0 · dsh `0.2.1-rc.2` · 全新 `DSH_HOME`
+> （`/tmp/stranger-home`，不碰真实 `~/.dsh`）。
+
+### 逐步骤与真实输出
+
+| # | 命令 | 结果 |
+| --- | --- | --- |
+| 1 | `node <dsh>/lib/bin.js --version` | `0.2.1-rc.2`，exit 0 |
+| 2 | `dsh --profile stranger --from-default-profile web --dump-config` | 组合出配置，含 `schedule`，exit 0 |
+| 3 | `dsh plugin --profile stranger add link:<repo>/packages/dsh-life` | `+ dsh-life link:…`，`Done in 200ms using pnpm v11.9.0`，exit 0 |
+| 4 | `dsh --profile stranger --dump-config \| grep -c dsh-life` | `3`（≥1 即装上） |
+| 5 | `dsh --profile stranger` | 真的起服务：`dsh web: http://127.0.0.1:3080/?token=…` |
+
+**第 5 步之后，一条命真的诞生了** —— 落盘在 `$DSH_HOME/life/default/`：
+
+```
+identity.json  ledger.jsonl  outbox.json  traits.json  wake.json
+```
+
+`identity.json` 的内容（原文，未改）：
+
+```json
+{
+  "schemaVersion": 1,
+  "lifeId": "default",
+  "name": "大肥鱼",
+  "species": "whale",
+  "bornAt": "2026-10-28T04:52:41.919Z",
+  "revision": 1,
+  "seeds": ["聪明但懒", "傲娇", "爱吃白饭"],
+  "updatedAt": "2026-10-28T04:52:41.919Z"
+}
+```
+
+`ledger.jsonl` 里第一条就是 `kind: "born"`。用仓库自己的工具读它（**不是手写**）：
+
+```sh
+DSH_HOME=/tmp/stranger-home node tools/day-report.mjs --life default
+```
+
+```text
+  大肥鱼的一天 · 2026-10-28
+  ──────────────────────────────────────────────
+
+  12:52  ◦ 大肥鱼出生了
+
+  ──────────────────────────────────────────────
+  今天：没什么活动
+```
+
+三处一致性都能对上：墙上时间 04:52:41Z、本地显示 12:52（+08:00）、账本只有一条 `born`。
+**「今天：没什么活动」是对的** —— 它出生才几十秒，还没到自己醒的时候。
+
+### 这次实测新增的两个结论
+
+1. **macOS 上 README 的路径可行。** 原文的「没测 macOS」这条缺口现在补上了：
+   `--from-default-profile web` → `add link:` → 启动，三步都 exit 0，且插件确实生效。
+2. **「装上了」和「它活了」可以分开看，而且都能被验证。** 第 4 步证明装上了
+   （配置里有 3 处 `dsh-life`）；第 5 步证明它活了（磁盘上有 `born`）。
+   README 里那句「怎么知道它真的活了」现在有一条**跑过的**答案，而不只是提示。
+
+### 仍然没有覆盖的（诚实边界）
+
+- **没测真人**，也**没测「从没装过 dsh」的人**：本次仍是「已经有 dsh 的人」的视角，
+  Node / pnpm / 网络的首次安装门槛一概未测。
+- **没测真账号登录后的首轮对话**：启动到了「web 服务起来、生命落盘」，
+  但没有凭据，所以没验证模型真的回过话、`life_*` 工具真的被调用过。
+- **`outbox.json` 只是被创建，没有真实发布**：发布线至今**一次真实 Telegram 都没发过**
+  （见 `docs/publish-verification.md` 的边界）。
+- **只在 macOS 上跑了一次**：Linux 仍然只是静态判断。
