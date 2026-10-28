@@ -787,7 +787,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 ### 11.1 代码级：已实现，可复现
 
 <!-- facts:plan-verify-table -->
-实测 **240 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
+实测 **235 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |
@@ -797,6 +797,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 | `verify/life-week.mjs` | **16** | 连跑七天（压缩时钟，复用生产的 store/choose/wake） | 否 |
 | `verify/ui.mjs` | **28** | 界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归 | 否 |
 | `verify/publish.mjs` | **27** | 发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation | 否 |
+| `verify/landing.mjs` | **17** | 落地页与场景原型在真 Chromium 里的像素级验证（三档视口、无溢出、无 JS 错误、数据真的渲染出来）；缺浏览器则跳过 | 否 |
 | `verify/e2e-tools.mjs` | **17** | 真 dsh 端到端：组合 profile → `dsh plugin` 安装 → 启动 → 断言运行系统实际产出 | 是 |
 | `verify/pack-install.mjs` | **9** | `pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身） | 是 |
 | `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |

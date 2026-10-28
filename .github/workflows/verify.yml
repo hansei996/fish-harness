@@ -56,9 +56,39 @@ jobs:
       # 浏览器只在开发机上跑，等于「像素级没验」这句话在 CI 上依然成立。
       #
       # 失败不阻断：装不上就退化成 SKIP，其余套件照跑（缺工具不该被读成页面坏了）。
-      - name: Install Playwright Chromium (for landing pixel checks)
+      # 装成**真依赖**，而不是 `npx playwright install`。
+      #
+      # 为什么：`npx --yes playwright@1.49.1 install chromium` 只把**浏览器二进制**
+      # 装到了用户缓存里，`playwright` 模块本身留在 npx 的临时目录、不在 Node 的
+      # 解析路径上 —— 于是 `verify/landing.mjs` `import('playwright')` 失败、
+      # 整套 SKIP（`0/0`），CI 上算出的总项数比本地少 17，`claims` 因此报假红。
+      # 实测过：CI 里那一步 exit 0、浏览器也真的装了，但套件仍然跳过。
+      #
+      # 装在 runner 的临时目录（不改仓库的 package.json、不引入 node_modules），
+      # 再用 PLAYWRIGHT_PATH 显式把模块路径指过去 —— 这是 landing.mjs 已经支持的入口。
+      - name: Install Playwright (module + Chromium, for landing pixel checks)
         continue-on-error: true
-        run: npx --yes playwright@1.49.1 install --with-deps chromium
+        run: |
+          # 自己的目录，不依赖后面那步建的 dsh-install（顺序耦合是这一节踩过的坑）。
+          node -e "const fs=require('node:fs'),p=require('node:path');const d=p.join(process.env.RUNNER_TEMP,'pw');fs.mkdirSync(d,{recursive:true});fs.writeFileSync(p.join(d,'package.json'),JSON.stringify({name:'pw-probe',private:true},null,2));console.log('dir: '+d)"
+        shell: bash
+
+      - name: Install Playwright package
+        continue-on-error: true
+        shell: bash
+        working-directory: ${{ runner.temp }}/pw
+        run: |
+          set -euo pipefail
+          pnpm add --ignore-scripts playwright@1.49.1
+          pnpm exec playwright install --with-deps chromium
+          test -f node_modules/playwright/index.mjs
+          echo "playwright module: $PWD/node_modules/playwright/index.mjs"
+
+      - name: Export PLAYWRIGHT_PATH for landing
+        continue-on-error: true
+        shell: bash
+        run: |
+          node -e "const fs=require('node:fs'),p=require('node:path');const m=p.join(process.env.RUNNER_TEMP,'pw','node_modules','playwright','index.mjs');if(fs.existsSync(m)){fs.appendFileSync(process.env.GITHUB_ENV,'PLAYWRIGHT_PATH='+m+String.fromCharCode(10));console.log('PLAYWRIGHT_PATH='+m)}else{console.log('playwright module missing — landing will SKIP')}"
 
       - name: Show tool versions
         run: |
@@ -179,15 +209,21 @@ jobs:
           set -euo pipefail
           node verify/landing.mjs 2>&1 | tee verify-landing.log
 
-      # 市场调研文档的结构与诚实性：三态标注、证伪条件、不许编造数字。
-      # 不需要 dsh、不需要网络（它查的是文档自己的形态，不是再去抓一遍）。
+      # 市场调研文档的结构与诚实性：三态标注、证伪条件、能力矩阵里那句
+      # 「对外发布未接真实平台」不许被删。
+      #
+      # **`--offline` 是有意的**：这套还有一半断言会去 GitHub / npm 抓实时数字
+      # （复核 docs/MARKET.md 里的星数没漂），而 CI 的 runner 到外网可能被限流 ——
+      # 那会让「项数」随网络环境变，进而让 verify/claims.mjs 在 CI 上报假红
+      # （它比的是生成块里的合计）。联网复核请在本机手动跑：
+      #     node verify/market.mjs
       - name: Verify — market
         id: market
         shell: bash
         continue-on-error: true
         run: |
           set -euo pipefail
-          node verify/market.mjs 2>&1 | tee verify-market.log
+          node verify/market.mjs --offline 2>&1 | tee verify-market.log
 
       # claims：文档里那些「必须等于实测」的数字，以及不许回流的旧值。
       # 它自己会调 tools/facts.mjs 重新量一遍并逐字比对生成块，所以**必须排在最后**：

@@ -176,10 +176,16 @@ check('workflow 里没有重复的 step id（重复会让整个 run 0 秒失败�
   dupIds.length ? `重复 id：${dupIds.join(', ')}` : `${ids.length} 个 id`)
 
 // 每套 verify 在 CI 里必须**恰好**被跑一次：漏了等于没进 CI，重复等于浪费机器。
+// 只数**真正会被执行的行**：`run:` 里那些 `node verify/xxx.mjs`。
+// 不能对着整份 workflow 做全文匹配 —— 注释里提到一个文件名（例如「手动跑请用
+// node verify/market.mjs」）会被算成「第二次调用」，于是这条断言报出一个假重复。
+// 判据必须贴着「什么会被执行」，而不是「文件里出现过几次这个词」。
+const runBlocks = [...workflow.matchAll(/^\s*run:\s*\|\n((?:\s{8,}.*\n?)*)/gm)]
+  .map((m) => m[1]).join('\n')
 const missingInCi = []
 const dupInCi = []
 for (const suite of SUITES) {
-  const n = (workflow.match(new RegExp(`node ${suite.file.replace('.', '\\.')}`, 'g')) || []).length
+  const n = (runBlocks.match(new RegExp(`node ${suite.file.replace('.', '\\.')}`, 'g')) || []).length
   if (n === 0) missingInCi.push(suite.name)
   else if (n > 1) dupInCi.push(`${suite.name}×${n}`)
 }

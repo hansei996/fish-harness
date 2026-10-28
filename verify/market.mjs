@@ -118,10 +118,22 @@ const REPOS = [
   ['moeru-ai/airi', 'Project AIRI'],
 ]
 
+// `--offline`：只查文档自身的形态（那一半不需要网络，而且那才是 CI 最该守的）。
+// 需要联网的断言在离线时一律 SKIP —— 见下面 netDown 的处理。
+const OFFLINE = process.argv.includes('--offline') || process.env.MARKET_OFFLINE === '1'
+
 let netDown = 0
 const drifted = []
 const missing = []
+// 先探一次连通性。**这一步很重要**：CI 的 runner 到 github.com 的请求可能被
+// 限流或拒绝，而「取不到」绝不能被读成「数字错了」—— 那是把环境的锅扣在文档头上。
+// 探不通就整体走离线分支：只跑不需要网络的那几条。
+const probeNet = () => !OFFLINE && fetchText('https://api.npmjs.org/downloads/point/last-month/mem0ai', { timeout: 8 }) !== null
+const NET = probeNet()
+if (!NET) skip('联网复核（星数 / npm 下载量 / 别人 README 原文）', OFFLINE ? '--offline' : '这台机器取不到外网')
+
 for (const [repo, label] of REPOS) {
+  if (!NET) break
   const actual = starCount(repo)
   if (actual === null) { netDown++; continue }
   const { found, value } = claimedStars(label)
@@ -129,12 +141,14 @@ for (const [repo, label] of REPOS) {
   if (!within(actual, value, 0.05)) drifted.push(`${repo}: 文档 ${value} → 实测 ${actual}`)
 }
 
-if (netDown === REPOS.length) {
+if (!NET) {
+  // 离线：什么都不报（上面已经 SKIP 一次，不重复刷屏）。
+} else if (netDown === REPOS.length) {
   skip('星数复核', `网络不可用或被限流（${REPOS.length} 个仓库全部取不到）`)
 } else if (netDown > 0) {
   skip(`星数复核（部分）`, `${netDown}/${REPOS.length} 个取不到，可能是限流`)
 }
-if (netDown < REPOS.length) {
+if (NET && netDown < REPOS.length) {
   check('docs/MARKET.md 里每个星数都还在 ±5% 以内',
     drifted.length === 0, drifted.length ? drifted.join(' | ') : `${REPOS.length - netDown} 个已核`)
   check('每个被引用的仓库在文档里都写了星数',
@@ -150,11 +164,12 @@ const NPM = [
 const npmBad = []
 let npmDown = 0
 for (const [pkg, claimed] of NPM) {
+  if (!NET) break
   const actual = npmMonthly(pkg)
   if (actual === null) { npmDown++; continue }
   if (!within(actual, claimed, 0.15)) npmBad.push(`${pkg}: 文档 ${claimed} → 实测 ${actual}`)
 }
-if (npmDown === NPM.length) skkipOrSkip()
+if (!NET) { /* 离线：上面已 SKIP */ } else if (npmDown === NPM.length) skkipOrSkip()
 else {
   check('docs/MARKET.md 里的 npm 月下载量还在 ±15% 以内', npmBad.length === 0, npmBad.join(' | ') || `${NPM.length} 个已核`)
 }
@@ -174,7 +189,7 @@ for (const c of CLAIMS) {
 // 直接去别人的 README 复查那两句原文 —— 这是这套里唯一「读别人的字」的断言，
 // 也正是它值钱的地方：OpenClaw 某天推付费档，这里第一个红。
 {
-  const readme = fetchText('https://raw.githubusercontent.com/openclaw/openclaw/main/README.md')
+  const readme = NET ? fetchText('https://raw.githubusercontent.com/openclaw/openclaw/main/README.md') : null
   if (readme === null) {
     skip('OpenClaw 的 no-paid-tier 原文复查', '取不到 README（网络或限流）')
   } else {

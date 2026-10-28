@@ -21,7 +21,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
 | [`tools/`](tools/) | 四个工具：`day-report` 把账本渲染成人能读的「它的一天」；`life-week` 把七天压缩跑完，产出「它的一周」；`demo-data` 把那一周导出成对外页面引用的数据；`facts` 量出文档里不许手抄的那些数字 |
 <!-- facts:verify-summary -->
-| [`verify/`](verify/) | 十套共 **240 项**；另有一条 opt-in 的真实唤醒检查（3 项） |
+| [`verify/`](verify/) | 十套共 **235 项**；另有一条 opt-in 的真实唤醒检查（3 项） |
 <!-- /facts:verify-summary -->
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
@@ -395,7 +395,7 @@ outbox.json       发布草稿与回执 · 幂等键 · 三档修剪（committed
 ## 验证
 
 <!-- facts:verify-headline -->
-十套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。合计 **240 项**：存储/策略/soak 70 + 当天报告 28 + 数据产物 18 + 七天连续 16 + 界面 28 + 发布线 27 + 真实 dsh 端到端 17 + 打包安装 9。
+十套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。合计 **235 项**：存储/策略/soak 70 + 当天报告 28 + 数据产物 18 + 七天连续 16 + 界面 28 + 发布线 27 + 真实 dsh 端到端 17 + 打包安装 9。
 <!-- /facts:verify-headline -->
 
 <!-- facts:verify-commands -->
@@ -409,7 +409,7 @@ node verify/publish.mjs                           # 27 项 · 发布状态机 / 
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs       # 17 项 · 真实 dsh 端到端
 DSH_BIN=<dsh bin> node verify/pack-install.mjs    # 9 项 · 打出来的包能不能装进 profile 并激活
 node verify/landing.mjs                           # 17 项 · 落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）
-node verify/market.mjs                            # 10 项 · 市场调研文档的结构与诚实性（数字三态标注、证伪条件、没有编造）
+node verify/market.mjs                            # 5 项 · 市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）
 DSH_BIN=<dsh bin> node verify/live/wake-live.mjs  # 可选 · 真实 web profile 的一次真实唤醒（先体检安装）
 # 另外：node verify/claims.mjs 核对文档里这些数字有没有过期
 # （它不在上面的项数里 —— 它数的就是这些项数，不能自己数自己）
