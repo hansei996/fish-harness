@@ -145,6 +145,7 @@ export const SUITES = [
   // 所以把它放进表里是安全的 —— 它不会因为缺浏览器而把流水线弄红。
   { name: 'landing', file: 'verify/landing.mjs', outcome: 'LANDING_OUTCOME' },
   { name: 'market', file: 'verify/market.mjs', outcome: 'MARKET_OUTCOME', offlineArgs: ['--offline'] },
+  { name: 'scenarios', file: 'verify/scenarios.mjs', outcome: 'SCENARIOS_OUTCOME' },
 ]
 
 /**
@@ -250,6 +251,7 @@ const SUITE_ROLES = {
   pack: { needsDsh: true, what: '打出来的包能不能装进 profile 并激活' },
   landing: { needsDsh: false, what: '落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）' },
   market: { needsDsh: false, what: '市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）' },
+  scenarios: { needsDsh: false, what: '落地剧本的每个引用都真实存在，且「未实现」的标记与 STORY.md 口径一致' },
 }
 
 export const BLOCKS = [

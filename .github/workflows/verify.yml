@@ -225,6 +225,17 @@ jobs:
           set -euo pipefail
           node verify/market.mjs --offline 2>&1 | tee verify-market.log
 
+      # 落地剧本：每个工具名 / 状态文件 / §X.Y / 被引用的文件都必须真实存在，
+      # 并且「发布未接真实平台」这类话必须一直在（删掉它，剧本就变成能力声称）。
+      # 不需要 dsh、不需要网络。
+      - name: Verify — scenarios
+        id: scenarios
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          node verify/scenarios.mjs 2>&1 | tee verify-scenarios.log
+
       # claims：文档里那些「必须等于实测」的数字，以及不许回流的旧值。
       # 它自己会调 tools/facts.mjs 重新量一遍并逐字比对生成块，所以**必须排在最后**：
       # 各套的项数正是它要比对的事实之一。
@@ -254,6 +265,7 @@ jobs:
           PACK_OUTCOME: ${{ steps.pack.outcome }}
           LANDING_OUTCOME: ${{ steps.landing.outcome }}
           MARKET_OUTCOME: ${{ steps.market.outcome }}
+          SCENARIOS_OUTCOME: ${{ steps.scenarios.outcome }}
         run: node .github/scripts/ci-report.mjs
 
       - name: Upload verify logs
