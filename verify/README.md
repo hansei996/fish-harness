@@ -3,7 +3,7 @@
 五套验证：`smoke`、`day-report`、`life-week` 只依赖本地文件；`e2e` 与 `pack` 需要**真的 dsh**，不是 mock：
 
 <!-- facts:verify-table -->
-| 套件 | 查什么 | 本机实测（合计 213 项） |
+| 套件 | 查什么 | 本机实测（合计 230 项） |
 |---|---|---|
 | `verify/smoke.mjs` | 70 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性）（需要真 dsh） | 70/70 通过 |
 | `verify/day-report.mjs` | 28 项：当天报告工具（不需要真 dsh） | 28/28 通过 |
@@ -13,6 +13,7 @@
 | `verify/publish.mjs` | 27 项：发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）（不需要真 dsh） | 27/27 通过 |
 | `verify/e2e-tools.mjs` | 17 项：真实 dsh 端到端（需要真 dsh） | 17/17 通过 |
 | `verify/pack-install.mjs` | 9 项：打出来的包能不能装进 profile 并激活（需要真 dsh） | 9/9 通过 |
+| `verify/landing.mjs` | 17 项：落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）（不需要真 dsh） | 17/17 通过 |
 | `verify/claims.mjs` | 文档里的数字有没有过期（它数的就是上面这些项数，所以不计入合计） | 见 `node verify/claims.mjs` |
 <!-- /facts:verify-table -->
 

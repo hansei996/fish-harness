@@ -49,6 +49,8 @@ const suites = [
   { name: 'publish', file: 'verify-publish.log', outcome: process.env.PUBLISH_OUTCOME },
   { name: 'e2e', file: 'verify-e2e.log', outcome: process.env.E2E_OUTCOME },
   { name: 'pack', file: 'verify-pack.log', outcome: process.env.PACK_OUTCOME },
+  // landing 在没有浏览器的机器上自己 SKIP（exit 0），所以不会把闸门弄红。
+  { name: 'landing', file: 'verify-landing.log', outcome: process.env.LANDING_OUTCOME },
   // claims 守的是「文档里的数字不许手抄、不许回流成旧值」。它读的正是前面那些
   // 套件的项数，所以**只出现一次，且排在最后** —— 两处一样的条目曾经让这个
   // workflow 与这份报告各有一份重复（一个人加的、另一个人也加了），

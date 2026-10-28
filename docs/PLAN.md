@@ -772,7 +772,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 ### 11.1 代码级：已实现，可复现
 
 <!-- facts:plan-verify-table -->
-实测 **213 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
+实测 **230 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |
@@ -786,7 +786,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 | `verify/pack-install.mjs` | **9** | `pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身） | 是 |
 | `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |
 
-八套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[`.github/workflows/verify.yml`](../.github/workflows/verify.yml)）。
+九套都在 GitHub Actions 上 ubuntu + windows 各跑一遍（[`.github/workflows/verify.yml`](../.github/workflows/verify.yml)）。
 **项数与合计都是真跑出来的**（`node tools/facts.mjs` 量、`node verify/claims.mjs` 拦），不再手写。
 <!-- /facts:plan-verify-table -->
 

@@ -194,6 +194,7 @@ jobs:
           PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           PACK_OUTCOME: ${{ steps.pack.outcome }}
+          LANDING_OUTCOME: ${{ steps.landing.outcome }}
         run: node .github/scripts/ci-report.mjs
 
       - name: Upload verify logs
