@@ -55,13 +55,25 @@ export DSH_BIN=$(pwd)/node_modules/@deepseek-ai/dsh/lib/bin.js
 
 ```sh
 export DSH_BIN=<dsh bin>   # e2e / pack 需要；smoke 与 day-report 不需要
-npm run verify              # smoke + day-report + e2e 一起（跳过 pack）
+npm run verify              # 除了 pack 的全部套件；**参数与 CI 完全一致**
 node verify/smoke.mjs       # 68 项
 node verify/day-report.mjs  # 22 项
 node verify/life-week.mjs   # 16 项
 node verify/e2e-tools.mjs   # 17 项
 node verify/pack-install.mjs # 9 项
 ```
+
+`npm run verify` 里每套的参数与 `.github/workflows/verify.yml` **逐条相同**（`market`、`framework` 都带
+`--offline`）。这条现在有断言守着 —— `verify/claims.mjs` 会比对两边「同一套件拿到的参数」，不一致就红。
+
+> 为什么会需要这条断言：这两边曾经不一致（`npm run verify` 少带 `--offline`），于是**本机红、CI 绿**，
+> 而 `tools/facts.mjs` 数项数时用的又是 `--offline` 口径 —— 同一件事三套说法，两边各自看都没问题。
+>
+> `pack-install` 故意**不在** `npm run verify` 里（要真装 + 真 boot，慢）；CI 会跑它。
+> `video` 需要本机有 **ffmpeg + ffprobe**、`landing` 需要 **Playwright/Chromium**：缺工具时
+> `video` 会红（它的价值就是「真的烧进首帧」，跳过等于没验）、`landing` 会跳过。
+> 所以 `claims`（核对文档项数）在**缺这些工具**的机器上会报「生成块与实测不一致」—— 那是环境口径差，
+> 不是文档过期；CI 装齐了工具，那里的 306 项才是权威口径。
 
 几个脚本都会把 `DSH_HOME` 指到临时目录（`VERIFY_DSH_HOME` / `E2E_DSH_HOME` 可覆盖），
 所以不会碰你真实的 `~/.dsh`。
