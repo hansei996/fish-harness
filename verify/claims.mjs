@@ -211,6 +211,62 @@ check('每套 verify 在 CI 里恰好跑一次',
   missingInCi.length === 0 && dupInCi.length === 0,
   [missingInCi.length ? `没进 CI：${missingInCi.join(', ')}` : '', dupInCi.length ? `重复：${dupInCi.join(', ')}` : ''].filter(Boolean).join('; ') || `${SUITES.length} 套`)
 
+// 本机入口与 CI 必须是**同一组参数**。
+//
+// 真事故：`package.json` 的 `verify` 链里跑的是 `node verify/market.mjs`（不带
+// `--offline`），CI 跑的却是 `node verify/market.mjs --offline`。于是同一台机器上
+// `npm run verify` 会把「要联网 / 要本机那棵 dsh 安装树」的检查也跑一遍：本机红、
+// CI 绿；而 `tools/facts.mjs` 数项数时用的又是 `offlineArgs`。同一件事三套口径，
+// 其中两套是错的 —— 而两边「各自看都没问题」，所以谁也不会发现。
+//
+// 判据只能是「同一套件在两边拿到的参数是否相同」，不是「两边都提到了它」。
+const pkg = JSON.parse(read('package.json'))
+const npmChain = String((pkg.scripts && pkg.scripts.verify) || '')
+  .split('&&').map((s) => s.trim()).filter(Boolean)
+const localArgv = new Map()
+for (const cmd of npmChain) {
+  const m = /^node\s+(verify\/[\w.-]+\.mjs)((?:\s+--?[\w-]+)*)$/.exec(cmd)
+  if (m) localArgv.set(m[1], (m[2] || '').trim())
+}
+// CI 一侧：只数真正会执行的命令行（跳过以 # 开头的注释行），参数按 **token** 逐个取，
+// 一旦遇到 shell 的重定向/管道（`2>&1`、`|`）就停 —— 它后面的是 `tee` 和日志文件名，
+// 不是套件参数。前两版分别在 `[^|&]*` 和「过滤 tee 这个词」上翻车，都报出了假不一致；
+// 判据必须是「在 shell 语义里什么算参数」。
+const ciArgv = new Map()
+for (const line of runBlocks.split('\n')) {
+  const trimmed = line.trim()
+  if (!trimmed || trimmed.startsWith('#')) continue
+  const tokens = trimmed.split(/\s+/)
+  if (tokens[0] !== 'node' || !/^verify\/[\w.-]+\.mjs$/.test(tokens[1] || '')) continue
+  const args = []
+  for (const token of tokens.slice(2)) {
+    if (/^(?:\d?>|\d?>&\d+|&|\||`)/.test(token)) break
+    args.push(token)
+  }
+  if (!ciArgv.has(tokens[1])) ciArgv.set(tokens[1], args.join(' '))
+}
+const argvMismatch = [...ciArgv.entries()]
+  .filter(([file, argv]) => localArgv.has(file) && localArgv.get(file) !== argv)
+  .map(([file, argv]) => `${file}: npm run verify 用 "${localArgv.get(file) || '(无参数)'}"，CI 用 "${argv || '(无参数)'}"`)
+check('npm run verify 与 CI 对同一套 verify 用同一组参数',
+  argvMismatch.length === 0,
+  argvMismatch.length
+    ? argvMismatch.join('; ')
+    : `已比对 ${[...ciArgv.keys()].filter((f) => localArgv.has(f)).length} 套（pack 需要真 dsh，故意不在 npm run verify 里）`)
+
+// `package.json` 里的重复 key 是**静默的**：JSON.parse 只留最后一个，肉眼也看不出。
+// 真事故：`verify:market` 写了两遍、值还不同，本机入口因此与 CI 不一致，而所有以
+// JSON.parse 为依据的检查都看不见它。
+{
+  const raw = read('package.json')
+  const scriptsBlock = (/"scripts"\s*:\s*\{([\s\S]*?)\n\s*\}/.exec(raw) || [])[1] || ''
+  const keys = [...scriptsBlock.matchAll(/"([^"]+)"\s*:/g)].map((m) => m[1])
+  const dupKeys = [...new Set(keys.filter((k) => keys.filter((x) => x === k).length > 1))]
+  check('package.json 的 scripts 里没有重复的 key（后者会静默覆盖前者）',
+    dupKeys.length === 0,
+    dupKeys.length ? `重复：${dupKeys.join(', ')}` : `${keys.length} 个脚本`)
+}
+
 // 每个 `id:` 都要有对应的 outcome 进了 ci-report，否则报告里会少一套而没人发现。
 const reported = [...workflow.matchAll(/([A-Z]+)_OUTCOME: \$\{\{ steps\.(\w+)\.outcome \}\}/g)]
   .map((m) => m[2])
