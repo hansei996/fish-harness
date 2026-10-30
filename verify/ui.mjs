@@ -62,7 +62,7 @@ check('client module registers itself with the lazy-CJS loader', Boolean(loaded)
   loaded ? `id=${loaded.id}` : 'load() never called')
 
 const ReactStub = {
-  createElement: (type, props, children) => ({ type, props, children }),
+  createElement: (type, props, ...children) => ({ type, props, children }),
   useState: (initial) => [initial, () => {}],
   useEffect: () => {},
 }
@@ -71,23 +71,27 @@ const clientExports = loaded.factory((specifier) => {
   throw new Error(`stub loader has no module ${JSON.stringify(specifier)}`)
 })
 check('factory exports apply/inject and requires only react',
-  typeof clientExports.apply === 'function' && JSON.stringify(clientExports.inject) === '["slots"]')
+  typeof clientExports.apply === 'function' && JSON.stringify(clientExports.inject) === '["slots","layout"]')
 
 const registrations = []
+let selectedPanel = 'life-overview'
 const ctx = {
+  layout: { selectPanel: (id) => { selectedPanel = id } },
   slots: {
     inject: (name, cb) => cb(),
     register: (options, component) => { registrations.push({ options, component }); return () => {} },
   },
 }
 clientExports.apply(ctx)
-const overlay = registrations.find((r) => r.options.name === 'shell.overlay')
-check('apply() registers the screen into shell.overlay',
-  Boolean(overlay) && overlay.options.id === 'life-overview' && overlay.options.order === 1000,
-  overlay ? `name=${overlay.options.name} id=${overlay.options.id} order=${overlay.options.order}` : `${registrations.length} registrations`)
-check('the settings.section companion is registered from the same component',
-  Boolean(registrations.find((r) => r.options.name === 'settings.section')))
-const element = overlay && overlay.component()
+const page = registrations.find((r) => r.options.name === 'main')
+const sidebar = registrations.find((r) => r.options.name === 'sidebar.panellist')
+check('apply() registers a keyed main page without covering conversation with an overlay',
+  page?.options.key === 'life-overview' && !registrations.some((r) => r.options.name === 'shell.overlay'))
+check('the sidebar entry selects the same keyed page',
+  sidebar?.options.id === page?.options.key && sidebar.options.label() === '鱼缸' && sidebar.component({ size: 18 }).props.width === 18)
+page?.options.inject().onChat()
+check('talking returns to the shell conversation through its navigation API', selectedPanel === null)
+const element = page && page.component()
 check('the component renders the probe-identifiable element', Boolean(element) && element.props.id === 'life-overview')
 
 // ---- 3. Client-side hygiene ------------------------------------------------
@@ -118,18 +122,20 @@ store.ensure({ name: '大肥鱼', species: 'whale' })
 store.startActivity({ what: '练第 38 层', why: '昨天连挂两次' })
 store.makeCommitment({ what: '把游标修好', dueAt: '2026-10-29T09:00:00.000Z' })
 store.rememberPerson({ name: '主人', note: '只有主人能看到的私密备注' })
-store.appendLedger({ kind: 'turn', detail: { sessionId: 'session-x', turn: 1, reason: null, woke: false } })
+store.appendLedger({ kind: 'turn', detail: { sessionId: 'session-x', turn: 1, reason: 'completed', woke: false } })
 store.appendLedger({ kind: 'turn', detail: { sessionId: 'session-x', turn: 2, reason: 'error', woke: true } })
+store.appendLedger({ kind: 'turn', detail: { sessionId: 'session-x', turn: 3, reason: 'aborted', woke: false } })
 store.appendLedger({ kind: 'wake', detail: { messageId: 'm-1', sessionId: 'session-x' } })
 store.appendLedger({ kind: 'activity-end', detail: { what: '读文档', outcome: 'failed', note: '账本正文不应外泄' } })
 store.updateWake({ nextAt: '2026-10-28T12:00:00.000Z', dayKey: '2026-10-28', countToday: 2 })
 
 let route
+const routes = []
 const fakeRoot = {
-  inject: (deps, cb) => { cb({ webServer: { register: (r) => { route = r } } }) },
+  inject: (deps, cb) => { cb({ webServer: { register: (r) => { routes.push(r); if (r.path === LIFE_STATE_PATH) route = r } } }) },
 }
 installLifeUi(fakeRoot, store, { lifeId: 'ui' })
-check('installLifeUi registers exactly one exact-path route', Boolean(route) && route.kind === 'exact' && route.path === LIFE_STATE_PATH,
+check('installLifeUi registers an exact-path state route', Boolean(route) && route.kind === 'exact' && route.path === LIFE_STATE_PATH,
   route ? `${route.kind} ${route.path}` : 'nothing registered')
 
 function callHandler (handler) {
@@ -153,8 +159,8 @@ check('the current activity keeps its reason (the "why" of the screen)',
 check('the open commitment reaches the screen with its due date',
   Array.isArray(state.openCommitments) && state.openCommitments.length === 1 &&
   state.openCommitments[0].what === '把游标修好' && Boolean(state.openCommitments[0].dueAt))
-check('per-day counters come from the real ledger',
-  state.today.turns === 2 && state.today.wakes === 1 && state.today.activities === 1 && state.today.failures === 2,
+check('per-day counters count explicit errors but not completed or user-aborted turns',
+  state.today.turns === 3 && state.today.wakes === 1 && state.today.activities === 1 && state.today.failures === 2,
   JSON.stringify(state.today))
 check('wake bookkeeping is exposed as counts only', state.wakeCountToday === 2 && state.nextWakeAt === '2026-10-28T12:00:00.000Z')
 const serialized = JSON.stringify(state)
@@ -163,7 +169,100 @@ check('private material never leaves the Host',
   !serialized.includes('"note"') && !serialized.includes('"ledger"'),
   serialized.includes('私密') ? 'relations note leaked' : 'no note/ledger fields')
 
+// The overview must be a projection of this life, not the prototype's story.
+store.recordInterest({ topic: '无线电', confidence: 0.7, note: '私密兴趣备注' })
+store.finishActivity({ outcome: 'failed', evidence: ['私密证据正文'], next: { what: '明天查时序表', why: '先弄清复位条件' } })
+const overview = readLifeState(store, { wakeEnabled: true, wakeMaxPerDay: 6 })
+check('overview exposes birth, interests and the next step from persisted state',
+  overview.identity.bornAt === fixed.toISOString() && overview.identity.lifeId === 'ui' &&
+  overview.interests?.[0]?.topic === '无线电' && overview.interests[0].confidence === 0.7 &&
+  overview.nextStep?.what === '明天查时序表')
+check('overview distinguishes no activity, wake allowance and unavailable cost data',
+  overview.lifeStatus === 'idle' && overview.wake?.maxPerDay === 6 &&
+  overview.wake.remainingToday === 4 && overview.budget?.status === 'unavailable')
+check('today is bounded, newest first, and contains evidence counts rather than bodies',
+  overview.recentEvents?.length <= 5 && overview.recentEvents?.[0]?.kind === 'activity-end' &&
+  overview.recentEvents[0].evidenceCount === 1 &&
+  !JSON.stringify(overview).includes('私密证据正文') && !JSON.stringify(overview).includes('私密兴趣备注'))
+store.updateWake({ paused: true })
+check('pausing wake is reported separately from an activity still in progress', (() => {
+  store.startActivity({ what: '读时序表', why: '接着昨天的事' })
+  const current = readLifeState(store, { wakeEnabled: true, wakeMaxPerDay: 6 })
+  return current.lifeStatus === 'active' && current.wake.paused === true
+})())
+check('an empty life does not inherit prototype events, interests or spending', (() => {
+  const empty = new LifeStore({ home: path.join(HOME, 'empty'), lifeId: 'empty', clock: () => fixed })
+  const result = readLifeState(empty)
+  return result.lifeStatus === 'uninitialized' && result.recentEvents.length === 0 &&
+    result.interests.length === 0 && result.budget.status === 'unavailable' && result.attention.total === 0
+})())
+check('the packaged placeholder is served locally with the correct MIME type', (() => {
+  const avatar = routes.find((r) => r.path === '/life/avatar.png')
+  let status, headers, body
+  avatar?.handler({ method: 'GET' }, { writeHead: (s, h) => { status = s; headers = h }, end: (b) => { body = b } })
+  return status === 200 && headers['content-type'] === 'image/png' && Buffer.isBuffer(body) && body.subarray(1, 4).toString() === 'PNG'
+})())
+
+// Exercise the actual client fetch/effect path. No network and no made-up DOM:
+// these hooks keep state between renders so an empty/error response can disprove
+// the visible claim rather than merely match a string in the implementation.
+{
+  let client, cursor = 0, effect, poll, aborted = false, response = { ok: true, json: async () => overview }
+  const values = []
+  const hooks = {
+    ...ReactStub,
+    useState: (initial) => {
+      const index = cursor++
+      if (!(index in values)) values[index] = initial
+      return [values[index], (next) => { values[index] = typeof next === 'function' ? next(values[index]) : next }]
+    },
+    useEffect: (fn) => { effect = fn },
+  }
+  new Function('window', 'fetch', 'setInterval', 'clearInterval', source)(
+    { __ModuleLoader__: { load: (mod) => { client = mod.factory(() => hooks) } } },
+    async (_url, options) => { options.signal.addEventListener('abort', () => { aborted = true }); if (response instanceof Error) throw response; return response },
+    (fn) => { poll = fn; return 1 }, () => {},
+  )
+  const render = () => { cursor = 0; return client.LifeOverview({ onChat: () => {} }) }
+  const visibleText = (node) => {
+    if (node === null || node === undefined || typeof node === 'boolean') return ''
+    if (Array.isArray(node)) return node.map(visibleText).join(' ')
+    if (typeof node !== 'object') return String(node)
+    return node.type === 'style' ? '' : visibleText(node.children)
+  }
+  check('first render says loading instead of presenting the prototype story',
+    visibleText(render()).includes('正在读取它的生活') && !visibleText(render()).includes('38 层'))
+  const dispose = effect()
+  await new Promise(setImmediate)
+  check('a real response renders its next step and explicitly unavailable spending',
+    visibleText(render()).includes('明天查时序表') && visibleText(render()).includes('费用尚无记录'))
+  response = new Error('offline')
+  await poll()
+  check('a failed refresh retains the previous snapshot and labels it stale',
+    visibleText(render()).includes('上次读取的记录') && visibleText(render()).includes('明天查时序表') && visibleText(render()).includes('读取异常'))
+  dispose()
+  check('unmount aborts outstanding requests', aborted)
+  values.length = 0
+  render()
+  response = { ok: false, status: 503, json: async () => overview }
+  const disposeError = effect()
+  await new Promise(setImmediate)
+  check('an HTTP error is not rendered as a healthy or empty life',
+    visibleText(render()).includes('暂时看不到它的近况') && visibleText(render()).includes('503') && !visibleText(render()).includes('明天查时序表'))
+  disposeError()
+}
+
 // ---- 5. Corrupt state is reported, never fabricated -----------------------
+const originalRead = fs.readFileSync
+let unreadableRejected = false
+try {
+  fs.readFileSync = (file, ...args) => {
+    if (file === store.files.traits) throw Object.assign(new Error('permission denied'), { code: 'EACCES' })
+    return originalRead(file, ...args)
+  }
+  try { readLifeState(store) } catch (err) { unreadableRejected = String(err.message).includes('state-unreadable') }
+} finally { fs.readFileSync = originalRead }
+check('an unreadable state file is an error, not an empty life', unreadableRejected)
 fs.writeFileSync(store.files.activity, '{ this is not json', 'utf8')
 const corrupt = JSON.parse(callHandler(route.handler))
 check('a corrupt state file answers { ok: false } instead of a made-up screen',
@@ -208,9 +307,12 @@ check('a headless composition registers no UI route at all', route === routeBefo
 // ---- 7. A real web profile mounts both the plugin and a web server --------
 let dshBin
 try {
+  if (process.argv.includes('--offline')) throw new Error('offline measurement')
   dshBin = resolveDshBin(process.env.DSH_BIN, [path.join(REPO, 'node_modules', '@deepseek-ai', 'dsh')])
 } catch (err) {
-  skip('real web profile composition', 'DSH_BIN not resolved (see verify/README.md)')
+  skip('real web profile composition', process.argv.includes('--offline')
+    ? '--offline: run without this flag for the real profile checks'
+    : 'DSH_BIN not resolved (see verify/README.md)')
 }
 if (dshBin) {
   const CHILD_PATH = [path.dirname(process.execPath), process.env.PATH || ''].filter(Boolean).join(path.delimiter)

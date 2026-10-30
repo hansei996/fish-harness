@@ -40,6 +40,24 @@ function check (label, ok, detail = '') {
 
 const facts = measureCodeFacts()
 
+// A documentation read must not silently launch a browser. Exercise the runner
+// boundary, then remove the separation to prove the predicate detects a leak.
+const measuredCalls = []
+const fakeRun = (_bin, args) => { measuredCalls.push(args); return { status: 0, stdout: '1/1 checks passed', stderr: '' } }
+measureSuiteCounts({ runSuite: fakeRun })
+const noBrowserCall = (calls) => !calls.some((args) => args[0].endsWith('landing.mjs'))
+check('事实度量不启动独立的浏览器验收，UI 使用稳定的 offline 口径',
+  noBrowserCall(measuredCalls) && measuredCalls.some((args) => args[0].endsWith('ui.mjs') && args.includes('--offline')))
+const browserSuite = SUITES.find((suite) => suite.name === 'landing')
+try {
+  browserSuite.separate = false
+  measuredCalls.length = 0
+  measureSuiteCounts({ runSuite: fakeRun })
+  check('移除浏览器分离后上述不启动浏览器的判据确实失败', !noBrowserCall(measuredCalls))
+} finally { browserSuite.separate = true }
+check('即使打印了通过汇总，验证进程异常退出也不能被统计成全绿',
+  !measureSuiteCounts({ runSuite: () => ({ status: 1, stdout: '1/1 checks passed', stderr: 'fatal after checks' }) }).allPassed)
+
 // 每个生成块都要真的存在于它的文件里。标记丢了 = 生成块被删了，那就是漂移。
 for (const block of BLOCKS) {
   const text = read(block.file)

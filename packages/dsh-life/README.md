@@ -218,15 +218,15 @@ outbox.json        发布线：每条内容的稳定编号、版本、批准、�
 
 ## 界面
 
-插件在 dsh 的 web 界面里挂一屏只读的**运行总览**：它现在在做什么、为什么（`activity.why`）、今天醒了几次 / 做完几件事 / 失败几次、欠着的事（最多 3 条，带到期时间）、下次醒来的时间。界面只读，不能改任何状态。
+dsh 侧栏的「鱼缸」打开一屏只读的**运行总览**，布局依据 `design/ui-complete.html`。形象、当前活动与原因、今天的近期事件、下一步、兴趣、承诺、唤醒额度及待确认数量都使用真实状态。费用未接入时显示「费用尚无记录」，系统状态只承诺生活记录可读取，不声称模型和渠道已经健康。
 
-**数据从哪来。** Host 半身 `lib/ui.js` 在 profile 有 `webServer` 时注册一个精确路由 `/life/state.json`；handler 每次请求都**现读 `LifeStore`**（不缓存、不预先组装），所以屏幕上不可能出现昨天的故事被当成今天。返回的字段只有 `generatedAt`、`identity{name,species,revision}`、`activity{what,why,startedAt}`、`nextWakeAt`、`wakeCountToday`、`openCommitments[{what,dueAt}]`、`today{turns,wakes,activities,failures}`。**不回** `relations` 的备注、**不回**账本正文 —— 私密内容不出 Host。状态文件坏掉时返回 `{ ok: false, error: "life/state-corrupt:<file>" }`，而不是编一个看起来正常的界面。
+**数据投影。** `/life/state.json` 每次请求现读 `LifeStore`，保留原有字段，并增加 `lifeStatus`、`health`、`wake`、`budget`、`attention`、`nextStep`、`interests`、`recentEvents`。近期事件只返回白名单摘要和证据条数，最多五条；不返回原始账本行、证据正文、关系和兴趣备注。存储损坏或不可读会返回错误，不伪装成空记录。 对话失败次数只统计 dsh 明确标为 `error` 的回合，`completed` 和用户取消的 `aborted` 不计为失败；此边界已用真实 API 回合和回归用例核对。
 
-**为什么客户端零构建。** dsh 的 web shell 用自有 lazy-CJS 表加载客户端模块：`window.__ModuleLoader__.load({ id, factory })`，`require('react')` 由 shell 提供。所以 `client/life-overview.js` 是一份手写文件，不含 JSX、不引依赖、不需要打包；`package.json` 里 `dsh.client.platform = 'web'`、`exports['./client']` 指向它、`files` 带上 `client/`。同时**保留** `dsh.bundle.patch`：只写 `dsh.client` 会让 `dsh plugin add` 只当普通依赖装、插件行不挂，客户端半身就永远不会被扫描（这个坑在 `docs/dsh-ui-slots.md` 里记着）。注册进 `shell.overlay`（已验证的 shell 级 slot）；`settings.section` 用同一个组件额外注册一次，slot 不存在就静默跳过。
+**客户端。** 仍是只使用 shell 内 React 的 lazy-CJS 文件，不增加构建或运行时依赖。使用 dsh 已有的 `main` keyed slot 和 `sidebar.panellist` 入口，替代遮挡会话的固定浮层；「和它说话」通过 `layout.selectPanel(null)` 回到宿主会话。刷新失败时保留并标明上次快照，卸载时终止请求并清理定时器。其余页面、照料和暂停入口暂不可用，不能把原型的模拟交互当作真实操作。
 
-**没有界面的 profile 不受影响。** `webServer` 不在模块级 `inject` 里；headless/SDK 组合没有它，`installLifeUi` 就什么都不注册、不 warn —— 工具面仍是 17 个，验证见 `verify/ui.mjs` 的 headless 一节。
+**素材。** `/life/avatar.png` 提供随包安装的静态占位图，来自设计稿已有的内嵌图片；加载失败时使用图形占位。正式上线前仍需合作方提供原创或已授权素材。
 
-**像素级未验证。** 我们只在两层证明过它：客户端模块出现在页面的 boot manifest 里、被 shell 按 URL 取到；模块在桩 loader 里执行 `apply()` 后确实注册进了 slot 并产出元素。**没有人真的看着它在屏幕上渲染出来** —— 本仓库没有可驱动的浏览器。别把「注册成功」读成「看得见」。
+**验证边界。** `verify/ui.mjs` 覆盖状态投影、隐私、加载/错误状态、主页面与侧栏契约、聊天返回及真实 Web profile 组合；`verify/pack-install.mjs` 覆盖包含素材的安装包。已在真实 dsh 浏览器中确认桌面首屏、刷新近况和返回会话正常；小屏布局及异常状态的浏览器验收仍待完成。headless/SDK 不注册任何 UI 路由，工具注册面保持不变。
 
 ## 本包强制的设计规则
 

@@ -139,11 +139,11 @@
 | **「它的一天」可读报告** | ✅ `tools/day-report.mjs`：把 `ledger.jsonl` 渲染成人话（失败照实说、结论带证据、对话往返单独计数），`--json` 供程序消费；行为测试 22 项已进 CI | 无 |
 | **视频发布（标注 + 核验）** | ✅ `lib/video.js`：每帧烧显式标识（含起始画面，标识办法 §4(4)）+ 容器元数据写隐式标识（§5 三项必填）；`verify/video.mjs` 用**真 ffmpeg** 跑一遍并**解码首帧比像素**证明标识真烧进去了（含「未标注素材必须被拒」的反例）；批准绑定**文件字节**（发布前重哈希 + 上传时再核，`verify/publish.mjs` C7 段） | **一次真实平台上传都没有过**；未验：H.265/AV1 等非 H.264 源、超 50MB、时长上限、平台侧转码后标识是否仍可见（平台可能重编码） |
 | **发布对账（回执、幂等、不盲目重发）** | ✅ `lib/outbox.js` 状态机（`draft → checked → approved → sending → confirmed / unconfirmed / failed`）+ 幂等键 + 内容版本绑定 + 三档修剪（committed 永不丢）；`lib/compliance.js` 标识硬闸（**没有 strip 函数**）；`life_publish` 走 dsh `approval`，只认 `allowed-once`，批准后**重算摘要**防 TOCTOU；`lib/telegram.js` 适配器（假 fetch 可测、错误擦 token）。`verify/publish.mjs` 26 项 | **一次真实 Telegram 都没发过**；真实 Web 批准弹窗未点过；跨进程并发与 `sending` 崩溃窗口未实测 |
-| **界面实体（一屏）** | ✅ `lib/ui.js` 的 `/life/state.json` **现读**真实状态 + `client/life-overview.js` 手写 lazy-CJS（零构建、只 `require('react')`）；headless 里不注册 | **像素级未验证**；`settings.section` 是盲注册（已 try/catch） |
+| **界面实体（一屏）** | ✅ 运行总览按稿实现，真实状态投影含近期事件、兴趣、下一步、唤醒和待确认；通过 `main` + `sidebar.panellist` 挂入 dsh；零构建与零自有依赖 | **桌面首屏、刷新与返回聊天已验，小屏及异常态待验**；其余页面、暂停和照料写操作未开放，费用未接入 |
 | **安装门槛实测（代理版）** | ✅ `docs/install-test.md`：抓到一个静默失败——自己起 profile 名字会得到**裸 profile**（无 agent/llm/schedule），鱼装上了却不动且不报错；README 已改成「先 `--from-default-profile web`」三步 | 不是真人实测；npm 发布后要重做 |
 
 <!-- facts:plan-code-size -->
-**代码规模**：10 个 host 文件 + 1 个 client 文件，5905 行（`choose.js` 703 / `compliance.js` 118 / `config.js` 313 / `index.js` 1861 / `outbox.js` 914 / `store.js` 737 / `telegram.js` 238 / `ui.js` 179 / `video.js` 428 / `wake.js` 238 / `life-overview.js` 176），零自有依赖，18 个工具，5 个服务挂载点 + 2 个会话事件 + 客户端 2 个 slot，8 个状态文件。
+**代码规模**：10 个 host 文件 + 1 个 client 文件，5997 行（`choose.js` 703 / `compliance.js` 118 / `config.js` 313 / `index.js` 1861 / `outbox.js` 914 / `store.js` 737 / `telegram.js` 238 / `ui.js` 258 / `video.js` 428 / `wake.js` 238 / `life-overview.js` 189），零自有依赖，18 个工具，5 个服务挂载点 + 2 个会话事件 + 客户端 2 个 slot，8 个状态文件。
 <!-- /facts:plan-code-size -->
 
 ### 规划说了但还没做
@@ -696,7 +696,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 | **2. 接上自主唤醒** | 第 4 周 | 接 dsh `schedule`：它自己过一天 | 无人干预下连续 7 天自己醒来、自己选活动、自己收尾 | ⚠️ **已实现**（策略 + 布防 + 记账 + `life_wake` + 活动选择器；验证里有 35 项专门盯唤醒与选择器，另有一条 opt-in 真实唤醒检查，且在 shipped `standard` preset 下 3/3 通过）；**决策门的 7 天真实运行未做**。见 §10.2 |
 | **3. 学会公开生活** | 第 5–7 周 | 接 `approval` 做逐条确认发布；发布幂等与回执对账；渠道按 §5.3 分层接入 | 无法确认的外部结果宁可停下对账，不重复发帖 | ❌ 设计完整（§7.3），未接真实平台 |
 | **4. 能力包** | 第 6–8 周 | 冲浪包、游戏包、表达包；以 dsh bundle 格式分发 | 每个能力包都有健康检查与降级路径，不是一段 prompt | ❌ 未实现 |
-| **5. UI 实体** | 第 7–9 周 | 把原型做成 dsh 插件视图，渲染槽先接静态图、留 Live2D 接口 | 顶栏、渲染槽、动作都落在 dsh 的 slot 机制上，不另起应用 | ⚠️ 原型完成（`design/ui-complete.html`，七页可交互），未落地 |
+| **5. UI 实体** | 第 7–9 周 | 把原型做成 dsh 插件视图，渲染槽先接静态图、留 Live2D 接口 | 顶栏、渲染槽、动作都落在 dsh 的 slot 机制上，不另起应用 | ⚠️ 运行总览与真实数据已实现；桌面首屏与导航已验，小屏及异常态待验，其余页面未落地 |
 | **6. 证明能长养** | MVP 后至少 30 天 | 多实例真实运行、故障注入、dsh 升级演练、行为回归 | 通过长期指标后才扩大平台与能力包数量 | ❌ 未开始。**最需要时间、最不能跳过的一项** |
 
 第 0 阶段原本担心 `approval`/`schedule` 不足以支撑产品流程——实测下来 `schedule` 存在且可用；若将来发现不够，要么补插件、要么改设计，**不要绕过它们自建并行机制**。
@@ -733,6 +733,9 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 **留空的一段**：`dsh-simulated-life` 是「每轮注入生活事件」，它不决定鱼想做什么；`dsh-proactive` 唤醒的是一个**会话**。我们要唤醒的是一个**有当前状态的个体**——这层状态是我们的，现在它接上了。
 
 ### 10.3 下一步：发布与界面，并行
+
+**当前实施检查点**：运行总览已从固定浮层改为 dsh 侧栏「鱼缸」页面，保留合作方设计稿不变。数据层增加白名单近期事件、兴趣、交接、出生时间与待确认计数；没有成本数据时显示未知。UI 行为、真实 profile 组合、打包安装和端到端验证已执行。视频工具在项目临时目录配置了支持 `drawtext` 的 ffmpeg，视频验证通过。尚未完成：小屏与异常态视觉验收、其余页面与写操作、真实 Telegram 发送、真实长期运行。真实发布验证仍需要独立的 Telegram 测试机器人与频道。 真实 dsh 桌面首屏已打开并检查，刷新近况、返回聊天和重新进入鱼缸均正常。
+
 
 自主唤醒做完之后，「它自己醒来、自己选活动、自己收尾」这条链已经通了。**剩下的缺口里，发布和界面各自挡着一个「能不能给人看」的问题。**
 
@@ -795,7 +798,7 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 ### 11.1 代码级：已实现，可复现
 
 <!-- facts:plan-verify-table -->
-实测 **306 项全绿**，命令与前置条件见 [`verify/README.md`](../verify/README.md)：
+固定基线 **297 项**（通过），浏览器与 UI 真实 profile 附加检查另行验收。命令与前置条件见 [`verify/README.md`](../verify/README.md)：
 
 | 套件 | 项数 | 查什么 | 需要真 dsh？ |
 | --- | --- | --- | --- |
@@ -803,9 +806,9 @@ dsh 有持久日志，但**外部副作用不是日志能解决的**。状态流
 | `verify/day-report.mjs` | **28** | 「它的一天」报告工具：账本→人话的翻译、失败照实说、结论带证据、缺数据不崩 | 否 |
 | `verify/demo-data.mjs` | **18** | 对外页面引用的数据产物与实现一致；含「换时区结论不变」与「篡改能被发现」 | 否 |
 | `verify/life-week.mjs` | **16** | 连跑七天（压缩时钟，复用生产的 store/choose/wake） | 否 |
-| `verify/ui.mjs` | **28** | 界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归 | 否 |
+| `verify/ui.mjs` | **38** | 界面半边：包清单、桩 loader 注册、host 路由的真实数据、私密不外泄、headless 零回归 | 否 |
 | `verify/publish.mjs` | **40** | 发布线：状态机、标识硬闸、approval 四态、TOCTOU、Telegram 载荷与脱敏；含两组 mutation | 否 |
-| `verify/landing.mjs` | **19** | 落地页与场景原型在真 Chromium 里的像素级验证（三档视口、无溢出、无 JS 错误、数据真的渲染出来）；缺浏览器则跳过 | 否 |
+| `verify/landing.mjs` | **—**（另行验收） | 落地页与场景原型在真 Chromium 里的像素级验证（三档视口、无溢出、无 JS 错误、数据真的渲染出来）；缺浏览器则跳过 | 否 |
 | `verify/e2e-tools.mjs` | **17** | 真 dsh 端到端：组合 profile → `dsh plugin` 安装 → 启动 → 断言运行系统实际产出 | 是 |
 | `verify/pack-install.mjs` | **9** | `pnpm pack` 出的 tarball 装进全新 profile 能否激活（最接近 npm 的替身） | 是 |
 | `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |

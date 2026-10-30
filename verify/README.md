@@ -1,19 +1,19 @@
 # 怎么跑 verify（含 Windows）
 
-五套验证：`smoke`、`day-report`、`life-week` 只依赖本地文件；`e2e` 与 `pack` 需要**真的 dsh**，不是 mock：
+固定基线由 `tools/facts.mjs` 真跑统计；`ui` 使用 `--offline`，浏览器验收独立运行，不因本机是否安装浏览器而改变统计口径。真实 Web profile 的附加检查使用不带 `--offline` 的 `verify/ui.mjs`；浏览器与 UI 完整检查仍在 CI 的各自步骤执行。
 
 <!-- facts:verify-table -->
-| 套件 | 查什么 | 本机实测（合计 306 项） |
+| 套件 | 查什么 | 固定基线实测（合计 297 项） |
 |---|---|---|
 | `verify/smoke.mjs` | 70 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性）（需要真 dsh） | 70/70 通过 |
 | `verify/day-report.mjs` | 28 项：当天报告工具（不需要真 dsh） | 28/28 通过 |
 | `verify/demo-data.mjs` | 18 项：对外页面引用的那份数据产物与实现一致（含时区稳定性）（不需要真 dsh） | 18/18 通过 |
 | `verify/life-week.mjs` | 16 项：连跑七天（不需要真 dsh） | 16/16 通过 |
-| `verify/ui.mjs` | 28 项：界面那半边的包清单 / 桩 loader / host 路由 / 私密不外泄（不需要真 dsh） | 28/28 通过 |
+| `verify/ui.mjs` | 38 项：界面包清单 / 页面与侧栏 / 状态投影 / 隐私 / 请求生命周期（--offline 基线；去掉参数另验真实 Web profile）（不需要真 dsh） | 38/38 通过 |
 | `verify/publish.mjs` | 40 项：发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）（不需要真 dsh） | 40/40 通过 |
 | `verify/e2e-tools.mjs` | 17 项：真实 dsh 端到端（需要真 dsh） | 17/17 通过 |
 | `verify/pack-install.mjs` | 9 项：打出来的包能不能装进 profile 并激活（需要真 dsh） | 9/9 通过 |
-| `verify/landing.mjs` | 19 项：落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）（不需要真 dsh） | 19/19 通过 |
+| `verify/landing.mjs` | 落地页与场景原型的像素级验证（真 Chromium；缺浏览器则跳过）；不计入固定基线 | 单独运行，以 CI/浏览器验收结果为准 |
 | `verify/market.mjs` | 5 项：市场调研文档的结构与诚实性（离线口径：三态标注、证伪条件、不许删掉「未接真实平台」）（不需要真 dsh） | 5/5 通过 |
 | `verify/scenarios.mjs` | 11 项：落地剧本的每个引用都真实存在，且「未实现」的标记与 STORY.md 口径一致（不需要真 dsh） | 11/11 通过 |
 | `verify/framework.mjs` | 23 项：技术总图（docs/framework.html）上画的 import 边 / 挂载 API / 生成块里的数字全部对着源码核（离线口径；装了 dsh 时手动跑可多核 dsh 包规模 3 条）（不需要真 dsh） | 23/23 通过 |

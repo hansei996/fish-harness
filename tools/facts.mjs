@@ -257,13 +257,14 @@ export const SUITES = [
   { name: 'day-report', file: 'verify/day-report.mjs', outcome: 'DAYREPORT_OUTCOME' },
   { name: 'demo-data', file: 'verify/demo-data.mjs', outcome: 'DEMODATA_OUTCOME' },
   { name: 'life-week', file: 'verify/life-week.mjs', outcome: 'LIFEWEEK_OUTCOME' },
-  { name: 'ui', file: 'verify/ui.mjs', outcome: 'UI_OUTCOME' },
+  { name: 'ui', file: 'verify/ui.mjs', outcome: 'UI_OUTCOME', offlineArgs: ['--offline'] },
   { name: 'publish', file: 'verify/publish.mjs', outcome: 'PUBLISH_OUTCOME' },
   { name: 'e2e', file: 'verify/e2e-tools.mjs', outcome: 'E2E_OUTCOME' },
   { name: 'pack', file: 'verify/pack-install.mjs', outcome: 'PACK_OUTCOME' },
-  // landing 需要一个有 Chromium 的 Playwright。CI 里没有就自己 SKIP（0/0），
-  // 所以把它放进表里是安全的 —— 它不会因为缺浏览器而把流水线弄红。
-  { name: 'landing', file: 'verify/landing.mjs', outcome: 'LANDING_OUTCOME' },
+  // Browser verification remains a separate CI gate. Do not turn a missing
+  // local browser into a smaller "structural" total or rerun UI automation as
+  // a side effect of reading documentation facts.
+  { name: 'landing', file: 'verify/landing.mjs', outcome: 'LANDING_OUTCOME', separate: true },
   { name: 'market', file: 'verify/market.mjs', outcome: 'MARKET_OUTCOME', offlineArgs: ['--offline'] },
   { name: 'scenarios', file: 'verify/scenarios.mjs', outcome: 'SCENARIOS_OUTCOME' },
   // framework：总览图的核对。它与 scenarios 一样是纯本地文本+源码核对，
@@ -287,14 +288,19 @@ export const SUITES = [
  * 为什么数「跑出来的」而不是源码里的 `check(`：`check` 会在循环里被调很多次
  * （soak 就是），静态数不出真实项数。而项数正是文档在引用的事实，所以只能真跑。
  */
-export function measureSuiteCounts ({ env = process.env, timeoutMs = 600000 } = {}) {
+export function measureSuiteCounts ({ env = process.env, timeoutMs = 600000, runSuite = spawnSync } = {}) {
   const suites = []
   for (const suite of SUITES) {
+    if (suite.separate) {
+      suites.push({ name: suite.name, file: suite.file, count: null, passed: null,
+        total: null, skipped: true, separate: true, ok: false, exitCode: null, ms: 0 })
+      continue
+    }
     const started = Date.now()
     // market 跑离线口径：它联网的那一半在 CI 上取不到外网，项数会随环境变，
     // 而项数是要写进文档的「结构事实」—— 不能因网络而漂。
     const extra = suite.offlineArgs || []
-    const r = spawnSync(process.execPath, [path.join(REPO, suite.file), ...extra], {
+    const r = runSuite(process.execPath, [path.join(REPO, suite.file), ...extra], {
       env, timeout: timeoutMs, encoding: 'utf8', cwd: REPO,
     })
     const text = `${r.stdout || ''}${r.stderr || ''}`
@@ -321,12 +327,13 @@ export function measureSuiteCounts ({ env = process.env, timeoutMs = 600000 } = 
       ok: !skipped && r.status === 0 && passed !== null && passed === total,
       exitCode: r.status,
       ms: Date.now() - started,
+      diagnostics: r.status !== 0 ? text.slice(-4000) : null,
     })
   }
   // 「跑不起来」和「自己跳过」是两件事：前者要拦住，后者只是这台机器没有那个工具。
   const missing = suites.filter((s) => s.total === null && !s.skipped).map((s) => s.name)
   const skippedSuites = suites.filter((s) => s.skipped).map((s) => s.name)
-  const failing = suites.filter((s) => s.total !== null && s.passed !== s.total).map((s) => `${s.name} ${s.passed}/${s.total}`)
+  const failing = suites.filter((s) => s.total !== null && !s.ok).map((s) => `${s.name} ${s.passed}/${s.total}`)
   return {
     suites,
     total: suites.reduce((sum, s) => sum + (s.total || 0), 0),
@@ -360,7 +367,7 @@ export function measureSuiteCounts ({ env = process.env, timeoutMs = 600000 } = 
  * 键必须覆盖 `measureCodeFacts().code.files` 的全部文件，`--check` 会核这一点。
  */
 const FILE_ROLES = {
-  'lib/index.js': '插件入口：注册 17 个工具、注入上下文、监听会话事件、向 `schedule` 布防、发布线接线',
+  'lib/index.js': '插件入口：注册生命工具、注入上下文、监听会话事件、向 `schedule` 布防、发布线接线',
   'lib/store.js': '生命状态机：三档变量、承诺、关系、账本、唤醒绑定、outbox；原子落盘',
   'lib/outbox.js': '发布状态机：`draft → checked → approved → sending → confirmed / unconfirmed / failed`、幂等键、三档修剪',
   'lib/choose.js': '活动选择器：七项加权、理由与明细、休息恒存；时钟可注入、无随机',
@@ -379,7 +386,7 @@ const SUITE_ROLES = {
   'day-report': { needsDsh: false, what: '当天报告工具' },
   'demo-data': { needsDsh: false, what: '对外页面引用的那份数据产物与实现一致（含时区稳定性）' },
   'life-week': { needsDsh: false, what: '连跑七天' },
-  ui: { needsDsh: false, what: '界面那半边的包清单 / 桩 loader / host 路由 / 私密不外泄' },
+  ui: { needsDsh: false, what: '界面包清单 / 页面与侧栏 / 状态投影 / 隐私 / 请求生命周期（--offline 基线；去掉参数另验真实 Web profile）' },
   publish: { needsDsh: false, what: '发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）' },
   e2e: { needsDsh: true, what: '真实 dsh 端到端' },
   pack: { needsDsh: true, what: '打出来的包能不能装进 profile 并激活' },
@@ -416,7 +423,7 @@ export const BLOCKS = [
     render: (facts) => {
       if (!facts.verify) throw new Error('verify-summary 需要 --suites 真跑的结果')
       const zh = cn(facts.verify.suites.length)
-      return `| [\`verify/\`](verify/) | ${zh}套共 **${facts.verify.total} 项**；另有一条 opt-in 的真实唤醒检查（3 项） |`
+      return `| [\`verify/\`](verify/) | ${zh}套；固定基线 **${facts.verify.total} 项**，浏览器、UI 真实 profile 与 opt-in 真实唤醒另行验收 |`
     },
   },
   {
@@ -447,7 +454,7 @@ export const BLOCKS = [
       return [
         `${zh}套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**`,
         `（[\`.github/workflows/verify.yml\`](.github/workflows/verify.yml)，固定 dsh \`0.2.1-rc.2\`，失败时日志进 artifact）。`,
-        `合计 **${facts.verify.total} 项**：${per}。`,
+        `固定基线 **${facts.verify.total} 项**：${per}。浏览器与 UI 真实 profile 附加检查不计入该基线，仍由各自 CI 步骤验收。`,
       ].join('')
     },
   },
@@ -463,10 +470,12 @@ export const BLOCKS = [
       const lines = facts.verify.suites.map((s) => {
         const role = SUITE_ROLES[s.name]
         const prefix = role.needsDsh ? 'DSH_BIN=<dsh bin> ' : ''
-        const cmd = `${prefix}node ${s.file}`
+        const args = SUITES.find((suite) => suite.name === s.name).offlineArgs || []
+        const cmd = `${prefix}node ${s.file}${args.length ? ' ' + args.join(' ') : ''}`
         // 自己跳过的套件（这台机器缺工具）不写「null 项」—— 那会被读成
         // 「这套没有断言」。写成「本机未跑」，并说明为什么。
-        const what = s.skipped ? `${role.what}（本机未跑：缺工具）` : `${s.count} 项 · ${role.what}`
+        const what = s.separate ? `${role.what}（单独验收，不计入基线）`
+          : s.skipped ? `${role.what}（本机未跑：缺工具）` : `${s.count} 项 · ${role.what}`
         // 命令要留一列再写注释；DSH_BIN 那几条前缀很长，用 50 才能都对齐。
         return `${cmd.padEnd(50)}# ${what}`
       })
@@ -492,7 +501,8 @@ export const BLOCKS = [
     file: 'docs/index.html',
     render: (facts) => {
       if (!facts.verify) throw new Error('verify-count 需要真跑结果')
-      return `      <div class="row"><span class="n">验证：${facts.verify.total} 项全绿<span>存储不变量 · 当天报告 · 连跑七天 · 界面注册 · 发布线 · 真实 dsh 端到端 · 打包安装</span></span><span class="pill done">已完成</span></div>`
+      const status = facts.verify.allPassed ? '基线通过' : '基线未通过'
+      return `      <div class="row"><span class="n">固定验证基线：${facts.verify.total} 项<span>存储 · 报告 · 连跑七天 · 界面数据 · 发布 · dsh 端到端 · 打包；浏览器与 UI 真实 profile 另行验收</span></span><span class="pill done">${status}</span></div>`
     },
   },
   {
@@ -536,13 +546,13 @@ export const BLOCKS = [
         '| --- | --- | --- | --- |',
         ...rows.map(([name, file, what, dsh]) => {
           const s = byName.get(name)
-          const cell = s.skipped ? '**—**（本机未跑）' : `**${s.count}**`
+          const cell = s.separate ? '**—**（另行验收）' : s.skipped ? '**—**（本机未跑）' : `**${s.count}**`
           return `| \`${file}\` | ${cell} | ${what} | ${dsh ? '是' : '否'} |`
         }),
         '| `verify/live/wake-live.mjs` | **3**（opt-in） | 真实 web profile 下的一次真实唤醒（三个连续进程），默认不进 CI | 是 |',
       ].join('\n')
       return [
-        `实测 **${facts.verify.total} 项全绿**，命令与前置条件见 [\`verify/README.md\`](../verify/README.md)：`,
+        `固定基线 **${facts.verify.total} 项**（${facts.verify.allPassed ? '通过' : '有未通过项'}），浏览器与 UI 真实 profile 附加检查另行验收。命令与前置条件见 [\`verify/README.md\`](../verify/README.md)：`,
         '',
         table,
         '',
@@ -566,13 +576,16 @@ export const BLOCKS = [
       const rows = Object.keys(fileOf).map((name) => {
         const s = byName.get(name)
         const role = SUITE_ROLES[name]
+        if (s.separate) {
+          return `| \`${fileOf[name]}\` | ${role.what}；不计入固定基线 | 单独运行，以 CI/浏览器验收结果为准 |`
+        }
         if (s.skipped) {
           return `| \`${fileOf[name]}\` | 本机未跑（缺浏览器等工具）：${role.what} | — |`
         }
         return `| \`${fileOf[name]}\` | ${s.count} 项：${role.what}${role.needsDsh ? '（需要真 dsh）' : '（不需要真 dsh）'} | ${s.passed}/${s.total} 通过${s.ok ? '' : ' ⚠'} |`
       })
       return [
-        `| 套件 | 查什么 | 本机实测（合计 ${v.total} 项） |`,
+        `| 套件 | 查什么 | 固定基线实测（合计 ${v.total} 项） |`,
         '|---|---|---|',
         ...rows,
         '| `verify/claims.mjs` | 文档里的数字有没有过期（它数的就是上面这些项数，所以不计入合计） | 见 `node verify/claims.mjs` |',
@@ -688,7 +701,7 @@ const STATE_ROLES = {
 
 /** 每个挂载点/事件「接到什么」。`--check` 会在有挂载点没登记时直接抛错。 */
 const MOUNT_TARGETS = {
-  tools: "ctx.tools.register()  注册 17 个工具",
+  tools: "ctx.tools.register()  注册生命工具",
   systemPrompt: 'ctx.systemPrompt.section()  注入每轮上下文',
   schedule: 'ctx.schedule.create()  布防一次性唤醒',
   approval: 'ctx.approval.request()  发布前逐条确认',

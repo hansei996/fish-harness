@@ -67,3 +67,10 @@
 1. **dsh slot + 手写 client（本文路径）**：零构建、真实状态可读；适合「运行总览」这类只读一屏。
 2. **只读本地 HTML**（由 `life_day` 类命令生成、浏览器直接打开）：零 UI 集成、零 slot 风险，但离开 dsh 界面，且要自己管刷新。
 3. **引入客户端构建链**（tsdown/JSX/CSS-module，与官方包同构）：只有当我们真的要做 Live2D/复杂交互时才值得；那时也该先按 1 做通数据链路。
+
+
+## 当前运行总览的接入方式
+
+运行总览现在采用正式页面，而非早期探针的 `shell.overlay`：`main` 的 `key` 与 `sidebar.panellist` 的 `id` 都为 `life-overview`。只依赖 `slots` 和 `layout`，聊天动作调用 `layout.selectPanel(null)` 返回宿主会话。
+
+依据是实际安装的 `@deepseek-ai/dsh-client-ui-schedule@0.2.1-rc.2/lib/client.js` 中的 `TaskManagerPage` 注册（`main` + 侧栏入口）与 `@deepseek-ai/dsh-client-ui-workspace@0.2.1-rc.2/lib/client.js` 中的会话导航。`verify/ui.mjs` 核对两处标识一致，并实际调用聊天动作验证返回宿主。真实 Web profile 的加载与 Host 路由已通过；真实 dsh 桌面首屏、刷新和返回聊天已通过浏览器检查；小屏及异常态仍待验收。以上历史探针结论本身不构成像素证据。
