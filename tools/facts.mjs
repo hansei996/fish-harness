@@ -101,9 +101,8 @@ export function measureCodeFacts () {
   const moduleMounts = [...index.matchAll(/root\.inject\(\[([^\]]+)\]/g)]
     .map((m) => m[1].replace(/['\s]/g, '').split(','))
     .flat()
-  const uiMounts = /inject\(\['webServer'\]/.test(fs.readFileSync(path.join(PLUGIN, 'lib', 'ui.js'), 'utf8'))
-    ? ['webServer']
-    : []
+  const uiMounts = [...fs.readFileSync(path.join(PLUGIN, 'lib', 'ui.js'), 'utf8').matchAll(/root\.inject\(\[([^\]]+)\]/g)]
+    .flatMap((m) => m[1].replace(/['\s]/g, '').split(','))
   const serviceMounts = [...new Set([...moduleMounts, ...uiMounts])].sort()
   const events = [...new Set([...index.matchAll(/root\.on\('([^']+)'/g)].map((m) => m[1]))].sort()
 
@@ -706,6 +705,7 @@ const MOUNT_TARGETS = {
   schedule: 'ctx.schedule.create()  布防一次性唤醒',
   approval: 'ctx.approval.request()  发布前逐条确认',
   webServer: 'ctx.webServer.register()  /life/state.json（headless 里不注册）',
+  connection: 'ctx.connection.fetch.register()  仅拥有者可访问的账本与本地投稿草稿',
   'agent/inbox/claimed': '在 prompt 组装前知道「这一轮是唤醒」',
   'session/event': '账本：turn、schedule 投递',
   'effect()': '卸载时全部反注册',

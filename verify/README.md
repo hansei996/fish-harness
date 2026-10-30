@@ -3,13 +3,13 @@
 固定基线由 `tools/facts.mjs` 真跑统计；`ui` 使用 `--offline`，浏览器验收独立运行，不因本机是否安装浏览器而改变统计口径。真实 Web profile 的附加检查使用不带 `--offline` 的 `verify/ui.mjs`；浏览器与 UI 完整检查仍在 CI 的各自步骤执行。
 
 <!-- facts:verify-table -->
-| 套件 | 查什么 | 固定基线实测（合计 297 项） |
+| 套件 | 查什么 | 固定基线实测（合计 315 项） |
 |---|---|---|
 | `verify/smoke.mjs` | 70 项：存储不变量 + 唤醒策略 + 7 天 soak + 活动选择器（确定性）（需要真 dsh） | 70/70 通过 |
 | `verify/day-report.mjs` | 28 项：当天报告工具（不需要真 dsh） | 28/28 通过 |
 | `verify/demo-data.mjs` | 18 项：对外页面引用的那份数据产物与实现一致（含时区稳定性）（不需要真 dsh） | 18/18 通过 |
 | `verify/life-week.mjs` | 16 项：连跑七天（不需要真 dsh） | 16/16 通过 |
-| `verify/ui.mjs` | 38 项：界面包清单 / 页面与侧栏 / 状态投影 / 隐私 / 请求生命周期（--offline 基线；去掉参数另验真实 Web profile）（不需要真 dsh） | 38/38 通过 |
+| `verify/ui.mjs` | 56 项：界面包清单 / 页面与侧栏 / 状态投影 / 隐私 / 请求生命周期（--offline 基线；去掉参数另验真实 Web profile）（不需要真 dsh） | 56/56 通过 |
 | `verify/publish.mjs` | 40 项：发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）（不需要真 dsh） | 40/40 通过 |
 | `verify/e2e-tools.mjs` | 17 项：真实 dsh 端到端（需要真 dsh） | 17/17 通过 |
 | `verify/pack-install.mjs` | 9 项：打出来的包能不能装进 profile 并激活（需要真 dsh） | 9/9 通过 |
@@ -72,8 +72,8 @@ node verify/pack-install.mjs # 9 项
 > `pack-install` 故意**不在** `npm run verify` 里（要真装 + 真 boot，慢）；CI 会跑它。
 > `video` 需要本机有 **ffmpeg + ffprobe**、`landing` 需要 **Playwright/Chromium**：缺工具时
 > `video` 会红（它的价值就是「真的烧进首帧」，跳过等于没验）、`landing` 会跳过。
-> 所以 `claims`（核对文档项数）在**缺这些工具**的机器上会报「生成块与实测不一致」—— 那是环境口径差，
-> 不是文档过期；CI 装齐了工具，那里的 306 项才是权威口径。
+> 固定基线统计不启动浏览器，UI 也按 `--offline` 口径统计；这与完整验收入口是两件事。
+> `claims` 仍需要能运行其它基线套件的 dsh 与 ffmpeg；浏览器及 UI 真实 profile 附加检查按各自 CI 步骤单独验收。
 
 几个脚本都会把 `DSH_HOME` 指到临时目录（`VERIFY_DSH_HOME` / `E2E_DSH_HOME` 可覆盖），
 所以不会碰你真实的 `~/.dsh`。

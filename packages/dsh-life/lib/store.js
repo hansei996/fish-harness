@@ -1,12 +1,15 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 import { dayKeyOf } from './wake.js'
 import {
   DEFAULT_OUTBOX_LIMIT,
   normalizeOutboxItems,
   pruneOutboxWithStats,
   upsertOutboxItem,
+  createBilibiliDraft,
+  exportBilibiliDraft,
 } from './outbox.js'
 
 /**
@@ -55,11 +58,12 @@ function appendJsonl (file, entry) {
   fs.appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf8')
 }
 
-function readJsonl (file) {
+function readJsonl (file, { strict = false } = {}) {
   let text = ''
   try {
     text = fs.readFileSync(file, 'utf8')
   } catch (err) {
+    if (strict && err?.code !== 'ENOENT') throw new Error('life/ledger-unreadable')
     return []
   }
   const out = []
@@ -694,11 +698,78 @@ export class LifeStore {
     }
   }
 
-  readLedger ({ limit = 50, kind = null } = {}) {
-    let rows = readJsonl(this.files.ledger)
+  readLedger ({ limit = 50, kind = null, strict = false } = {}) {
+    let rows = readJsonl(this.files.ledger, { strict })
     if (kind) rows = rows.filter((row) => row.kind === kind)
     if (limit > 0 && rows.length > limit) rows = rows.slice(-limit)
     return rows
+  }
+
+  /** Content-derived cursors survive new appends; a pruned cursor is rejected. */
+  ledgerEntries () {
+    const occurrences = new Map()
+    return this.readLedger({ limit: 0, strict: true }).map((row) => {
+      const digest = createHash('sha256').update(JSON.stringify(row)).digest('hex').slice(0, 24)
+      const n = occurrences.get(digest) || 0
+      occurrences.set(digest, n + 1)
+      return { id: `${digest}-${n}`, row }
+    })
+  }
+
+  readBilibiliDrafts () {
+    const raw = this.readOutboxFile()
+    if (fs.existsSync(this.files.outbox) && (!raw || !Array.isArray(raw.items))) throw new Error('life/bilibili-store-unreadable')
+    return this.readOutbox().items.filter((item) => item.manualDraft?.platform === 'bilibili').map((item) => {
+      try {
+        if (!/^bili-[a-f0-9]{16}$/.test(item.contentId)) throw new Error('invalid id')
+        const checked = createBilibiliDraft({ ...item.manualDraft, contentId: item.contentId, now: item.createdAt })
+        return { ...item, manualDraft: checked.manualDraft }
+      } catch { throw new Error('life/bilibili-store-unreadable') }
+    })
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+  }
+
+  saveBilibiliDraft (input = {}) {
+    const drafts = this.readBilibiliDrafts()
+    const requestId = input.requestId
+    if (requestId !== undefined && (typeof requestId !== 'string' || !/^[a-f0-9-]{36}$/.test(requestId))) throw new Error('life/bilibili-invalid-request')
+    const replay = !input.id && requestId ? drafts.find((item) => item.clientRequestId === requestId) : null
+    if (input.id !== undefined && (typeof input.id !== 'string' || !input.id)) throw new Error('life/bilibili-invalid-id')
+    const id = input.id || replay?.contentId || newId('bili')
+    if (!/^bili-[a-f0-9]{16}$/.test(id)) throw new Error('life/bilibili-invalid-id')
+    const previous = drafts.find((item) => item.contentId === id)
+    if (input.id && !previous) throw new Error('life/bilibili-not-found')
+    if (previous && !replay && (previous.status !== 'draft' || input.expectedVersion !== previous.contentVersion)) throw new Error('life/bilibili-version-conflict')
+    if (input.sourceEventIds !== undefined && !Array.isArray(input.sourceEventIds)) throw new Error('life/bilibili-invalid-sources')
+    const sourceIds = Array.isArray(input.sourceEventIds) ? [...new Set(input.sourceEventIds)] : []
+    if (sourceIds.length > 5 || sourceIds.some((id) => typeof id !== 'string')) throw new Error('life/bilibili-invalid-sources')
+    const entries = this.ledgerEntries()
+    const sources = sourceIds.map((id) => {
+      const entry = entries.find((e) => e.id === id)
+      if (!entry || !['activity-start', 'activity-end', 'interest', 'skill'].includes(entry.row.kind)) throw new Error('life/bilibili-source-unavailable')
+      const d = entry.row.detail || {}
+      return { id, at: entry.row.at, summary: String(d.what || d.topic || d.name || '').slice(0, 240) }
+    })
+    const record = createBilibiliDraft({ contentId: id, title: input.title, description: input.description,
+      tags: input.tags, videoName: input.videoName, sources, now: this.nowIso(), previous })
+    if (replay) {
+      if (record.contentVersion !== replay.contentVersion) throw new Error('life/bilibili-request-conflict')
+      return replay
+    }
+    if (requestId) record.clientRequestId = requestId
+    const outbox = this.readOutbox()
+    const items = outbox.items.filter((item) => item.contentId !== id)
+    // Manual drafts must not evict work that has already been approved/sent.
+    if (!previous && drafts.length >= 100) throw new Error('life/bilibili-draft-limit')
+    this.writeOutbox({ items: [...items, record] }, { max: Math.max(DEFAULT_OUTBOX_LIMIT, outbox.items.length + 1) })
+    this.appendLedger({ kind: 'publish', detail: { contentId: id, channel: 'bilibili-manual', status: 'draft', textLength: record.text.length } })
+    return record
+  }
+
+  exportBilibiliDraft (id) {
+    const record = this.readBilibiliDrafts().find((item) => item.contentId === id)
+    if (!record) throw new Error('life/bilibili-not-found')
+    return { contentId: record.contentId, text: exportBilibiliDraft(record) }
   }
 
   /** Compact, model-facing snapshot. Bounded so it can be injected every turn. */

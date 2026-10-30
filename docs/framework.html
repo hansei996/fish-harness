@@ -220,7 +220,7 @@ h1 em{font-style:normal;color:var(--life2)}
 
       <div class="dgrp">
         <span class="gt">② 我们挂上去的</span>
-        <p class="gn">这 <b>7 个包</b>共给了我们 <b>5 个服务注入 + 2 个事件监听 + 2 个客户端 slot</b>，
+        <p class="gn">这 <b>8 个包</b>共给了我们 <b>6 个服务注入 + 2 个事件监听 + 2 个客户端 slot</b>，
           全部是公开扩展点，<b>没有一处改 dsh 核心</b>。每个框下面那行斜体就是真实 API。</p>
         <div class="pkg wired" id="p-loop"><div class="p">dsh-agent-loop</div>
           <div class="n">跑轮次<em>ctx.tools.register() × 18</em></div></div>
@@ -235,8 +235,9 @@ h1 em{font-style:normal;color:var(--life2)}
             <em>root.on('agent/inbox/claimed')</em></div></div>
         <div class="pkg wired" id="p-web"><div class="p">dsh-host-webserver</div>
           <div class="n">宿主 web 服务<em>ctx.webServer.register()</em></div></div>
+        <div class="pkg wired" id="p-connection"><div class="p">dsh-client-connection</div><div class="n">登录与拥有者权限<em>ctx.connection.fetch.register()</em></div></div>
         <div class="pkg wired" id="p-clientmods"><div class="p">dsh-client-modules</div>
-          <div class="n">浏览器半身<em>slots: shell.overlay · settings.section</em></div></div>
+          <div class="n">浏览器半身<em>slots: main · sidebar.panellist</em></div></div>
       </div>
 
       <div class="dgrp">
@@ -266,7 +267,7 @@ h1 em{font-style:normal;color:var(--life2)}
   <!-- ============ 带 3：生命层 ============ -->
   <div class="band" id="band-life">
     <span class="band-tag">Band 3 · 生命层（本仓库）<!-- facts:framework-size -->
-10 个宿主模块 5808 行 + 客户端半身 189 行
+10 个宿主模块 6008 行 + 客户端半身 353 行
 <!-- /facts:framework-size --></span>
     <div class="dag" id="dag">
       <svg id="dagwires" preserveAspectRatio="none"></svg>
@@ -277,7 +278,7 @@ h1 em{font-style:normal;color:var(--life2)}
 
       <div class="node entry" id="n-index" style="left:470px;top:18px;width:390px">
         <div class="fn">index.js<span class="ln">1590 行 · 唯一装配点</span></div>
-        <div class="rl">插件入口。<b>五个服务注入 + 两个事件监听 + 卸载反注册，全收在这一个文件里</b>；
+        <div class="rl">插件入口。<b>六个服务注入 + 两个事件监听 + 卸载反注册，全收在这一个文件里</b>；
           其余九个模块不知道 dsh 存在。</div>
         <div class="svc">tools · systemPrompt · schedule · approval · session/event · agent/inbox/claimed</div>
         <div class="diskout">写：ledger(turn / wake) · outbox(publish)</div>
@@ -417,8 +418,8 @@ h1 em{font-style:normal;color:var(--life2)}
   <div class="did">
     <h3>这张图证明什么</h3>
     <ul>
-      <li><b>接线全是公开扩展点</b>：五个服务注入（<code>tools</code> · <code>systemPrompt</code> ·
-        <code>schedule</code> · <code>approval</code> · <code>webServer</code>）加两个事件监听
+      <li><b>接线全是公开扩展点</b>：六个服务注入（<code>tools</code> · <code>systemPrompt</code> ·
+        <code>schedule</code> · <code>approval</code> · <code>webServer</code> · <code>connection</code>）加两个事件监听
         （<code>session/event</code> · <code>agent/inbox/claimed</code>），再加客户端两个 slot。
         <b>没有一处改 dsh 核心</b>，所以 dsh 升级不会把我们改坏。</li>
       <li><b>模块之间的线是真的</b>：<b>10 个模块</b>的 <b>12 条 import</b> 扫自源码，
@@ -477,13 +478,14 @@ h1 em{font-style:normal;color:var(--life2)}
 
   // ---- dsh 包 → 生命层模块：真实挂载点 ------------------------------------
   var WIRES = [
-    { from:'p-loop',       to:'n-index', label:'ctx.tools.register() × 17' },
+    { from:'p-loop',       to:'n-index', label:'ctx.tools.register() × 18' },
     { from:'p-prompt',     to:'n-index', label:'ctx.systemPrompt.section()' },
     { from:'p-sched',      to:'n-index', label:'ctx.schedule.create()' },
     { from:'p-auth',       to:'n-index', label:'ctx.approval.request()' },
     { from:'p-sessionw',   to:'n-index', label:"on('session/event') · on('agent/inbox/claimed')" },
     { from:'p-web',        to:'n-ui',    label:'ctx.webServer.register()' },
-    { from:'p-clientmods', to:'n-ui',    label:'slots: shell.overlay · settings.section' }
+    { from:'p-connection', to:'n-ui',    label:'ctx.connection.fetch.register()' },
+    { from:'p-clientmods', to:'n-ui',    label:'slots: main · sidebar.panellist' }
   ]
 
   // ---- 生命层模块 → 磁盘：真实写盘点 --------------------------------------

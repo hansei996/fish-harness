@@ -169,6 +169,7 @@ const API_PAIRS = [
   { page: 'ctx.schedule.create()', src: 'schedule.create' },
   { page: 'ctx.approval.request()', src: 'approval.request(' },
   { page: 'ctx.webServer.register()', src: 'webServer.register(' },
+  { page: 'ctx.connection.fetch.register()', src: 'connection.fetch.register(' },
 ]
 const pluginSrc = facts.code.files ? read('packages/dsh-life/lib/index.js') + read('packages/dsh-life/lib/ui.js') : ''
 const badApis = API_PAIRS.filter((p) => page.includes(p.page) && !pluginSrc.includes(p.src))

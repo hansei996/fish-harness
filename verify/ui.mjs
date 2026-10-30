@@ -51,10 +51,11 @@ check('the host half stays dependency-free', !manifest.dependencies || Object.ke
 // ---- 2. The client module runs under a stub loader -------------------------
 const source = fs.readFileSync(clientPath, 'utf8')
 let loaded
+const clientFetches = []
 const windowStub = { __ModuleLoader__: { load: (mod) => { loaded = mod } } }
 new Function('window', 'fetch', 'setInterval', 'clearInterval', source)(
   windowStub,
-  () => Promise.reject(new Error('no network in this suite')),
+  async (url) => { clientFetches.push(url); return { ok: true, json: async () => ({ ok: true }) } },
   () => 0,
   () => {},
 )
@@ -71,12 +72,14 @@ const clientExports = loaded.factory((specifier) => {
   throw new Error(`stub loader has no module ${JSON.stringify(specifier)}`)
 })
 check('factory exports apply/inject and requires only react',
-  typeof clientExports.apply === 'function' && JSON.stringify(clientExports.inject) === '["slots","layout"]')
+  typeof clientExports.apply === 'function' && JSON.stringify(clientExports.inject) === '["slots","layout","uiWorkspace"]')
 
 const registrations = []
 let selectedPanel = 'life-overview'
+let preparedSession
 const ctx = {
   layout: { selectPanel: (id) => { selectedPanel = id } },
+  uiWorkspace: { startSession: (...args) => { preparedSession = args } },
   slots: {
     inject: (name, cb) => cb(),
     register: (options, component) => { registrations.push({ options, component }); return () => {} },
@@ -91,6 +94,14 @@ check('the sidebar entry selects the same keyed page',
   sidebar?.options.id === page?.options.key && sidebar.options.label() === '鱼缸' && sidebar.component({ size: 18 }).props.width === 18)
 page?.options.inject().onChat()
 check('talking returns to the shell conversation through its navigation API', selectedPanel === null)
+page.options.inject().onCompose(clientExports.chatPrompt('promise', '明天查时序表'))
+check('chat prepares a real dsh draft without sending or replacing an existing draft',
+  preparedSession?.[1]?.prompt.includes('life_promise') && preparedSession[1].prompt.endsWith('明天查时序表') && preparedSession[1].clearPreviousDraft === false)
+check('empty chat messages are refused and suggestions remain optional', (() => {
+  let empty = false
+  try { clientExports.chatPrompt('talk', '  ') } catch { empty = true }
+  return empty && clientExports.chatPrompt('suggestion', '看看新资料').includes('决定是否采纳')
+})())
 const element = page && page.component()
 check('the component renders the probe-identifiable element', Boolean(element) && element.props.id === 'life-overview')
 
@@ -105,15 +116,16 @@ const violations = forbidden.filter(([, pattern]) => pattern.test(source)).map((
 check('client code has no document.write / eval / innerHTML / inlined token', violations.length === 0,
   violations.join(', ') || 'clean')
 const fetched = [...source.matchAll(/fetch\(\s*([^,)]+)/g)].map((m) => m[1].trim())
-const onlyStateUrl = source.includes("const STATE_URL = '/life/state.json'") &&
-  fetched.length > 0 && fetched.every((target) => target === 'STATE_URL') &&
-  !/https?:\/\//.test(source)
-check('client fetches only /life/state.json and nothing else', onlyStateUrl,
-  `${fetched.join(', ')} via STATE_URL; absolute URLs=${/https?:\/\//.test(source)}`)
+const onlyLocalRequests = fetched.length === 2 && fetched.every((target) => target === 'STATE_URL' || target === 'url')
+const callsBefore = clientFetches.length
+let externalRefused = false
+try { await clientExports.ownerRequest('https://example.invalid/steal') } catch { externalRefused = true }
+check('client state and owner requests stay local; external fetches are refused before network IO',
+  onlyLocalRequests && externalRefused && clientFetches.length === callsBefore)
 
 // ---- 4. Host route over a real store --------------------------------------
 const { LifeStore } = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'store.js')).href)
-const { installLifeUi, readLifeState, LIFE_STATE_PATH } = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'ui.js')).href)
+const { installLifeUi, installOwnerLifeUi, readLifeState, readLifeLedger, LIFE_STATE_PATH } = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'ui.js')).href)
 check('the route path is the one the client fetches', LIFE_STATE_PATH === '/life/state.json')
 
 const fixed = new Date('2026-10-28T10:00:00.000Z')
@@ -201,6 +213,110 @@ check('the packaged placeholder is served locally with the correct MIME type', (
   let status, headers, body
   avatar?.handler({ method: 'GET' }, { writeHead: (s, h) => { status = s; headers = h }, end: (b) => { body = b } })
   return status === 200 && headers['content-type'] === 'image/png' && Buffer.isBuffer(body) && body.subarray(1, 4).toString() === 'PNG'
+})())
+
+// Owner-only history and local Bilibili submission sheets.
+const history = new LifeStore({ home: path.join(HOME, 'history'), lifeId: 'history', clock: () => fixed })
+history.ensure({ name: '账本验收' })
+history.startActivity({ what: '试验 A', why: '核对失败与交接' })
+history.finishActivity({ outcome: 'failed', evidence: ['evidence:A'], note: '私密备注', next: { what: '试验 B' } })
+const firstPage = readLifeLedger(history, { limit: 2 })
+history.recordInterest({ topic: '新兴趣' })
+const secondPage = readLifeLedger(history, { limit: 2, cursor: firstPage.nextCursor })
+check('ledger cursors survive newer appends without duplicating or skipping older records',
+  firstPage.items.length === 2 && secondPage.items.length === 1 && secondPage.items[0].kind === 'born' &&
+  !firstPage.items.some((a) => secondPage.items.some((b) => a.id === b.id)))
+const failedEvent = firstPage.items.find((item) => item.kind === 'activity-end')
+const detail = readLifeLedger(history, { eventId: failedEvent.id })
+check('ledger detail joins only the same activity and preserves failure, evidence and handoff',
+  detail.event.outcome === 'failed' && detail.event.evidence[0] === 'evidence:A' && detail.event.nextStep === '试验 B' &&
+  detail.related.length === 2 && !JSON.stringify(detail).includes('私密备注'))
+check('ledger category filters preserve real counts and reject an expired cursor', (() => {
+  const filtered = readLifeLedger(history, { category: 'activity' })
+  let rejected = false
+  try { readLifeLedger(history, { cursor: 'missing' }) } catch (err) { rejected = err.message.includes('cursor-expired') }
+  return filtered.total === 2 && rejected
+})())
+history.appendLedger({ kind: 'turn', detail: { reason: 'blocked' } })
+check('blocked replies are never presented as successful completions',
+  !readLifeLedger(history, { category: 'turn' }).items[0].label.includes('完成'))
+check('an unreadable ledger is not displayed as an empty history', (() => {
+  const original = fs.readFileSync
+  let refused = false
+  try {
+    fs.readFileSync = (file, ...args) => {
+      if (file === history.files.ledger) throw Object.assign(new Error('permission denied'), { code: 'EACCES' })
+      return original(file, ...args)
+    }
+    try { readLifeLedger(history) } catch (err) { refused = err.message.includes('ledger-unreadable') }
+  } finally { fs.readFileSync = original }
+  return refused
+})())
+const requestId = '01234567-89ab-cdef-0123-456789abcdef'
+const draftInput = { title: '试验 A 的真实记录', description: '尚未做成，下一步尝试 B。', tags: ['实验', 'AI'], videoName: 'test.mp4', sourceEventIds: [failedEvent.id], requestId }
+const manualDraft = history.saveBilibiliDraft(draftInput)
+check('a Bilibili draft persists locally with source references but no uploaded media or receipt',
+  new LifeStore({ home: path.join(HOME, 'history'), lifeId: 'history' }).readBilibiliDrafts()[0].contentId === manualDraft.contentId &&
+  manualDraft.status === 'draft' && manualDraft.platformId === null && manualDraft.manualDraft.mediaAttached === false && manualDraft.manualDraft.sources[0].id === failedEvent.id)
+check('retrying a draft create request does not create another record',
+  history.saveBilibiliDraft(draftInput).contentId === manualDraft.contentId && history.readBilibiliDrafts().length === 1)
+check('reusing a create request id for different content is rejected instead of losing edits', (() => {
+  try { history.saveBilibiliDraft({ ...draftInput, title: '另一份内容' }); return false } catch (err) { return err.message.includes('request-conflict') }
+})())
+const revised = history.saveBilibiliDraft({ ...draftInput, id: manualDraft.contentId, expectedVersion: manualDraft.contentVersion, title: '试验 A：修订后的草稿' })
+check('draft edits change version and refuse stale overwrites', (() => {
+  let refused = false
+  try { history.saveBilibiliDraft({ ...draftInput, id: manualDraft.contentId, expectedVersion: manualDraft.contentVersion }) } catch (err) { refused = err.message.includes('version-conflict') }
+  return refused && revised.contentVersion !== manualDraft.contentVersion && history.readBilibiliDrafts()[0].manualDraft.title === revised.manualDraft.title
+})())
+const exported = history.exportBilibiliDraft(manualDraft.contentId)
+check('draft export has AI labelling and a manual checklist, and never marks publication complete',
+  exported.text.includes('AI 生成') && exported.text.includes(manualDraft.contentId) && exported.text.includes('不包含视频文件') &&
+  exported.text.includes('尚未发布') && history.findOutboxItem(manualDraft.contentId).status === 'draft')
+const outboxLogic = await import(pathToFileURL(path.join(PLUGIN, 'lib', 'outbox.js')).href)
+check('manual Bilibili records cannot enter the automated publish state machine', (() => {
+  let checked = false, sending = false
+  try { outboxLogic.markChecked(manualDraft) } catch (err) { checked = err.message.includes('manual-submission-only') }
+  try { outboxLogic.beginSend({ ...manualDraft, status: 'approved' }) } catch (err) { sending = err.message.includes('manual-submission-only') }
+  return checked && sending
+})())
+check('empty drafts and invented source records fail without adding anything', (() => {
+  let empty = false, invented = false
+  try { history.saveBilibiliDraft({ title: '' }) } catch { empty = true }
+  try { history.saveBilibiliDraft({ title: '假来源', sourceEventIds: ['missing'] }) } catch { invented = true }
+  return empty && invented && history.readBilibiliDrafts().length === 1
+})())
+const ownerRoutes = []
+installOwnerLifeUi({ inject: (deps, callback) => {
+  if (deps.join() !== 'connection') throw new Error('owner API must use Connection')
+  callback({ connection: { fetch: { register: (route) => { ownerRoutes.push(route); return () => {} } } } })
+} }, history)
+check('ledger and draft routes use the signed-owner Connection channel, never the public Web routes',
+  ownerRoutes.length === 3 && ownerRoutes.every((r) => r.path.startsWith('/api/life/') && r.requestBody === 'buffered'))
+const draftsRoute = ownerRoutes.find((r) => r.path.endsWith('bilibili-drafts'))
+const invalidResponse = await draftsRoute.fetch(new Request('http://localhost/api/life/bilibili-drafts', {
+  method: 'POST', headers: { 'content-type': 'application/json' }, body: '{broken',
+}))
+check('a malformed draft request returns an error without changing stored drafts',
+  invalidResponse.status === 400 && history.readBilibiliDrafts().length === 1)
+const download = await ownerRoutes.find((r) => r.path.endsWith('bilibili-export')).fetch(
+  new Request('http://localhost/api/life/bilibili-export?id=' + manualDraft.contentId))
+check('owner export is a UTF-8 attachment with no state transition',
+  download.status === 200 && download.headers.get('content-disposition').includes('attachment') &&
+  (await download.text()).includes('试验 A：修订后的草稿') && history.findOutboxItem(manualDraft.contentId).status === 'draft')
+check('malformed persisted draft fields fail visibly and unknown fields stay out of the owner response', (() => {
+  const s = new LifeStore({ home: path.join(HOME, 'draft-corruption'), lifeId: 'draft-corruption', clock: () => fixed })
+  s.ensure()
+  s.saveBilibiliDraft({ title: '字段验证' })
+  const raw = JSON.parse(fs.readFileSync(s.files.outbox, 'utf8'))
+  raw.items[0].manualDraft.privateNote = '不该输出的备注'
+  fs.writeFileSync(s.files.outbox, JSON.stringify(raw))
+  const safe = !JSON.stringify(s.readBilibiliDrafts()).includes('不该输出的备注')
+  raw.items[0].manualDraft.tags = null
+  fs.writeFileSync(s.files.outbox, JSON.stringify(raw))
+  let refused = false
+  try { s.readBilibiliDrafts() } catch (err) { refused = err.message.includes('store-unreadable') }
+  return safe && refused
 })())
 
 // Exercise the actual client fetch/effect path. No network and no made-up DOM:

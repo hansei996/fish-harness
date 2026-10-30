@@ -21,10 +21,15 @@ import { dayKeyOf } from './wake.js'
 /** Exact route the client half fetches. Kept in sync with client/life-overview.js. */
 export const LIFE_STATE_PATH = '/life/state.json'
 export const LIFE_AVATAR_PATH = '/life/avatar.png'
+export const LIFE_LEDGER_PATH = '/api/life/ledger'
+export const LIFE_DRAFTS_PATH = '/api/life/bilibili-drafts'
+export const LIFE_DRAFT_EXPORT_PATH = '/api/life/bilibili-export'
 
 /** At most this many open commitments reach the screen. */
 const MAX_COMMITMENTS = 3
 const MAX_RECENT_EVENTS = 5
+const TURN_LABELS = { completed: '完成了一次回应', error: '一次回应失败', aborted: '停止了一次回应',
+  blocked: '一次回应受阻', 'max-tokens': '回应达到长度上限', interrupted: '一次回应中断' }
 
 function brief (value, max = 240) {
   return typeof value === 'string' ? value.slice(0, max) : ''
@@ -45,7 +50,10 @@ function publicEvent (row) {
     case 'commitment': label = what ? `记住约定：${what}` : null; break
     case 'commitment-settled': label = d.status === 'done' ? '兑现了一件约定' : '更新了一件约定'; break
     case 'wake': label = '自己醒来了'; break
-    case 'publish': label = d.status === 'confirmed' ? '一条作品收到发布回执' : '更新了作品的发布状态'; break
+    case 'publish': label = d.status === 'draft' ? '保存了一份投稿草稿' : d.status === 'confirmed' ? '一条作品收到发布回执' : '更新了作品的发布状态'; break
+    case 'turn': label = Object.hasOwn(TURN_LABELS, d.reason) ? TURN_LABELS[d.reason] : '一轮回应结束'; break
+    case 'identity-change': label = '更新了身份档案'; break
+    case 'encounter': label = '记下了一次关系互动'; break
     default: return null
   }
   return label ? {
@@ -53,6 +61,81 @@ function publicEvent (row) {
     evidenceCount: Array.isArray(d.evidence) ? d.evidence.filter((item) => typeof item === 'string' && item.trim()).length : 0,
     outcome: row.kind === 'activity-end' ? brief(d.outcome, 32) : null,
   } : null
+}
+
+function ledgerItem ({ id, row }) {
+  const item = publicEvent(row)
+  if (!item) return null
+  const d = row.detail || {}
+  return { ...item, id, why: brief(d.why),
+    entityId: ['activity-start', 'activity-end', 'commitment', 'commitment-settled'].includes(row.kind) ? brief(d.id, 80) : null,
+    nextStep: row.kind === 'activity-end' && d.next?.what ? brief(d.next.what) : null,
+    canDraft: ['activity-start', 'activity-end', 'interest', 'skill'].includes(row.kind),
+  }
+}
+
+/** An owner-only ledger page, with cursors that do not shift on new appends. */
+export function readLifeLedger (store, { cursor = '', category = 'all', limit = 25, eventId = '' } = {}) {
+  const groups = { all: null, activity: ['activity-start', 'activity-end'], interest: ['interest', 'skill'],
+    commitment: ['commitment', 'commitment-settled'], turn: ['turn', 'wake'], publish: ['publish'] }
+  if (!Object.hasOwn(groups, category) || !Number.isInteger(limit) || limit < 1 || limit > 50) throw new Error('life/ledger-invalid-query')
+  const entries = store.ledgerEntries()
+  if (eventId) {
+    const entry = entries.find((e) => e.id === eventId)
+    const event = entry && ledgerItem(entry)
+    if (!event) throw new Error('life/ledger-event-not-found')
+    const d = entry.row.detail || {}
+    return { ok: true, event: { ...event, evidence: (Array.isArray(d.evidence) ? d.evidence : [])
+      .filter((e) => typeof e === 'string' && e.trim()).slice(0, 8).map((e) => brief(e, 1000)) },
+      related: event.entityId ? entries.map(ledgerItem).filter((e) => e && e.entityId === event.entityId).slice(-10) : [] }
+  }
+  const filtered = entries.map(ledgerItem).filter((item) => item && (!groups[category] || groups[category].includes(item.kind))).reverse()
+  const after = cursor ? filtered.findIndex((item) => item.id === cursor) : -1
+  if (cursor && after < 0) throw new Error('life/ledger-cursor-expired')
+  const items = filtered.slice(after + 1, after + 1 + limit)
+  return { ok: true, items, total: filtered.length,
+    nextCursor: after + 1 + items.length < filtered.length ? items.at(-1).id : null }
+}
+
+function draftView (record) {
+  return { id: record.contentId, version: record.contentVersion, status: 'manual-draft',
+    createdAt: record.createdAt, updatedAt: record.updatedAt, ...record.manualDraft }
+}
+
+/** Connection owns Host/Origin checks, signed-cookie admission and owner scope. */
+export function installOwnerLifeUi (root, store) {
+  root.inject(['connection'], (ctx) => {
+    if (!ctx.connection?.fetch?.register) return
+    const register = (route) => typeof ctx.effect === 'function'
+      ? ctx.effect(() => ctx.connection.fetch.register(route)) : ctx.connection.fetch.register(route)
+    const json = (value, status = 200) => Response.json(value, { status, headers: { 'cache-control': 'no-store' } })
+    const wrap = (handler) => async (request) => {
+      try { return await handler(request) } catch (err) {
+        const error = messageOf(err)
+        const status = /conflict|cursor-expired/.test(error) ? 409 : /not-found|source-unavailable/.test(error) ? 404 : 400
+        return json({ ok: false, error }, status)
+      }
+    }
+    register({ path: LIFE_LEDGER_PATH, methods: ['GET'], requestBody: 'buffered', fetch: wrap(async (request) => {
+      const p = new URL(request.url).searchParams
+      return json(readLifeLedger(store, { cursor: p.get('cursor') || '', category: p.get('category') || 'all',
+        limit: p.has('limit') ? Number(p.get('limit')) : 25, eventId: p.get('event') || '' }))
+    }) })
+    register({ path: LIFE_DRAFTS_PATH, methods: ['GET', 'POST'], requestBody: 'buffered', fetch: wrap(async (request) => {
+      if (request.method === 'GET') return json({ ok: true, items: store.readBilibiliDrafts().map(draftView) })
+      if (!request.headers.get('content-type')?.startsWith('application/json')) return json({ ok: false, error: 'life/json-required' }, 415)
+      const body = await request.text()
+      if (Buffer.byteLength(body, 'utf8') > 32768) return json({ ok: false, error: 'life/body-too-large' }, 413)
+      const input = JSON.parse(body)
+      if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('life/bilibili-invalid-input')
+      return json({ ok: true, item: draftView(store.saveBilibiliDraft(input)) })
+    }) })
+    register({ path: LIFE_DRAFT_EXPORT_PATH, methods: ['GET'], requestBody: 'buffered', fetch: wrap(async (request) => {
+      const file = store.exportBilibiliDraft(new URL(request.url).searchParams.get('id'))
+      return new Response(file.text, { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store',
+        'content-disposition': `attachment; filename="bilibili-${file.contentId}.txt"`, 'x-content-type-options': 'nosniff' } })
+    }) })
+  })
 }
 
 function messageOf (err) {
@@ -118,8 +201,9 @@ export function readLifeState (store, { now, wakeEnabled = true, wakeMaxPerDay =
   const attention = {
     approval: outbox.items.filter((item) => item.status === 'checked').length,
     unconfirmed: outbox.items.filter((item) => item.status === 'unconfirmed').length,
+    manualDrafts: outbox.items.filter((item) => item.manualDraft?.platform === 'bilibili' && item.status === 'draft').length,
   }
-  attention.total = attention.approval + attention.unconfirmed
+  attention.total = attention.approval + attention.unconfirmed + attention.manualDrafts
 
   const today = { turns: 0, wakes: 0, activities: 0, failures: 0 }
   const events = []
@@ -203,6 +287,7 @@ export function readLifeState (store, { now, wakeEnabled = true, wakeMaxPerDay =
  */
 export function installLifeUi (root, store, settings = {}) {
   if (!root || typeof root.inject !== 'function') return
+  try { installOwnerLifeUi(root, store) } catch {}
   try {
     root.inject(['webServer'], (ctx) => {
       try {

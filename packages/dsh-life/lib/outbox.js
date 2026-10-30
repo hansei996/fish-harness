@@ -172,6 +172,48 @@ export function createDraft ({
   return record
 }
 
+/** A local submission sheet. Exporting it is never a platform receipt. */
+export function createBilibiliDraft ({ contentId, title, description = '', tags = [], videoName = '', sources = [], now, previous = null } = {}) {
+  const field = (value, max, required = false) => {
+    if (typeof value !== 'string' || (required && !value.trim()) || [...value.trim()].length > max) {
+      throw new Error('life/bilibili-invalid-field')
+    }
+    return value.trim()
+  }
+  const draft = {
+    platform: 'bilibili',
+    title: field(title, 80, true),
+    description: field(description, 4000),
+    videoName: field(videoName, 200),
+    tags: [], sources: [], mediaAttached: false,
+  }
+  if (!Array.isArray(tags) || tags.length > 10) throw new Error('life/bilibili-invalid-tags')
+  draft.tags = [...new Set(tags.map((tag) => field(tag, 20, true)))]
+  if (!Array.isArray(sources) || sources.length > 5) throw new Error('life/bilibili-invalid-sources')
+  draft.sources = sources.map((s) => ({ id: field(s.id, 80, true), at: field(s.at, 40, true), summary: field(s.summary, 240, true) }))
+  const text = [draft.title, draft.description, draft.tags.join('，'), draft.videoName,
+    ...draft.sources.map((s) => `${s.id} ${s.at} ${s.summary}`)].join('\n\n')
+  return {
+    ...createDraft({ contentId, text, channel: 'bilibili-manual', account: 'local', now }),
+    ...(previous ? { createdAt: previous.createdAt } : {}),
+    manualDraft: draft,
+  }
+}
+
+export function exportBilibiliDraft (record) {
+  if (record?.manualDraft?.platform !== 'bilibili' || record.status !== 'draft') throw new Error('life/bilibili-draft-required')
+  const d = record.manualDraft
+  return labelContent({ contentId: record.contentId, text: [
+    'B 站投稿草稿 · 待人工核对与投稿（尚未发布）',
+    `内容编号：${record.contentId}`, `版本：${record.contentVersion}`,
+    `标题：${d.title}`, `简介：\n${d.description || '（待补充）'}`,
+    `标签：${d.tags.join('，') || '（待补充）'}`,
+    `视频文件名：${d.videoName || '（待选择）'}\n本文件只包含投稿文字与材料清单，不包含视频文件。`,
+    '记录来源：\n' + (d.sources.length ? d.sources.map((s) => `- ${s.at} ${s.summary} [${s.id}]`).join('\n') : '（未关联生活记录，请自行核对事实）'),
+    '投稿前核对：\n[ ] 正文事实与来源\n[ ] 视频与封面版权\n[ ] 视频中的 AI 标识\n[ ] 分区、标签与平台设置\n[ ] 在 B 站创作中心人工完成投稿',
+  ].join('\n\n') }).text
+}
+
 /**
  * Label the content and move `draft`/`checked` to `checked`.
  *
@@ -180,6 +222,7 @@ export function createDraft ({
  */
 export function markChecked (record, { now = Date.now(), labelOptions } = {}) {
   assertRecord(record)
+  if (record.manualDraft?.platform === 'bilibili') throw new Error('life/manual-submission-only')
   if (record.status !== 'draft' && record.status !== 'checked') {
     throw new Error(`life/publish-invalid-state: checked-from-${record.status}`)
   }
@@ -297,6 +340,7 @@ export function revalidate (record, { now = Date.now(), labelOptions } = {}) {
  */
 export function beginSend (record, { now = Date.now(), labelOptions } = {}) {
   assertRecord(record)
+  if (record.manualDraft?.platform === 'bilibili') throw new Error('life/manual-submission-only')
   const at = isoOf(now)
   const check = revalidate(record, { now, labelOptions })
   if (!check.ok) {

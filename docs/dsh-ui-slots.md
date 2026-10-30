@@ -71,6 +71,15 @@
 
 ## 当前运行总览的接入方式
 
-运行总览现在采用正式页面，而非早期探针的 `shell.overlay`：`main` 的 `key` 与 `sidebar.panellist` 的 `id` 都为 `life-overview`。只依赖 `slots` 和 `layout`，聊天动作调用 `layout.selectPanel(null)` 返回宿主会话。
+运行总览现在采用正式页面，而非早期探针的 `shell.overlay`：`main` 的 `key` 与 `sidebar.panellist` 的 `id` 都为 `life-overview`。依赖 `slots`、`layout` 和 `uiWorkspace`，聊天动作调用 `layout.selectPanel(null)` 返回宿主会话。
 
 依据是实际安装的 `@deepseek-ai/dsh-client-ui-schedule@0.2.1-rc.2/lib/client.js` 中的 `TaskManagerPage` 注册（`main` + 侧栏入口）与 `@deepseek-ai/dsh-client-ui-workspace@0.2.1-rc.2/lib/client.js` 中的会话导航。`verify/ui.mjs` 核对两处标识一致，并实际调用聊天动作验证返回宿主。真实 Web profile 的加载与 Host 路由已通过；真实 dsh 桌面首屏、刷新和返回聊天已通过浏览器检查；小屏及异常态仍待验收。以上历史探针结论本身不构成像素证据。
+
+
+## 账本、聊天意图与 B 站草稿
+
+拥有者接口使用 `connection.fetch.register({ path, methods, requestBody: 'buffered', fetch })`，而不是把写操作加到公开的 `webServer` 路由。接口契约来自 `@deepseek-ai/dsh-client-connection@0.2.1-rc.2/lib/types/rpc.d.ts` 的 `ConnectionFetchRoute`：公共 API 通道先验证 Host/Origin、签名 Cookie 与 owner principal，非 owner 被拒绝；生命周期通过 `ctx.effect` 回收路由。独立 HTTP 验证得到未登录 401、跨源 403、拥有者 200。
+
+聊天意图使用 `uiWorkspace.startSession(undefined, { prompt, clearPreviousDraft: false })`，依据 `dsh-client-ui-workspace` 的 `StartSessionOptions` 与 `dsh-client-ui-conversation` 的 `DraftInitializationOptions`。实际浏览器已确认文本出现在宿主输入框，但没有自动发送、调用模型或写入新承诺。
+
+桌面和 390px 窄屏已检查：账本列表/详情切换、B 站草稿保存与下载、聊天意图衔接。草稿状态一直为 `draft`，无平台回执，导出只含文字与材料清单。

@@ -21,7 +21,7 @@ dsh 给 Agent 一个会话。这个东西给它一段**跨会话活着**的生�
 | [`packages/dsh-life/`](packages/dsh-life/) | **要做的产品**：dsh 插件，生命层 |
 | [`tools/`](tools/) | 四个工具：`day-report` 把账本渲染成人能读的「它的一天」；`life-week` 把七天压缩跑完，产出「它的一周」；`demo-data` 把那一周导出成对外页面引用的数据；`facts` 量出文档里不许手抄的那些数字 |
 <!-- facts:verify-summary -->
-| [`verify/`](verify/) | 13套；固定基线 **297 项**，浏览器、UI 真实 profile 与 opt-in 真实唤醒另行验收 |
+| [`verify/`](verify/) | 13套；固定基线 **315 项**，浏览器、UI 真实 profile 与 opt-in 真实唤醒另行验收 |
 <!-- /facts:verify-summary -->
 | [`design/`](design/) | 界面原型与技术架构图（单文件 HTML，直接打开） |
 | [`docs/PLAN.md`](docs/PLAN.md) | 规划 v0.5（当前）· `v0.1` / `v0.2` / `v0.3` / `v0.4` 保留在旁，可对照错在哪 |
@@ -294,9 +294,11 @@ draft → checked → approved → sending → confirmed / unconfirmed / failed
 
 ### 界面上看得见
 
-`lib/ui.js` 起一个只读路由 `/life/state.json`，**每次请求现读状态文件**（不缓存、不写死），客户端半身 `client/life-overview.js` 用它渲染一屏：它现在在做什么、为什么、今天醒了几次、欠着几件事、下次什么时候醒。
+客户端以 dsh 侧栏「鱼缸」页面呈现：**运行总览、生活账本、和它说话、作品与发布**。总览的数据来自 `/life/state.json`，账本和本地草稿通过 dsh 登录保护下的 `/api/life/*` 接口读写。聊天页会把留言、建议或约定带入宿主输入框，由用户确认发送。
 
-客户端沿用**手写 lazy-CJS**，只 `require('react')`（shell 已提供），**零构建、零依赖、不写 JSX**。现在通过 `main` + `sidebar.panellist` 注册为侧栏「鱼缸」页面，按 `design/ui-complete.html` 落地运行总览。它的一天、兴趣、下一步、待确认数量均来自状态投影；费用未接入时明确显示无记录。加载、空记录、错误重试与旧数据过期提示已实现。没有 `webServer` 的 profile（headless）里这半边**什么都不注册**。
+当前首发目标为 **B 站普通账号的投稿草稿**：保存标题、简介、标签、视频文件名，关联生活记录，并导出带 AI 标识的人工投稿清单。这里没有 B 站自动上传；视频文件另行准备，保存或导出始终是“待人工投稿”。详细行为、权限与验证边界见 [`packages/dsh-life/README.md`](packages/dsh-life/README.md#界面)。
+
+客户端继续采用手写 lazy-CJS，只使用 shell 提供的 React，不新增运行时依赖，合作方的 `design/` 原型不变。
 
 ### 一条证据规则
 
@@ -351,23 +353,24 @@ node tools/day-report.mjs --json              # 供程序消费（带 tone 与 e
 | `lib/compliance.js` | 118 | 内容标识：显式 + 隐式、「没有 strip 函数」的硬闸 |
 | `lib/config.js` | 313 | 零依赖 Standard Schema 校验器（唤醒 / 选择器 / 发布） |
 | `lib/index.js` | 1861 | 插件入口：注册生命工具、注入上下文、监听会话事件、向 `schedule` 布防、发布线接线 |
-| `lib/outbox.js` | 914 | 发布状态机：`draft → checked → approved → sending → confirmed / unconfirmed / failed`、幂等键、三档修剪 |
-| `lib/store.js` | 737 | 生命状态机：三档变量、承诺、关系、账本、唤醒绑定、outbox；原子落盘 |
+| `lib/outbox.js` | 958 | 发布状态机：`draft → checked → approved → sending → confirmed / unconfirmed / failed`、幂等键、三档修剪 |
+| `lib/store.js` | 808 | 生命状态机：三档变量、承诺、关系、账本、唤醒绑定、outbox；原子落盘 |
 | `lib/telegram.js` | 238 | Telegram 适配器（文本 + 视频上传；假 fetch 可测、错误里擦 token、平台不可反查就照实说） |
-| `lib/ui.js` | 258 | Host 半身：`/life/state.json` 现读真实状态，私密内容不出 Host |
+| `lib/ui.js` | 343 | Host 半身：`/life/state.json` 现读真实状态，私密内容不出 Host |
 | `lib/video.js` | 428 | 视频标注：每帧烧显式标识 + 容器写隐式标识，并**回读首帧像素**证明它真的烧进去了；没有 ffmpeg 就拒绝，绝不发原片 |
 | `lib/wake.js` | 238 | 唤醒策略纯函数：静默区间、`every ± jitter`、不跳日夹取、明日兜底；随机量可注入 |
-| `client/life-overview.js` | 189 | 浏览器半身：手写 lazy-CJS、只 `require('react')`、零构建 |
-| **合计** | **5997** | 10 个宿主文件 + 1 个客户端文件，零自有依赖 |
+| `client/life-overview.js` | 353 | 浏览器半身：手写 lazy-CJS、只 `require('react')`、零构建 |
+| **合计** | **6361** | 10 个宿主文件 + 1 个客户端文件，零自有依赖 |
 <!-- /facts:file-table -->
 
 **为什么零自有依赖**：插件会被装进 npm CLI 或内置 Electron 运行时，两者依赖解析根不同。只用 Node 内置模块，才能保证在两种环境下都加载得起来。
 
 <!-- facts:mounts -->
-**5 个服务挂载点 + 2 个会话事件 + 客户端 2 个 slot**（全部是公开扩展点）：
+**6 个服务挂载点 + 2 个会话事件 + 客户端 2 个 slot**（全部是公开扩展点）：
 
 ```
 inject(['approval'])       → ctx.approval.request()  发布前逐条确认
+inject(['connection'])     → ctx.connection.fetch.register()  仅拥有者可访问的账本与本地投稿草稿
 inject(['schedule'])       → ctx.schedule.create()  布防一次性唤醒
 inject(['systemPrompt'])   → ctx.systemPrompt.section()  注入每轮上下文
 inject(['tools'])          → ctx.tools.register()  注册生命工具
@@ -402,7 +405,7 @@ outbox.json       发布草稿与回执 · 幂等键 · 三档修剪（committed
 ## 验证
 
 <!-- facts:verify-headline -->
-13套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。固定基线 **297 项**：存储/策略/soak 70 + 当天报告 28 + 数据产物 18 + 七天连续 16 + 界面 38 + 发布线 40 + 真实 dsh 端到端 17 + 打包安装 9。浏览器与 UI 真实 profile 附加检查不计入该基线，仍由各自 CI 步骤验收。
+13套 verify 在 GitHub Actions 上 **ubuntu + windows 各跑一遍**（[`.github/workflows/verify.yml`](.github/workflows/verify.yml)，固定 dsh `0.2.1-rc.2`，失败时日志进 artifact）。固定基线 **315 项**：存储/策略/soak 70 + 当天报告 28 + 数据产物 18 + 七天连续 16 + 界面 56 + 发布线 40 + 真实 dsh 端到端 17 + 打包安装 9。浏览器与 UI 真实 profile 附加检查不计入该基线，仍由各自 CI 步骤验收。
 <!-- /facts:verify-headline -->
 
 <!-- facts:verify-commands -->
@@ -411,7 +414,7 @@ DSH_BIN=<dsh bin> node verify/smoke.mjs           # 70 项 · 存储不变量 + 
 node verify/day-report.mjs                        # 28 项 · 当天报告工具
 node verify/demo-data.mjs                         # 18 项 · 对外页面引用的那份数据产物与实现一致（含时区稳定性）
 node verify/life-week.mjs                         # 16 项 · 连跑七天
-node verify/ui.mjs --offline                      # 38 项 · 界面包清单 / 页面与侧栏 / 状态投影 / 隐私 / 请求生命周期（--offline 基线；去掉参数另验真实 Web profile）
+node verify/ui.mjs --offline                      # 56 项 · 界面包清单 / 页面与侧栏 / 状态投影 / 隐私 / 请求生命周期（--offline 基线；去掉参数另验真实 Web profile）
 node verify/publish.mjs                           # 40 项 · 发布状态机 / 标识硬闸 / approval 四态 / TOCTOU / Telegram 脱敏（不联网）
 DSH_BIN=<dsh bin> node verify/e2e-tools.mjs       # 17 项 · 真实 dsh 端到端
 DSH_BIN=<dsh bin> node verify/pack-install.mjs    # 9 项 · 打出来的包能不能装进 profile 并激活
